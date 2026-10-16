@@ -6,6 +6,7 @@
  */
 import { computed, ref } from 'vue'
 import { t } from '../i18n'
+import { matchesMQ, MQ } from '../composables/useMediaQuery'
 import type { Dianjing } from '../composables/useDianjing'
 import type { DjPosition } from '../services/dianjing/engine'
 
@@ -19,7 +20,7 @@ const loading = computed(() => props.dj.outlineLoading.value)
 function go(pos: DjPosition) {
   void props.dj.goTo(pos)
   emit('navigate', pos)
-  if (!props.embedded && window.matchMedia?.('(max-width: 600px)').matches) close()
+  if (!props.embedded && matchesMQ(MQ.phone)) close()
 }
 function close() {
   props.dj.outlineOpen.value = false
@@ -220,12 +221,12 @@ const title = (s: { title: string; section: number }) => s.title || t('dianjing.
   color: var(--text-3);
   border-top: 1px solid var(--border);
 }
-@media (max-width: 600px) {
+@media (max-width: 720px) {
   .dj-outline:not(.embedded) {
     top: auto;
     left: 0;
     width: 100%;
-    height: 80vh;
+    height: 80dvh;
     border-left: none;
     border-top: 1px solid var(--border);
     border-radius: var(--radius-xl) var(--radius-xl) 0 0;

@@ -1482,12 +1482,12 @@ const APPEARANCE_OPTIONS = [
 /* ================= 页面骨架 ================= */
 .settings {
   --nav-h: 52px;
-  padding: 24px 28px calc(40px + var(--lr-safe-bottom));
+  padding: var(--page-top) var(--page-x) calc(var(--page-bottom) + var(--lr-safe-bottom));
   max-width: 820px;
   margin: 0 auto;
 }
 h1 {
-  font-size: 22px;
+  font-size: var(--page-title);
   font-weight: 650;
   letter-spacing: -0.01em;
   margin-bottom: 6px;
@@ -1500,8 +1500,8 @@ h1 {
   z-index: 3;
   display: flex;
   gap: 6px;
-  margin: 0 -28px 10px;
-  padding: 10px 28px;
+  margin: 0 calc(-1 * var(--page-x)) 10px;
+  padding: 10px var(--page-x);
   overflow-x: auto;
   scrollbar-width: none;
   background: var(--bg);
@@ -2632,18 +2632,16 @@ h2:focus {
 }
 
 /* ================= 手机 ================= */
-@media (max-width: 600px) {
+@media (max-width: 720px) {
   .settings {
     --nav-h: 56px;
-    padding: 14px 16px calc(28px + var(--lr-safe-bottom));
   }
   h1 {
-    font-size: 26px;
     margin: 2px 0 4px;
   }
   .settings-nav {
-    margin: 0 -16px 8px;
-    padding: 10px 16px;
+    margin: 0 calc(-1 * var(--page-x)) 8px;
+    padding: 10px var(--page-x);
   }
   .nav-chip {
     height: 36px;

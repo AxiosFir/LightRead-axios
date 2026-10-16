@@ -6,6 +6,7 @@
  */
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { t } from '../i18n'
+import { matchesMQ, MQ } from '../composables/useMediaQuery'
 import type { Dianjing } from '../composables/useDianjing'
 import type { KeyItem, NoteItem, TermItem } from '../services/dianjing/protocol'
 
@@ -36,7 +37,7 @@ function place() {
   const s = state.value
   const box = el.value
   if (!s || !box) return
-  if (window.matchMedia?.('(max-width: 600px)').matches) { pos.value = null; return }
+  if (matchesMQ(MQ.phone)) { pos.value = null; return }
   const w = box.offsetWidth
   const h = box.offsetHeight
   const vw = window.innerWidth
@@ -212,7 +213,7 @@ onBeforeUnmount(() => {
   gap: var(--space-2);
   margin-top: var(--space-1);
 }
-@media (max-width: 600px) {
+@media (max-width: 720px) {
   .dj-card {
     left: 0 !important;
     right: 0;

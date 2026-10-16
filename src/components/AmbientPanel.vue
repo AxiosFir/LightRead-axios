@@ -720,7 +720,7 @@ const statusText = computed(() => {
   height: 0;
   overflow: hidden;
 }
-@media (max-width: 600px) {
+@media (max-width: 720px) {
   .am-panel {
     top: auto;
     left: 0;

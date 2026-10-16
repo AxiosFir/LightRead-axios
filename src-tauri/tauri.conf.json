@@ -126,6 +126,14 @@
         "role": "Viewer",
         "mimeType": "text/markdown",
         "rank": "Default"
+      },
+      {
+        "ext": ["mdown", "mkd", "mkdn", "mdx", "rst", "org", "adoc", "log", "csv", "tsv", "json", "jsonl", "yaml", "yml", "toml", "ini", "conf", "xml", "srt", "vtt", "sql", "sh", "py", "js", "ts", "go", "rs", "java", "c", "cpp", "h", "rb", "php", "lua", "swift", "kt", "css", "vue", "tex"],
+        "name": "Plain Text / Source Code",
+        "description": "纯文本与源码",
+        "role": "Viewer",
+        "mimeType": "text/plain",
+        "rank": "Alternate"
       }
     ],
     "icon": [

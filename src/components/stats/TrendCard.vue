@@ -737,7 +737,7 @@ h3 {
     height: 150px;
   }
 }
-@media (max-width: 560px) {
+@media (max-width: 600px) {
   .trend {
     padding: 16px 16px 12px;
   }

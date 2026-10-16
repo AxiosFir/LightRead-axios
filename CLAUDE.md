@@ -35,6 +35,7 @@ node scripts/build-wendian-index.mjs      # 重新生成研辞问典离线书目
 npm run test:opds-library / test:library-upload   # 自建书库: 连接信息解析·搜索发现·EPUB 优先; 上传协议
 npm run test:folder-pick / e2e:folder-pick   # 选择文件夹导入 / 上传: 递归找书 + 按格式推荐度去重
 npm run e2e:continuous-scroll   # 跨章连续滚动: 逐帧触摸 + 惯性跨章, 无回跳 / 预载 / 插入上方不跳 (设计见 docs/continuous-scroll.md)
+npm run test:plain-text      # 通用纯文本: 源码/配置/日志/无扩展名文件识别 · 内容嗅探 · 代码视图 (行号/分块), 按 txt 入库 (src/services/plainText.ts)
 npm run test:convert-epub    # 格式转换: MOBI/AZW3/FB2/TXT → EPUB 3 (OPF/nav/资源改写)
 npm run test:transfer / test:qr   # 互传: 三种通道 (账号 / WebDAV / 取件码) 纯逻辑; 无依赖二维码编码
 npm run test:booklists / e2e:booklists   # 书单: 待找匹配·自动归入·分享导入·推荐书单校验; 浏览→找书→加入→分享→导入 (node scripts/build-booklists.mjs 用 Wikidata 重建奖项书单)
@@ -47,6 +48,7 @@ npm run tauri dev|build     # 桌面 (需要 Rust 工具链)
 # 端到端冒烟 (Playwright): 先构建并起预览, 再跑脚本 (脚本写死 http://localhost:4173)
 npm run build && npx vite preview --port 4173 --strictPort &
 npm run e2e                 # scripts/e2e-smoke.mjs, ~35 步: 导入 → 书单 → 阅读器 → PDF → 持久化
+npm run e2e:mobile          # scripts/e2e-mobile.mjs: 15 款手机竖屏 × 主要页面, 查横向溢出/触控目标/安全区遮挡, 报告 /tmp/lightread-mobile (STRICT=1 有 error 即失败)
 npm run e2e:sync            # 内嵌 WebDAV, 两个浏览器上下文互相同步 (协议见 docs/sync.md)
 npm run e2e:account         # 本地 wrangler 起 sync-server, 两台设备走邮箱验证码登录并同步
 BIG_TXT=… PDF_FIXTURE=… node scripts/perf.mjs   # 性能基准 (打开/翻页/PDF + 长任务), 账本见 docs/perf-ledger.md

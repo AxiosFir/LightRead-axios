@@ -168,15 +168,15 @@ function onClick(e: MouseEvent) {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: calc(12px + var(--lr-safe-top)) 20px 12px;
+  padding: calc(12px + var(--lr-safe-top)) var(--page-x) 12px;
 }
 .page-head h1 {
   margin: 0;
-  font-size: 20px;
+  font-size: var(--page-title);
 }
 .icon-btn {
-  width: 32px;
-  height: 32px;
+  width: var(--icon-btn);
+  height: var(--icon-btn);
   border: none;
   border-radius: var(--radius-sm);
   background: none;
@@ -194,7 +194,7 @@ function onClick(e: MouseEvent) {
   min-height: 0;
   display: flex;
   gap: 20px;
-  padding: 0 20px calc(20px + var(--lr-safe-bottom));
+  padding: 0 var(--page-x) calc(20px + var(--lr-safe-bottom));
 }
 .manual-toc {
   flex-shrink: 0;
@@ -303,11 +303,11 @@ function onClick(e: MouseEvent) {
   border-top: 1px solid var(--border);
 }
 
-@media (max-width: 600px) {
+@media (max-width: 720px) {
   .manual-body {
     flex-direction: column;
     gap: 10px;
-    padding: 0 12px calc(12px + var(--lr-safe-bottom));
+    padding-bottom: calc(12px + var(--lr-safe-bottom));
   }
   .manual-toc {
     display: none;

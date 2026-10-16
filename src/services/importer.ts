@@ -1,5 +1,7 @@
 import { getStorage, type NewBookMeta } from '../storage'
+import { t } from '../i18n'
 import { detectFormat, isFoliateNative, isTextLike } from './format'
+import { detectReadableFormat, looksLikeText } from './plainText'
 import { convertToEpub } from './textToEpub'
 import { makeFoliateBook } from './foliateBook'
 
@@ -84,8 +86,13 @@ export async function importFile(
   source = '本地导入',
   overrides?: MetaOverrides,
 ): Promise<ImportResult> {
-  const format = detectFormat(file.name)
-  if (!format) return { ok: false, fileName: file.name, error: '不支持的格式' }
+  let format = detectReadableFormat(file.name)
+  // 书籍格式以外的文本 (含认不出扩展名的): 看内容确实是文本才按 txt 收, 二进制照旧拒绝
+  if (!detectFormat(file.name)) {
+    const textual = looksLikeText(new Uint8Array(await file.slice(0, 64 * 1024).arrayBuffer()))
+    format = textual ? 'txt' : null
+  }
+  if (!format) return { ok: false, fileName: file.name, error: t('library.importUnsupported') }
 
   const baseName = file.name.replace(/\.[^.]+$/, '')
   const meta: NewBookMeta = {
@@ -128,7 +135,9 @@ export async function importFile(
       meta.title = title
     }
   } catch (e: any) {
-    return { ok: false, fileName: file.name, error: e?.message ?? '文件解析失败' }
+    // 底层报错 (如 Cannot read properties of null) 对读者没用, 原文留在控制台
+    console.warn('[import]', file.name, e)
+    return { ok: false, fileName: file.name, error: t('library.importParseFailed') }
   }
 
   if (overrides?.title) meta.title = overrides.title

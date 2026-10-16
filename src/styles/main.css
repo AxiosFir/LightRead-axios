@@ -80,9 +80,52 @@
   --control-h-sm: 30px;
   --tap-min: 44px;
 
+  --seg-h: 28px;
+  /* 纯图标按钮的边长 (视觉上可以更小, 但可点区域不小于它) */
+  --icon-btn: 32px;
+
   --font: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Segoe UI',
     'Microsoft YaHei', 'Helvetica Neue', Arial, sans-serif;
   --font-mono: ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+
+  /* 页面骨架: 各页根容器的边距与标题, 手机断点下统一收窄 (见下方「尺寸层」) */
+  --page-x: 28px;
+  --page-top: 24px;
+  --page-bottom: 40px;
+  --page-title: 22px;
+}
+
+/* ---- 尺寸层: 断点 / 页面骨架 / 触控 ----
+ * CSS 变量不能写进 @media, 手机相关只用这三档断点 (别再新增 560 / 620 之类的中间值;
+ * 860 / 960 / 1180 这类只调整桌面宽屏排版的不在此列):
+ *   ≤720px  手机布局: 底部标签栏、阅读器底部工具栏、页面单列 (与 App 外壳同一断点; 折叠屏内屏 673–720 也在这档)
+ *   ≤600px  紧凑密度: 弹窗变底部抽屉、表单单列
+ *   ≤380px  小屏手机: iPhone SE / mini (375)、360 宽安卓、Galaxy Fold 外屏 (344)
+ * 触屏 (pointer: coarse) 与宽度无关, 单独抬高控件高度下限。
+ * 2024–2026 主流机型矩阵与自动审计: scripts/e2e-mobile.mjs (npm run e2e:mobile)
+ */
+@media (max-width: 720px) {
+  :root {
+    /* 344 → 14px, 390 → 16px, 440 → 18px */
+    --page-x: clamp(12px, 4.1vw, 20px);
+    --page-top: 16px;
+    --page-bottom: 24px;
+    --page-title: 20px;
+  }
+}
+@media (max-width: 380px) {
+  :root {
+    --page-title: 19px;
+  }
+}
+@media (pointer: coarse) {
+  :root {
+    /* 触屏: 主要控件 40px、次要 36px (再小手指就容易点偏) */
+    --control-h: 40px;
+    --control-h-sm: 36px;
+    --seg-h: 34px;
+    --icon-btn: 40px;
+  }
 }
 
 :root[data-theme='dark'] {
@@ -251,6 +294,32 @@ svg {
 }
 
 /* ---- 工具类 ---- */
+/* 小屏 (≤380px) 换短文案: 完整文案包 .hide-narrow, 短文案包 .only-narrow (无障碍名称用完整文案) */
+.only-narrow {
+  display: none;
+}
+@media (max-width: 380px) {
+  .hide-narrow {
+    display: none;
+  }
+  .only-narrow {
+    display: inline;
+  }
+}
+
+/* 扩大可点区域 (外观不变): 小胶囊 / 文字按钮 / 封面角标按钮在触屏上四周各外扩 8px。
+   :where 零优先级, 组件自己的 position: absolute 照常生效; 审计脚本按外扩后的尺寸计算 */
+@media (pointer: coarse) {
+  :where(.hit) {
+    position: relative;
+  }
+  .hit::after {
+    content: '';
+    position: absolute;
+    inset: -8px;
+  }
+}
+
 .sr-only {
   position: absolute !important;
   width: 1px;
@@ -432,7 +501,7 @@ input[type='range'] {
   flex-shrink: 0;
 }
 .segmented button {
-  height: 28px;
+  height: var(--seg-h);
   padding: 0 12px;
   border: none;
   border-radius: var(--radius-sm);
@@ -562,7 +631,7 @@ input[type='range'] {
   border-radius: var(--radius-xl);
   box-shadow: var(--shadow-lg);
   width: min(480px, 100%);
-  max-height: min(80vh, 100%);
+  max-height: min(80dvh, 100%);
   overflow: auto;
   padding: var(--space-6);
   animation: modal-in var(--dur-slow) var(--ease);
@@ -598,7 +667,7 @@ input[type='range'] {
   }
   .modal {
     width: 100%;
-    max-height: 88vh;
+    max-height: 88dvh;
     border-radius: var(--radius-xl) var(--radius-xl) 0 0;
     padding: var(--space-5) var(--space-4) calc(var(--space-5) + var(--lr-safe-bottom));
     animation-name: sheet-in;
@@ -686,14 +755,6 @@ input[type='range'] {
   to {
     opacity: 1;
     transform: translateY(0);
-  }
-}
-
-/* ---- 触控设备: 加大可点区域 ---- */
-@media (pointer: coarse) {
-  :root {
-    --control-h: 40px;
-    --control-h-sm: 34px;
   }
 }
 

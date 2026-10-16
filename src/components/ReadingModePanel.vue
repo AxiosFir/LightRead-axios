@@ -12,6 +12,7 @@ import LevelSlider from './LevelSlider.vue'
  */
 import { computed, ref } from 'vue'
 import { t } from '../i18n'
+import { matchesMQ, MQ } from '../composables/useMediaQuery'
 import { useSettings } from '../stores/settings'
 import type { ReadingModes, ReadingModeTab } from '../composables/useReadingModes'
 import { TYPING_SOUND_PRESETS } from '../services/readingModes/soundPresets'
@@ -186,7 +187,7 @@ function toggleAuto() {
   }
   props.modes.stopForExternal('auto')
   // 手机上面板是盖住正文的底部抽屉: 开始后收起 (同打字机 / 歌词), 暂停、调速用底部迷你条或轻点正文
-  if (window.matchMedia?.('(max-width: 600px)').matches) close()
+  if (matchesMQ(MQ.phone)) close()
   emit('start-auto')
 }
 
@@ -1019,7 +1020,7 @@ function onSpeedInput(e: Event) {
     display: none;
   }
 }
-@media (max-width: 600px) {
+@media (max-width: 720px) {
   /* 16px 以下 iOS 聚焦时会放大页面 */
   .rm-speed-input {
     font-size: 16px;
@@ -1310,7 +1311,7 @@ function onSpeedInput(e: Event) {
     min-height: 44px;
   }
 }
-@media (max-width: 600px) {
+@media (max-width: 720px) {
   .rm-indent {
     padding-left: 62px;
   }
@@ -1318,7 +1319,7 @@ function onSpeedInput(e: Event) {
     min-height: 76px;
   }
 }
-@media (max-width: 360px) {
+@media (max-width: 380px) {
   .rm-cards {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }

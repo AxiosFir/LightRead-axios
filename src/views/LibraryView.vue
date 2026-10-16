@@ -7,7 +7,9 @@ import { IMPORT_FORMATS, planFolderPick, type FolderPlan } from '../services/fol
 import { canPickFolder, loadFolderFile, scanFromFileList, scanNativeFolder, useNativeFolderPicker, type FolderFile, type FolderScan } from '../services/folderSource'
 import { importFromUrl } from '../services/urlImport'
 import { sendBookToDevices } from '../services/transfer'
-import { ACCEPT, SUPPORTED_EXTS, canConvertToEpub } from '../services/format'
+import { canConvertToEpub } from '../services/format'
+import { MQ, useMediaQuery } from '../composables/useMediaQuery'
+import { ACCEPT_READABLE } from '../services/plainText'
 import { toast } from '../services/toast'
 import { formatReadingTime } from '../composables/useReadingTimer'
 import { readerPath } from '../services/readerRoute'
@@ -272,6 +274,8 @@ function onPick(e: Event) {
 
 // 选择文件夹: 递归找出书, 同一本书多种格式只留最推荐的, 先确认再导入
 const folderInput = ref<HTMLInputElement>()
+/** 以触屏为主的设备: 文案不提「拖入」 */
+const touchPrimary = useMediaQuery(MQ.touch)
 const folderSupported = canPickFolder()
 const folderPick = ref<{ scanning: boolean; scan?: FolderScan; plan?: FolderPlan<FolderFile> } | null>(null)
 
@@ -642,7 +646,7 @@ async function batchClearTags() {
         <router-link
           v-if="!paperMode"
           to="/stats"
-          class="today-link"
+          class="today-link hit"
           :class="{ done: todayDone }"
           :title="t('stats.libraryTodayTitle', { m: todayMinutes })"
           :aria-label="t('stats.libraryTodayTitle', { m: todayMinutes })"
@@ -659,7 +663,8 @@ async function batchClearTags() {
             />
           </svg>
           <svg v-else viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M4 13a1.5 1.5 0 0 1 3 0v5.5a1.5 1.5 0 0 1-3 0V13zm6.5-5a1.5 1.5 0 0 1 3 0v10.5a1.5 1.5 0 0 1-3 0V8zM17 4.5a1.5 1.5 0 0 1 3 0v14a1.5 1.5 0 0 1-3 0v-14z"/></svg>
-          <span>{{ goalMinutes > 0 && !todayDone ? t('stats.libraryTodayGoal', { m: todayMinutes, goal: goalMinutes }) : t('stats.libraryToday', { m: todayMinutes }) }}</span>
+          <span class="hide-narrow">{{ goalMinutes > 0 && !todayDone ? t('stats.libraryTodayGoal', { m: todayMinutes, goal: goalMinutes }) : t('stats.libraryToday', { m: todayMinutes }) }}</span>
+          <span class="only-narrow">{{ goalMinutes > 0 && !todayDone ? t('stats.libraryTodayGoalShort', { m: todayMinutes, goal: goalMinutes }) : t('stats.libraryTodayShort', { m: todayMinutes }) }}</span>
         </router-link>
       </div>
       <div class="spacer" />
@@ -688,9 +693,15 @@ async function batchClearTags() {
         {{ manageMode ? t('common.done') : t('library.manage') }}
       </button>
       <div class="import-group">
-        <button class="btn btn-primary import-main" :disabled="importing" @click="fileInput?.click()">
+        <button
+          class="btn btn-primary import-main"
+          :disabled="importing"
+          :aria-label="t(paperMode ? 'library.importPapers' : 'library.import')"
+          @click="fileInput?.click()"
+        >
           <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M11 13H5a1 1 0 1 1 0-2h6V5a1 1 0 1 1 2 0v6h6a1 1 0 1 1 0 2h-6v6a1 1 0 1 1-2 0v-6z"/></svg>
-          {{ t(paperMode ? 'library.importPapers' : 'library.import') }}
+          <span class="hide-narrow">{{ t(paperMode ? 'library.importPapers' : 'library.import') }}</span>
+          <span class="only-narrow">{{ t('library.importShort') }}</span>
         </button>
         <button
           class="btn btn-primary import-caret"
@@ -728,28 +739,28 @@ async function batchClearTags() {
       </div>
       <!-- 手机端换行点: 标题+导入 一行, 搜索+排序+管理 一行 -->
       <span class="row-break" aria-hidden="true" />
-      <input ref="fileInput" type="file" multiple :accept="ACCEPT" hidden @change="onPick" />
+      <input ref="fileInput" type="file" multiple :accept="ACCEPT_READABLE" hidden @change="onPick" />
       <!-- 选文件夹: 不带 multiple, e2e 的 input[type=file][multiple] 仍只指向上面的文件输入框 -->
       <input v-if="folderSupported" ref="folderInput" type="file" webkitdirectory hidden data-folder-input @change="onFolderPick" />
     </header>
-    <p class="add-books-hint">{{ t('library.addFormatsHint') }}<span v-if="activeBooklist"> · {{ t('library.addIntoBooklist', { name: activeBooklist.name }) }}</span></p>
+    <p class="add-books-hint">{{ t(touchPrimary ? 'library.addFormatsHintTouch' : 'library.addFormatsHint') }}<span v-if="activeBooklist"> · {{ t('library.addIntoBooklist', { name: activeBooklist.name }) }}</span></p>
 
     <!-- 书单: 一级内容分组，可与标签和搜索组合筛选 -->
     <section v-if="!paperMode" class="booklist-section">
       <div class="booklist-heading">
         <span>{{ t('library.booklists') }}</span>
-        <button class="booklist-text-action" @click="openCreateBooklist">
+        <button class="booklist-text-action hit" @click="openCreateBooklist">
           <svg viewBox="0 0 24 24" width="13" height="13"><path fill="currentColor" d="M11 13H5a1 1 0 1 1 0-2h6V5a1 1 0 1 1 2 0v6h6a1 1 0 1 1 0 2h-6v6a1 1 0 1 1-2 0v-6z"/></svg>
           {{ t('library.newBooklist') }}
         </button>
         <button
           v-if="library.booklists.length"
-          class="booklist-text-action"
+          class="booklist-text-action hit"
           @click="openBooklistManage"
         >{{ t('library.manageBooklists') }}</button>
-        <button v-if="activeBooklist && booklistCount(activeBooklist.id)" class="booklist-text-action" @click="uploadBooks(library.booklistBookIds[activeBooklist.id] ?? [])">{{ t('library.uploadBooklist') }}</button>
-        <button v-if="activeBooklist" class="booklist-text-action" @click="showBooklistShare = true">{{ t('booklist.share') }}</button>
-        <button class="booklist-text-action" @click="showBooklistImport = true">{{ t('booklist.import') }}</button>
+        <button v-if="activeBooklist && booklistCount(activeBooklist.id)" class="booklist-text-action hit" @click="uploadBooks(library.booklistBookIds[activeBooklist.id] ?? [])">{{ t('library.uploadBooklist') }}</button>
+        <button v-if="activeBooklist" class="booklist-text-action hit" @click="showBooklistShare = true">{{ t('booklist.share') }}</button>
+        <button class="booklist-text-action hit" @click="showBooklistImport = true">{{ t('booklist.import') }}</button>
       </div>
       <div class="booklist-row">
         <button
@@ -828,7 +839,7 @@ async function batchClearTags() {
       <p class="empty-title">{{ t(paperMode ? 'library.papersEmptyTitle' : 'library.emptyTitle') }}</p>
       <p class="hint">
         <template v-if="paperMode">{{ t('library.papersEmptyHint') }}</template>
-        <template v-else>{{ t('library.emptyHint') }}<br />{{ t('library.supportedFormats', { formats: SUPPORTED_EXTS.join(' / ') }) }}</template>
+        <template v-else>{{ t(touchPrimary ? 'library.emptyHintTouch' : 'library.emptyHint') }}<br />{{ t('library.supportedFormats') }}</template>
       </p>
       <div class="empty-actions">
         <button class="btn btn-primary" @click="fileInput?.click()">
@@ -1124,7 +1135,7 @@ async function batchClearTags() {
 .add-books-hint { margin: -4px 0 16px; color: var(--text-3); font-size: 12px; line-height: 1.6; }
 .library {
   min-height: 100%;
-  padding: 0 28px calc(40px + var(--lr-safe-bottom));
+  padding: 0 var(--page-x) calc(var(--page-bottom) + var(--lr-safe-bottom));
   position: relative;
 }
 /* 顶栏吸顶: 长书架滚动时搜索 / 导入随手可及 */
@@ -1136,8 +1147,8 @@ async function batchClearTags() {
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
-  margin: 0 -28px 18px;
-  padding: 16px 28px 12px;
+  margin: 0 calc(-1 * var(--page-x)) 18px;
+  padding: var(--page-top) var(--page-x) 12px;
   background: color-mix(in srgb, var(--bg) 88%, transparent);
   -webkit-backdrop-filter: blur(12px);
   backdrop-filter: blur(12px);
@@ -1150,7 +1161,7 @@ async function batchClearTags() {
   min-width: 0;
 }
 .toolbar h1 {
-  font-size: 20px;
+  font-size: var(--page-title);
   font-weight: 650;
   letter-spacing: -0.01em;
   white-space: nowrap;
@@ -1593,7 +1604,7 @@ async function batchClearTags() {
   border-bottom-left-radius: 0;
   border-left: 1px solid rgba(255, 255, 255, 0.35);
   padding: 0 8px;
-  min-width: 0;
+  min-width: var(--control-h);
 }
 .import-menu {
   position: absolute;
@@ -1709,16 +1720,11 @@ async function batchClearTags() {
 }
 
 @media (max-width: 720px) {
-  .library {
-    padding: 0 16px calc(24px + var(--lr-safe-bottom));
-  }
   .toolbar {
-    margin: 0 -16px 14px;
-    padding: 12px 16px 10px;
+    margin-bottom: 14px;
+    padding-top: 12px;
+    padding-bottom: 10px;
     gap: 8px;
-  }
-  .toolbar h1 {
-    font-size: 18px;
   }
   /* 手机端两行: 标题+导入 / 搜索+排序+管理 */
   .heading {
@@ -1778,12 +1784,12 @@ async function batchClearTags() {
     margin-bottom: 8px;
   }
   .booklist-row {
-    margin-inline: -16px;
-    padding-inline: 16px;
+    margin-inline: calc(-1 * var(--page-x));
+    padding-inline: var(--page-x);
   }
   .booklist-chip {
     min-width: 0;
-    height: 34px;
+    height: var(--control-h-sm);
     border-radius: var(--radius-pill);
     padding: 0 12px;
   }

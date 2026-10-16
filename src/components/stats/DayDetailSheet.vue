@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { t } from '../../i18n'
+import { matchesMQ, MQ } from '../../composables/useMediaQuery'
 import type { BookMeta } from '../../storage'
 import { addDays, type DayEntry } from '../../services/readingStats'
 import StatsBookList, { type StatsBookRow } from './StatsBookList.vue'
@@ -86,7 +87,7 @@ function onKey(e: KeyboardEvent) {
 const dragY = ref(0)
 let dragStart: number | null = null
 function onDragStart(e: PointerEvent) {
-  if (e.pointerType === 'mouse' || !window.matchMedia('(max-width: 720px)').matches) return
+  if (e.pointerType === 'mouse' || !matchesMQ(MQ.phone)) return
   if ((e.target as HTMLElement).closest('button')) return
   dragStart = e.clientY
   ;(e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId)
@@ -287,7 +288,7 @@ h2 {
   .dd-panel {
     width: 100%;
     height: auto;
-    max-height: 82vh;
+    max-height: 82dvh;
     max-height: 82dvh;
     border-left: 0;
     border-top: 1px solid var(--border);

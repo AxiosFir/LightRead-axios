@@ -212,7 +212,7 @@ const showHow = ref(false)
 .stats {
   max-width: 1160px;
   margin: 0 auto;
-  padding: 24px 28px calc(40px + var(--lr-safe-bottom));
+  padding: var(--page-top) var(--page-x) calc(var(--page-bottom) + var(--lr-safe-bottom));
 }
 .page-head {
   display: flex;
@@ -222,7 +222,7 @@ const showHow = ref(false)
   margin-bottom: 18px;
 }
 h1 {
-  font-size: 22px;
+  font-size: var(--page-title);
   font-weight: 700;
   letter-spacing: -0.015em;
 }
@@ -318,14 +318,8 @@ h1 {
 }
 
 @media (max-width: 720px) {
-  .stats {
-    padding: 16px 16px calc(24px + var(--lr-safe-bottom));
-  }
   .page-head {
     margin-bottom: 14px;
-  }
-  h1 {
-    font-size: 20px;
   }
   .layout {
     gap: 12px;

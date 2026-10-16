@@ -5,7 +5,7 @@
  *  - 文件名与格式从 URL 路径 / Content-Disposition 推断
  */
 import { fetchRemote } from './net'
-import { detectFormat } from './format'
+import { detectReadableFormat } from './plainText'
 import { importFile, type ImportResult, type MetaOverrides } from './importer'
 import { t } from '../i18n'
 
@@ -78,7 +78,7 @@ export async function importFromUrl(
   }
 
   const fileName = inferFileName(url, res)
-  if (!detectFormat(fileName)) {
+  if (!detectReadableFormat(fileName)) {
     throw new Error(t('library.urlUnsupported', { name: fileName }))
   }
   const file = new File([data as BlobPart], fileName)

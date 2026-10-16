@@ -94,7 +94,7 @@ onMounted(() => first.value?.focus())
   border-radius: var(--radius-sm);
   box-shadow: var(--ring);
 }
-@media (max-width: 600px) {
+@media (max-width: 720px) {
   .dj-consent-actions {
     flex-direction: column-reverse;
   }

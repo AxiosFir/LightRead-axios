@@ -438,7 +438,7 @@ onBeforeUnmount(() => {
 .transfer {
   max-width: 820px;
   margin: 0 auto;
-  padding: 24px 28px calc(40px + var(--lr-safe-bottom));
+  padding: var(--page-top) var(--page-x) calc(var(--page-bottom) + var(--lr-safe-bottom));
 }
 .page-head {
   display: flex;
@@ -448,7 +448,7 @@ onBeforeUnmount(() => {
   margin-bottom: 16px;
 }
 h1 {
-  font-size: 22px;
+  font-size: var(--page-title);
   font-weight: 700;
   letter-spacing: -0.015em;
 }
@@ -724,9 +724,6 @@ h1 {
 }
 
 @media (max-width: 720px) {
-  .transfer {
-    padding: 16px 16px calc(24px + var(--lr-safe-bottom));
-  }
   .drop-grid {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -738,7 +735,7 @@ h1 {
     max-width: 150px;
   }
 }
-@media (max-width: 420px) {
+@media (max-width: 600px) {
   .drop-result {
     grid-template-columns: minmax(0, 1fr);
     justify-items: start;

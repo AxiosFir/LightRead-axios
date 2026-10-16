@@ -345,7 +345,7 @@ onBeforeUnmount(() => {
   color: var(--text-3);
   z-index: 3;
 }
-@media (max-width: 600px) {
+@media (max-width: 720px) {
   .title {
     display: none;
   }

@@ -16,8 +16,16 @@ const EXT_MAP: Record<string, BookFormat> = {
   html: 'html',
   htm: 'html',
   xhtml: 'html',
+  shtml: 'html',
   md: 'md',
   markdown: 'md',
+  mdown: 'md',
+  mkd: 'md',
+  mkdn: 'md',
+  mdwn: 'md',
+  mdx: 'md',
+  qmd: 'md',
+  rmd: 'md',
 }
 
 export const SUPPORTED_EXTS = Object.keys(EXT_MAP)

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref } from 'vue'
 import type { BookMeta } from '../storage'
-import { FORMAT_LABELS } from '../services/format'
+import { formatLabelOf } from '../services/plainText'
 import { formatReadingTime } from '../composables/useReadingTimer'
 import { t } from '../i18n'
 
@@ -19,6 +19,9 @@ const props = defineProps<{
   /** 显示「发送到其他设备」(设置里开启了互传) */
   sendable?: boolean
 }>()
+
+/** 封面占位标题的断行点: 文件名式标题 (package.json / my_notes-v2) 在 . _ - / 之后换行, 不在词中间硬断 */
+const coverTitleParts = computed(() => props.book.title.replace(/([._\-/])/g, '$1\u0000').split('\u0000'))
 
 const emit = defineEmits<{
   open: []
@@ -139,10 +142,10 @@ function onKeydown(e: KeyboardEvent) {
         }"
         aria-hidden="true"
       >
-        <span class="cover-fallback-title">{{ book.title }}</span>
+        <span class="cover-fallback-title"><template v-for="(part, i) in coverTitleParts" :key="i">{{ part }}<wbr /></template></span>
         <span v-if="book.author" class="cover-fallback-author">{{ book.author }}</span>
       </div>
-      <span class="format" aria-hidden="true">{{ FORMAT_LABELS[book.format] }}</span>
+      <span class="format" aria-hidden="true">{{ formatLabelOf(book) }}</span>
       <span v-if="progress != null" class="progress" aria-hidden="true">{{ progress }}%</span>
       <span v-if="progress != null" class="progress-track" aria-hidden="true">
         <span class="progress-fill" :style="{ width: `${progress}%` }" />
@@ -151,7 +154,7 @@ function onKeydown(e: KeyboardEvent) {
       <div v-if="!selectable" ref="actionsEl" class="actions" :class="{ open: menuOpen }">
         <button
           type="button"
-          class="action more"
+          class="action more hit"
           :title="t('common.moreActions')"
           :aria-label="t('common.moreActions')"
           :aria-expanded="menuOpen"
@@ -301,6 +304,7 @@ function onKeydown(e: KeyboardEvent) {
 }
 .cover-fallback-title {
   font-size: 14px;
+  overflow-wrap: break-word;
   font-weight: 650;
   line-height: 1.35;
   letter-spacing: 0.01em;
@@ -308,7 +312,6 @@ function onKeydown(e: KeyboardEvent) {
   -webkit-line-clamp: 4;
   -webkit-box-orient: vertical;
   overflow: hidden;
-  word-break: break-word;
 }
 .cover-fallback-author {
   font-size: 11px;
@@ -345,7 +348,7 @@ function onKeydown(e: KeyboardEvent) {
   -webkit-backdrop-filter: blur(4px);
   backdrop-filter: blur(4px);
   color: #fff;
-  font-size: 10.5px;
+  font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.04em;
   padding: 2px 6px;

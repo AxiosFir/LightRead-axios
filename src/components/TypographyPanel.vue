@@ -607,7 +607,7 @@ let systemFontsLoading = false
 }
 
 /* 手机: 底部抽屉 */
-@media (max-width: 600px) {
+@media (max-width: 720px) {
   .settings-pop {
     top: auto;
     left: 0;

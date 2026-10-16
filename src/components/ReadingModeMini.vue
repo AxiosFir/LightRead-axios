@@ -237,7 +237,7 @@ onBeforeUnmount(() => clearTimeout(fadeTimer))
   color: inherit;
   font-size: 12px;
 }
-@media (min-width: 601px) {
+@media (min-width: 721px) {
   .rm-mini.docked {
     height: 48px;
   }

@@ -516,7 +516,7 @@ const continueProgress = computed(() => props.continueBook?.progress == null ? n
   flex-shrink: 0;
 }
 
-@media (max-width: 560px) {
+@media (max-width: 600px) {
   .today {
     padding: 20px 16px 16px;
     gap: 18px;

@@ -4679,7 +4679,6 @@ onBeforeUnmount(() => {
 .paper:fullscreen,
 .paper.is-fullscreen {
   width: 100vw;
-  height: 100vh;
   height: 100dvh;
 }
 .paper.is-fullscreen .paper-header,
@@ -6107,7 +6106,7 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  max-height: 46vh;
+  max-height: 46dvh;
 }
 .sel-tr-head {
   display: flex;
@@ -6523,7 +6522,7 @@ onBeforeUnmount(() => {
 .bd-panel {
   width: 720px;
   max-width: calc(100vw - 48px);
-  max-height: calc(100vh - 48px);
+  max-height: calc(100dvh - 48px);
   overflow-y: auto;
   background: var(--card);
   border-radius: 12px;
@@ -6731,7 +6730,7 @@ onBeforeUnmount(() => {
   }
 }
 
-@media (max-width: 620px) {
+@media (max-width: 720px) {
   /* 手机: 打印 / 幻灯片 / 快捷键 / 双页视图用不上, 换文档与返回重复 */
   .no-phone,
   .change-document,

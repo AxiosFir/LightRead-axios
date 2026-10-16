@@ -455,7 +455,7 @@ h2 {
   height: 11px;
   border-radius: 3px;
 }
-@media (max-width: 560px) {
+@media (max-width: 600px) {
   .cal {
     padding: 16px;
   }

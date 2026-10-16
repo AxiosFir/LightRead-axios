@@ -30,6 +30,7 @@ import { autoSpeedKey, stepAutoSpeed } from '../services/autoReadSpeed'
 import { TTS_RATE_MAX, TTS_RATE_MIN, TTS_RATE_STOPS, rateText } from '../services/ttsRate'
 import { toast } from '../services/toast'
 import { t } from '../i18n'
+import { matchesMQ, MQ } from '../composables/useMediaQuery'
 import { searchBook, type SearchHit } from '../services/bookSearch'
 import { chatStream, aiConfigured, readerSystemPrompt, explainPrompt, providerById, type AiMessage } from '../services/ai'
 import TocList, { type TocItem } from '../components/TocList.vue'
@@ -375,7 +376,7 @@ function layoutGeometry() {
   const width = container.value?.clientWidth || window.innerWidth
   const portrait = portraitView.value
   const spacing = portrait ? portraitSpacing(width, prefs.gap) : null
-  const phone = window.innerWidth <= 600
+  const phone = matchesMQ(MQ.phone)
   // 上下边带: 翻页模式放页眉页脚 (章节名 / 进度), 手机屏幕矮收窄些; 滚动模式下正文铺满全高,
   // 它只决定「哪段算在屏上」(进度 / 朗读起点), 竖屏滚动收窄让判定贴近实际可见区
   const margin = portrait && readerLayout.value.flow === 'scrolled'
@@ -3553,8 +3554,8 @@ onBeforeUnmount(() => {
   gap: 4px;
 }
 .icon-btn {
-  width: 32px;
-  height: 32px;
+  width: var(--icon-btn);
+  height: var(--icon-btn);
   border: none;
   background: none;
   border-radius: 6px;
@@ -4486,7 +4487,7 @@ onBeforeUnmount(() => {
   display: none;
 }
 
-@media (max-width: 600px) {
+@media (max-width: 720px) {
   /* 手机页眉留白较窄 (见 applyPrefs 的 margin) */
   .tts-mini {
     --head-band: 36px;
@@ -4511,6 +4512,8 @@ onBeforeUnmount(() => {
   .bar {
     gap: 4px;
     padding-inline: max(8px, var(--lr-safe-left)) max(8px, var(--lr-safe-right));
+    /* 小屏上工具栏压在正文上, 半透明会让正文 (尤其粗体标题) 透出来和栏内书名叠在一起 */
+    background: var(--card);
   }
   .bar.top {
     padding-top: calc(6px + var(--safe-top));
@@ -4542,6 +4545,7 @@ onBeforeUnmount(() => {
   }
   .progress-label {
     padding: 0 4px;
+    min-height: var(--icon-btn);
   }
   .jump-pop {
     left: 12px;

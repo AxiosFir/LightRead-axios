@@ -1742,7 +1742,7 @@ async function removeSource(s: CatalogSourceRec) {
 
 <style scoped>
 .catalog {
-  padding: 24px 28px calc(48px + var(--lr-safe-bottom));
+  padding: var(--page-top) var(--page-x) calc(var(--page-bottom) + var(--lr-safe-bottom));
   min-height: 100%;
   max-width: 1160px;
 }
@@ -1762,7 +1762,7 @@ async function removeSource(s: CatalogSourceRec) {
   margin-bottom: 18px;
 }
 .page-title h1 {
-  font-size: 22px;
+  font-size: var(--page-title);
   font-weight: 650;
   letter-spacing: -0.01em;
   line-height: 1.3;
@@ -3006,12 +3006,6 @@ async function removeSource(s: CatalogSourceRec) {
 }
 
 @media (max-width: 720px) {
-  .catalog {
-    padding: 16px 16px calc(28px + var(--lr-safe-bottom));
-  }
-  .page-title h1 {
-    font-size: 20px;
-  }
   .page-title p {
     display: none;
   }

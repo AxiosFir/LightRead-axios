@@ -45,6 +45,7 @@ defineEmits<{
   list-style: none;
 }
 .toc-item {
+  min-height: var(--control-h);
   display: block;
   width: 100%;
   text-align: left;

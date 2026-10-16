@@ -6,6 +6,7 @@ import { t } from '../i18n'
 import { useSettings } from '../stores/settings'
 import { toast } from '../services/toast'
 import { detectFormat } from '../services/format'
+import { detectReadableFormat } from '../services/plainText'
 import { readerPath } from '../services/readerRoute'
 import {
   copyText, importTransferFile, openExternalLink, removeTransfer, saveTextToLibrary, saveTransferFile,
@@ -67,7 +68,7 @@ const linkIsBook = computed(() => {
     return false
   }
 })
-const fileIsBook = computed(() => !!detectFormat(props.item.filename ?? ''))
+const fileIsBook = computed(() => !!detectReadableFormat(props.item.filename ?? ''))
 const fileAvailable = computed(() => props.item.kind === 'file' && !(props.item.channel === 'drop' && expired.value))
 
 const progressText = computed(() => {

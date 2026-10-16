@@ -247,15 +247,15 @@ export async function fetchTransferBlob(item: TransferItem, onProgress?: Progres
 
 /** 导入书库; 返回新书 (调用方决定是否打开) */
 async function importBlob(blob: Blob, name: string) {
-  const [{ importFile }, { detectFormat }, { useLibrary }] = await Promise.all([
-    import('../importer'), import('../format'), import('../../stores/library'),
+  const [{ importFile }, { detectReadableFormat }, { useLibrary }] = await Promise.all([
+    import('../importer'), import('../plainText'), import('../../stores/library'),
   ])
   const file = new File([blob], name)
-  if (!detectFormat(name)) throw new Error(t('transfer.err.unsupported', { name }))
+  if (!detectReadableFormat(name)) throw new Error(t('transfer.err.unsupported', { name }))
   const res = await importFile(file, t('transfer.source'))
   if (!res.ok || !res.bookId) throw new Error(res.error ?? t('common.unknownError'))
   await useLibrary().refresh()
-  return { id: res.bookId, format: detectFormat(name)! }
+  return { id: res.bookId, format: detectReadableFormat(name)! }
 }
 
 export async function importTransferFile(item: TransferItem, onProgress?: ProgressFn) {
