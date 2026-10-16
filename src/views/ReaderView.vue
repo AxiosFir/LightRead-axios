@@ -17,7 +17,7 @@ import { isTauri } from '../storage/types'
 import { listVoicesSorted, warmUpSpeech, resetEdgeFailure } from '../services/tts'
 import { ListenPlayer, type ListenFeed } from '../services/listenPlayer'
 import { SentenceCursor, loadListenBookmark, saveListenBookmark, agoBucket, type CursorPos, type ListenBookmark } from '../services/readAloud'
-import { readingArea, followTarget, jumpLine, isOnScreen, followHeld, scrollMotion, type Area } from '../services/readingFocus'
+import { readingArea, followTarget, jumpLine, isOnScreen, followHeld, scrollMotion, prefersReducedMotion, type Area } from '../services/readingFocus'
 import { EDGE_VOICES, edgeAvailable, playAudio } from '../services/edgeTts'
 import { KOKORO_VOICES, DEFAULT_KOKORO_SID, kokoroVoiceLabel } from '../services/kokoroVoices'
 import { localPack, localTtsSynthesize, refreshLocalPack } from '../services/localTts'
@@ -26,7 +26,7 @@ import LevelSlider from '../components/LevelSlider.vue'
 import { useReadingTimer } from '../composables/useReadingTimer'
 import { usePortraitView } from '../composables/usePortraitView'
 import { effectiveReaderLayout, portraitSpacing } from '../services/portraitLayout'
-import { autoSpeedKey, stepAutoSpeed } from '../services/autoReadSpeed'
+import { autoReadMotion, autoSpeedKey, stepAutoSpeed } from '../services/autoReadSpeed'
 import { TTS_RATE_MAX, TTS_RATE_MIN, TTS_RATE_STOPS, rateText } from '../services/ttsRate'
 import { toast } from '../services/toast'
 import { t } from '../i18n'
@@ -138,6 +138,13 @@ function openTypography(section?: TypographySection) {
   closeOverlays()
   typoFocus.value = section ?? null
   settingsOpen.value = true
+}
+
+/** 从「排版」的版式入口跳到「模式 › 阅读方式」(书页怎么动只在那里设置) */
+const modeFocus = ref<'layout' | null>(null)
+function openModes(section?: 'layout') {
+  modeFocus.value = section ?? null
+  modes.openPanel()
 }
 
 /** 手机端抽屉打开时显示遮罩 (桌面端遮罩由 CSS 隐藏) */
@@ -336,22 +343,27 @@ let autoTimer: ReturnType<typeof setInterval> | undefined
 let view: any = null
 let Overlayer: any = null
 let saveTimer: ReturnType<typeof setTimeout> | undefined
+/** 节流中待保存的最新进度 */
+let pendingProgress: { cfi: string; frac: number } | null = null
 
 const appDark = computed(() => resolvedTheme.value === 'dark')
 // 竖屏 (手机 / iPad / Surface 竖着拿): 「竖屏时单页滚动」开启时改为单栏连续滚动, 横过来恢复用户自己的翻页 / 分栏。
 // 只算生效值, 不改写保存的 settings.reader.flow; 页码、手势等凡按 flow 分支的地方都用 effectiveFlow
 const portraitView = usePortraitView()
+// 阅读模式与点睛在下方声明, 二者初始化时会互相 / 回头读取这里的值;
+// 先用响应式占位, 声明完再填入, 避免初始化顺序问题 (TDZ), 填入后依赖它们的 computed 自动重算
+const lateModes = shallowRef<ReturnType<typeof useReadingModes>>()
+const lateDj = shallowRef<ReturnType<typeof useDianjing>>()
+// 生效版式的唯一出口: 用户保存的翻页 / 分栏 + 临时约束 (竖屏锁定、歌词要滚动、大字 / 歌词要单栏), 约束不回写设置
 const readerLayout = computed(() => effectiveReaderLayout({
   flow: settings.reader.flow,
   maxColumnCount: settings.reader.maxColumnCount,
   portraitScroll: settings.reader.portraitScroll,
   portrait: portraitView.value,
+  forceSingleColumn: lateModes.value?.forceSingleColumn.value,
+  forceScrolled: lateModes.value?.forceScrolled.value,
 }))
 const effectiveFlow = computed(() => readerLayout.value.flow)
-// 阅读模式与点睛在下方声明, 二者初始化时会互相 / 回头读取这里的值;
-// 先用响应式占位, 声明完再填入, 避免初始化顺序问题 (TDZ), 填入后依赖它们的 computed 自动重算
-const lateModes = shallowRef<ReturnType<typeof useReadingModes>>()
-const lateDj = shallowRef<ReturnType<typeof useDianjing>>()
 // 墨水屏等阅读模式会改写正文配色 (纯黑白)
 const themeColors = computed(() => resolveReaderColors(settings.reader.theme, appDark.value, lateModes.value?.readerStyle.value))
 // 正文主题铺满全屏 (含状态栏下方), 安卓系统栏图标按正文深浅切换
@@ -394,6 +406,14 @@ let bookVertical = false
 /** 渲染器处于跨章连续滚动 (多槽) 模式: 同时活着多个分节文档, getContents() 主章 (阅读线所在) 排第一 */
 const isContinuous = () => !!view?.renderer?.continuous
 
+/**
+ * 渲染器的版式属性只在值变了时写: 自定义元素对同值 setAttribute 也会回调 render(),
+ * 连续滚动时会同步重排所有已载入的章节 (改主题、调暗这类与版式无关的设置也会让正文抖一下)
+ */
+function setRendererAttr(r: any, name: string, value: string) {
+  if (r.getAttribute(name) !== value) r.setAttribute(name, value)
+}
+
 function applyPrefs() {
   if (!view) return
   const prefs = settings.reader
@@ -404,16 +424,19 @@ function applyPrefs() {
     const layout = readerLayout.value
     // 跨章连续滚动 (docs/continuous-scroll.md §11): 滚动模式、非固定版式、非竖排时开启; 先于 flow 设置,
     // 切到滚动时渲染器直接进多槽模式。旧版 paginator 不认这个属性, 照常单章滚动
-    view.renderer.toggleAttribute('continuous', layout.flow === 'scrolled' && prefs.continuousScroll && !view.isFixedLayout && !bookVertical)
-    view.renderer.setAttribute('flow', layout.flow)
+    const r = view.renderer
+    const wantContinuous = layout.flow === 'scrolled' && prefs.continuousScroll && !view.isFixedLayout && !bookVertical
+    if (r.hasAttribute('continuous') !== wantContinuous) r.toggleAttribute('continuous', wantContinuous)
+    setRendererAttr(r, 'flow', layout.flow)
     const geo = layoutGeometry()
     appliedGeometry = JSON.stringify(geo)
-    view.renderer.setAttribute('gap', geo.gap)
-    view.renderer.setAttribute('max-inline-size', geo.maxInline)
-    // 大字 / 歌词运行时、竖屏单页滚动时强制单栏, 不改用户自己的分栏设置
-    view.renderer.setAttribute('max-column-count', String(modes.forceSingleColumn.value ? 1 : layout.maxColumnCount))
-    view.renderer.setAttribute('margin', geo.margin)
-    view.renderer.setStyles?.(getReaderCSS({ ...prefs, fontFamily: resolveFontFamily(prefs.fontFamily) }, appDark.value, modes.readerStyle.value))
+    setRendererAttr(r, 'gap', geo.gap)
+    setRendererAttr(r, 'max-inline-size', geo.maxInline)
+    // 大字 / 歌词运行时、竖屏单页滚动时强制单栏 (已算进 readerLayout), 不改用户自己的分栏设置
+    setRendererAttr(r, 'max-column-count', String(layout.maxColumnCount))
+    setRendererAttr(r, 'margin', geo.margin)
+    // 歌词运行时的字号 / 行距只是生效值 (modes.typographyOverride), 不写回设置
+    view.renderer.setStyles?.(getReaderCSS({ ...prefs, ...modes.typographyOverride.value, fontFamily: resolveFontFamily(prefs.fontFamily) }, appDark.value, modes.readerStyle.value))
     const custom = selectedCustomFont()
     if (custom) {
       for (const content of view.renderer.getContents?.() ?? []) {
@@ -456,10 +479,16 @@ function onRelocate(e: CustomEvent) {
   if (tocAuto.value) syncSmartTocPosition()
   updatePages(e.detail)
   updateMarginals()
-  clearTimeout(saveTimer)
-  saveTimer = setTimeout(() => {
-    if (cfi) library.saveProgress(bookId, cfi, frac ?? 0)
-  }, 600)
+  // 节流而非防抖: 连续 / 自动滚动时 relocate 每 250ms 一次, 防抖会一直等到停下才保存
+  if (cfi) pendingProgress = { cfi, frac: frac ?? 0 }
+  if (!saveTimer) {
+    saveTimer = setTimeout(() => {
+      saveTimer = undefined
+      const p = pendingProgress
+      pendingProgress = null
+      if (p) library.saveProgress(bookId, p.cfi, p.frac)
+    }, 600)
+  }
 }
 
 /**
@@ -790,6 +819,9 @@ function handleKeydown(e: KeyboardEvent) {
   }
 }
 
+/** 自动阅读怎么推进: 翻页 / 匀速滚动 / 墨水屏整屏推进 (面板说明同一个判断) */
+const autoMotion = computed(() => autoReadMotion(effectiveFlow.value, { eink: !!lateModes.value?.einkActive.value, fixedLayout: fixedLayout.value }))
+
 function startAutoRead() {
   modes.stopForExternal('auto')
   // 带读同一时间只运行一个: 自动翻页开始时暂停听书 (听书会自己跟着翻页, 两者抢位置)
@@ -806,8 +838,9 @@ function startAutoRead() {
 function runAutoEngine() {
   clearInterval(autoTimer)
   cancelAnimationFrame(autoRaf)
+  view?.renderer?.driftEnd?.()
   if (!autoReading.value || autoPaused.value) return
-  if (effectiveFlow.value === 'scrolled' && !view?.isFixedLayout) {
+  if (autoMotion.value === 'scroll') {
     autoLastTs = 0
     autoRaf = requestAnimationFrame(autoScrollFrame)
     return
@@ -827,6 +860,7 @@ function stopAutoRead() {
   autoPaused.value = false
   clearInterval(autoTimer)
   cancelAnimationFrame(autoRaf)
+  view?.renderer?.driftEnd?.()
 }
 
 function pauseAutoRead() {
@@ -882,23 +916,28 @@ function autoScrollFrame(ts: number) {
     if (autoHeld()) {
       autoPos = -1
       autoCarry = 0
+      r?.driftEnd?.()
     }
     return
   }
   const size = Number(r.size) || 0
   const viewSize = Number(r.viewSize) || 0
   if (!size) return
+  const px = size / Math.max(3, settings.autoReadSeconds) * dt / 1000
   // 跨章连续滚动: 在连续容器上按帧匀速推进, 章与章之间不停顿; 进度由渲染器滚动中节流派发的 relocate 更新
   if (r.continuous) {
     if (r.atEnd) {
       stopAutoRead()
       return
     }
-    autoCarry += size / Math.max(3, settings.autoReadSeconds) * dt / 1000
-    const step = Math.floor(autoCarry)
-    if (step >= 1) {
-      autoCarry -= step
-      r.scrollBy(0, step)
+    // driftBy 按亚像素推进 (scrollTop 只认整像素, 慢速时逐帧 1/0/1 地走, 文字一顿一顿地跳)
+    if (!r.driftBy?.(px)) {
+      autoCarry += px
+      const step = Math.floor(autoCarry)
+      if (step >= 1) {
+        autoCarry -= step
+        r.scrollBy(0, step)
+      }
     }
     pingReadingAuto()
     return
@@ -911,10 +950,16 @@ function autoScrollFrame(ts: number) {
     }
     autoCrossing = true
     autoPos = -1
+    r.driftEnd?.()
     Promise.resolve(r.next()).finally(() => {
       autoCrossing = false
       autoLastTs = 0
     })
+    return
+  }
+  // 单章滚动: 同样亚像素推进, 渲染器滚动中节流报告位置; 旧渲染器走下面的整像素路径
+  if (r.driftBy?.(px)) {
+    pingReadingAuto()
     return
   }
   const speed = size / Math.max(3, settings.autoReadSeconds) // px/s
@@ -940,8 +985,8 @@ function autoScrollFrame(ts: number) {
 watch(() => settings.autoReadSeconds, () => {
   if (autoReading.value && !autoPaused.value) runAutoEngine()
 })
-// 旋转屏幕等导致翻页 / 滚动方式改变: 换对应的推进方式
-watch(effectiveFlow, () => {
+// 旋转屏幕、歌词临时滚动、开关墨水屏等导致推进方式改变: 换对应的引擎
+watch(autoMotion, () => {
   if (autoReading.value) runAutoEngine()
 })
 
@@ -1338,9 +1383,6 @@ function highlightListen(range: Range, scroll: boolean | 'force' = true) {
 
 // ---- 阅读焦点 (services/readingFocus.ts): 程序把视图移到一段文字时, 落在可读区 38% 的焦点线,
 // 不贴顶边、不钻到顶栏下面; 跟随时在 25%–65% 舒适区里就不动。只管滚动模式, 翻页模式照旧翻到目标所在页 ----
-const prefersReducedMotion = () => {
-  try { return !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches } catch { return false }
-}
 /** 滚动模式且渲染器支持阅读焦点 (fork 的 rangeBox / scrollToRange) */
 function focusFlow(): boolean {
   const r = view?.renderer
@@ -2575,6 +2617,8 @@ const modes = useReadingModes({
   onLyricSeek: range => { void startTTS({ range }) },
 })
 lateModes.value = modes
+// 模式面板关上后, 下次从工具栏打开不再定位到版式
+watch(() => modes.panelOpen.value, open => { if (!open) modeFocus.value = null })
 
 // ---- 点睛阅读 (docs/dianjing-reading.md) ----
 const dj = useDianjing({
@@ -2801,6 +2845,9 @@ onBeforeUnmount(() => {
   // 回藏书页时恢复窗口状态
   if (isFullscreen.value) toggleFullscreen()
   clearTimeout(saveTimer)
+  // 离开前把节流中的最新进度写下
+  if (pendingProgress) library.saveProgress(bookId, pendingProgress.cfi, pendingProgress.frac)
+  pendingProgress = null
   clearTimeout(pageSaveTimer)
   clearTimeout(jumpBackTimer)
   clearTimeout(tocFractionTimer)
@@ -3058,7 +3105,12 @@ onBeforeUnmount(() => {
       :modes="modes"
       :progress="typewriterProgress"
       :auto-reading="autoReading && !autoPaused"
-      :auto-scrolled="effectiveFlow === 'scrolled'"
+      :auto-motion="autoMotion"
+      :effective-flow="effectiveFlow"
+      :fixed-layout="fixedLayout"
+      :portrait-locked="readerLayout.portraitLocked"
+      :mode-locked="readerLayout.modeLocked"
+      :focus="modeFocus"
       :tts-active="ttsState === 'playing'"
       v-model:auto-read-seconds="settings.autoReadSeconds"
       @start-auto="startAutoRead"
@@ -3430,9 +3482,10 @@ onBeforeUnmount(() => {
       :effective-flow="effectiveFlow"
       :fixed-layout="fixedLayout"
       :portrait-locked="readerLayout.portraitLocked"
+      :mode-locked="readerLayout.modeLocked"
       :focus="typoFocus"
       @close="settingsOpen = false"
-      @open-modes="modes.openPanel()"
+      @open-modes="openModes"
     />
   </div>
 </template>

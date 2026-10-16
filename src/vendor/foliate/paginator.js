@@ -693,6 +693,10 @@ export class Paginator extends HTMLElement {
         this.#footer = this.#root.getElementById('footer')
 
         this.#observer.observe(this.#container)
+        this.#container.addEventListener('scroll', () => {
+            // LightRead: someone else scrolled (the reader, navigation, compensation): drop the remainder
+            if (this.#drift && this.#container.scrollTop !== this.#drift.whole) this.#dropDrift()
+        })
         this.#container.addEventListener('scroll', () => this.dispatchEvent(new Event('scroll')))
         this.#container.addEventListener('scroll', () => {
             if (this.#mode === 'cont') this.#contOnScroll()
@@ -716,6 +720,8 @@ export class Paginator extends HTMLElement {
         // LightRead: continuous mode needs to know whether a finger is down
         const trackTouch = e => {
             this.#touching = e.type === 'touchstart' || e.touches.length > 0
+            // a transformed scroller may lose compositor scrolling: whole pixels before the finger moves
+            if (e.type === 'touchstart') this.driftEnd()
             if (!this.#touching) this.#lastTouchEndAt = performance.now()
             // a swipe at the end of the loaded content scrolls nothing: still check the preload
             else if (this.#mode === 'cont') this.#contScheduleFrame()
@@ -783,6 +789,7 @@ export class Paginator extends HTMLElement {
     attributeChangedCallback(name, _, value) {
         switch (name) {
             case 'flow':
+                this.#dropDrift() // LightRead: no sub-pixel remainder outside the scrolled flow
                 // LightRead: leave continuous mode while the slots are still laid out
                 // as scrolled, so the reading position can be measured
                 if (this.#mode === 'cont' && !this.#wantCont() && !this.#busy) {
@@ -1015,6 +1022,64 @@ export class Paginator extends HTMLElement {
             return
         }
         this.#container[this.scrollProp] = newVal
+    }
+
+    // ---- LightRead: sub-pixel drift (auto scroll, typewriter follow) ----
+    // scrollTop only takes whole CSS px (Chromium rounds the setter), so a slow auto scroll moved
+    // the text 1,0,1,1,0… px per frame and it visibly juddered. driftBy keeps the exact position:
+    // the whole-px part goes to scrollTop, the remainder (< 1px) to a transform on the container.
+    // Any other scroll (the reader, navigation, relayout compensation) drops the remainder.
+    // Returns false where it does not apply (paginated, vertical writing); callers fall back.
+    driftBy(dy) {
+        if (!this.scrolled || this.#vertical || !Number.isFinite(dy)) return false
+        const ct = this.#container
+        const st = ct.scrollTop
+        const d = this.#drift
+        const max = Math.max(0, ct.scrollHeight - ct.clientHeight)
+        const exact = Math.max(0, Math.min(max, (d && d.whole === st ? st + d.frac : st) + dy))
+        const whole = Math.floor(exact)
+        if (whole !== st) {
+            if (this.#mode === 'cont') {
+                this.#primaryLock = null
+                this.#setScroll(whole)
+            } else ct.scrollTop = whole
+        }
+        const now = ct.scrollTop
+        const frac = Math.max(0, Math.min(0.99, exact - now))
+        this.#drift = { whole: now, frac }
+        this.#showDrift(frac)
+        // the single-section scroll debounce never fires while drifting: report as cont mode does
+        if (this.#mode !== 'cont' && !this.#driftRelocTimer) this.#driftRelocTimer = setTimeout(() => {
+            this.#driftRelocTimer = null
+            if (this.scrolled && this.#mode !== 'cont') this.#afterScroll('scroll')
+        }, CONT_RELOCATE_MS)
+        return true
+    }
+    // back to whole pixels (paused / stopped / the reader takes over)
+    driftEnd() {
+        const d = this.#drift
+        if (!d) return
+        this.#drift = null
+        this.#showDrift(0)
+        const ct = this.#container
+        if (d.frac >= 0.5 && ct.scrollTop === d.whole) {
+            if (this.#mode === 'cont') this.#setScroll(d.whole + 1)
+            else ct.scrollTop = d.whole + 1
+        }
+    }
+    #drift = null // { whole, frac }: scrollTop we wrote and the remainder shown by the transform
+    #driftShown = 0
+    #driftRelocTimer = null
+    #showDrift(frac) {
+        const v = frac >= 0.01 ? frac : 0
+        if (v === this.#driftShown) return
+        this.#driftShown = v
+        this.#container.style.transform = v ? `translateY(${-v}px)` : ''
+    }
+    #dropDrift() {
+        if (!this.#drift && !this.#driftShown) return
+        this.#drift = null
+        this.#showDrift(0)
     }
 
     scrollBy(dx, dy) {
@@ -1470,6 +1535,8 @@ export class Paginator extends HTMLElement {
     destroy() {
         this.#observer.unobserve(this)
         this.#observer.disconnect() // LightRead: it observes #container, not `this`
+        clearTimeout(this.#driftRelocTimer)
+        this.#dropDrift()
         if (this.#mode === 'cont') {
             this.#contCancelTimers()
             for (const slot of [...this.#slots]) this.#contUnload(slot, false)

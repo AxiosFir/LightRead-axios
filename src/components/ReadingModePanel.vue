@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { AUTO_SPEED_LEVELS, AUTO_SPEED_STEPS, speedPosition, secondsAtPosition } from '../services/autoReadSpeed'
+import { AUTO_SPEED_LEVELS, AUTO_SPEED_STEPS, speedPosition, secondsAtPosition, type AutoReadMotion } from '../services/autoReadSpeed'
 import LevelSlider from './LevelSlider.vue'
 /**
  * 「阅读模式」面板 (docs/reader-panels.md §3.2): 书页怎么动、怎么带你读。桌面为顶栏下的浮层卡片, 手机为底部抽屉
@@ -10,7 +10,7 @@ import LevelSlider from './LevelSlider.vue'
  * 点卡片角上的 ⓘ 展开「会调整什么」、场景自己的选项 (定时、休息提醒、大 / 特大…) 和「在排版里微调」。
  * 自动翻页沿用 ReaderView 的实现 (props/emits), 容器保留 .auto-panel 类名供 e2e 使用。
  */
-import { computed, ref } from 'vue'
+import { computed, nextTick, onMounted, ref } from 'vue'
 import { t } from '../i18n'
 import { matchesMQ, MQ } from '../composables/useMediaQuery'
 import { useSettings } from '../stores/settings'
@@ -27,8 +27,18 @@ const props = defineProps<{
   autoReading: boolean
   /** 自动翻页速度, 秒/页 (v-model:auto-read-seconds); 滚动模式下为秒/屏 */
   autoReadSeconds: number
-  /** 当前为滚动模式: 自动翻页改为匀速平滑滚动 */
-  autoScrolled?: boolean
+  /** 自动阅读的推进方式 (翻页 / 匀速滚动 / 墨水屏整屏推进), 见 services/autoReadSpeed autoReadMotion */
+  autoMotion?: AutoReadMotion
+  /** 生效的版式 (竖屏锁定、歌词临时滚动都已算进去), 见 services/portraitLayout effectiveReaderLayout */
+  effectiveFlow?: 'paginated' | 'scrolled'
+  /** 固定版式 (漫画 / 版式 EPUB): 没有翻页 / 滚动之分 */
+  fixedLayout?: boolean
+  /** 竖屏单栏滚动锁定生效中 */
+  portraitLocked?: boolean
+  /** 歌词运行中临时单栏滚动 */
+  modeLocked?: boolean
+  /** 打开时滚到这个分区 (从「排版」的版式入口跳来) */
+  focus?: 'layout' | null
   /** 打字机 / 歌词运行时的进度与剩余时间 (阅读器计算); 未运行为 null */
   progress?: ReadingModeProgress | null
   /** 听书正在播放 */
@@ -134,13 +144,41 @@ function onClock(which: 'from' | 'to', e: Event) {
 }
 
 // ---- 带读 ----
+const autoScrolled = computed(() => !!props.autoMotion && props.autoMotion !== 'page')
 const guideTabs = computed(() => [
   // 滚动方式下自动翻页是匀速滚动, 页签随之改名
-  { value: 'auto' as const, key: props.autoScrolled ? 'readingMode.tabAutoScroll' : 'readingMode.tabAuto' },
+  { value: 'auto' as const, key: autoScrolled.value ? 'readingMode.tabAutoScroll' : 'readingMode.tabAuto' },
   { value: 'typewriter' as const, key: 'readingMode.tabTypewriter' },
   { value: 'lyric' as const, key: 'readingMode.tabLyric' },
   { value: 'tts' as const, key: 'readingMode.tabTts' },
 ])
+
+/**
+ * 带读与版式: 同一个带读在翻页 / 滚动版式下动法不同, 在页签下说清楚现在会怎么动, 并可跳去排版换版式
+ * (docs/reader-panels.md §3.2: 版式的值只在排版里改, 这里只说明和跳转)
+ */
+/** 读者自己的版式 (含竖屏锁定, 不含歌词的临时滚动): 带读各自怎么动由它决定 */
+const baseFlow = computed(() => (props.modeLocked ? 'paginated' : props.effectiveFlow ?? settings.reader.flow))
+const guideLayoutNote = computed(() => {
+  if (props.fixedLayout) return ''
+  const scrolled = baseFlow.value === 'scrolled'
+  switch (tab.value) {
+    case 'auto': return props.autoMotion === 'screen' ? t('readingMode.autoScreenNote') : ''
+    case 'typewriter': return t(scrolled ? 'readingMode.typewriterScrollNote' : 'readingMode.typewriterPageNote')
+    // 歌词运行中版式行下已有「临时一栏滚动」的说明, 不再重复
+    case 'lyric': return scrolled || props.modeLocked ? '' : t('readingMode.lyricLayoutNote')
+    case 'tts': return t(scrolled ? 'readingMode.ttsScrollNote' : 'readingMode.ttsPageNote')
+    default: return ''
+  }
+})
+
+// ---- 版式 (翻页 / 滚动 / 跨章 / 分栏 / 竖屏): 与带读同在「阅读方式」, 书页怎么动只在这一处设置 ----
+const root = ref<HTMLElement>()
+onMounted(async () => {
+  if (props.focus !== 'layout') return
+  await nextTick()
+  root.value?.querySelector<HTMLElement>('[data-section="layout"]')?.scrollIntoView({ block: 'start' })
+})
 
 const runningTab = computed<ReadingModeTab | null>(() => {
   if (props.autoReading) return 'auto'
@@ -211,7 +249,7 @@ function onSpeedInput(e: Event) {
 </script>
 
 <template>
-  <section class="rm-panel card" role="dialog" :aria-label="t('readingMode.title')">
+  <section ref="root" class="rm-panel card" role="dialog" :aria-label="t('readingMode.title')">
     <header class="rm-head">
       <strong>{{ t('readingMode.title') }}</strong>
       <button class="rm-close" type="button" :title="t('common.close')" :aria-label="t('common.close')" @click="close">
@@ -367,10 +405,54 @@ function onSpeedInput(e: Event) {
       </div>
     </section>
 
-    <!-- 带读: 同一时间只运行一个 -->
-    <section class="rm-group" :aria-label="t('readingMode.groupGuide')">
-      <h3 class="rm-group-title">{{ t('readingMode.groupGuide') }}</h3>
-      <div class="segmented rm-tabs">
+    <!-- 阅读方式: 版式 (书页怎么排、怎么翻) + 带读 (怎么带着你读), 书页怎么动只在这一处设置 (docs/reader-panels.md) -->
+    <section class="rm-group" data-section="layout" :aria-label="t('readingMode.groupHow')">
+      <h3 class="rm-group-title">{{ t('readingMode.groupHow') }}</h3>
+
+      <template v-if="!fixedLayout">
+        <div class="rm-row">
+          <span class="rm-label">{{ t('reader.flow') }}</span>
+          <div class="segmented" role="group" :aria-label="t('reader.flow')">
+            <button type="button" :class="{ active: settings.reader.flow === 'paginated' }" :aria-pressed="settings.reader.flow === 'paginated'" @click="settings.reader.flow = 'paginated'">{{ t('reader.paginated') }}</button>
+            <button type="button" :class="{ active: settings.reader.flow === 'scrolled' }" :aria-pressed="settings.reader.flow === 'scrolled'" @click="settings.reader.flow = 'scrolled'">{{ t('reader.scrolled') }}</button>
+          </div>
+        </div>
+        <p v-if="portraitLocked" class="rm-hint rm-indent" role="note">{{ t('reader.portraitLockedNote') }}</p>
+        <p v-else-if="modeLocked" class="rm-hint rm-indent" role="note">{{ t('reader.modeLockedNote') }}</p>
+
+        <!-- 滚动: 跨章连续 / 逐章 (按生效方式, 竖屏锁定时也能调) -->
+        <div v-if="effectiveFlow === 'scrolled'" class="rm-row">
+          <span class="rm-label" :title="t('reader.continuousScrollTitle')">{{ t('reader.continuousScroll') }}</span>
+          <div class="segmented" role="group" :aria-label="t('reader.continuousScroll')">
+            <button type="button" :class="{ active: settings.reader.continuousScroll }" :aria-pressed="settings.reader.continuousScroll" @click="settings.reader.continuousScroll = true">{{ t('reader.continuousScrollOn') }}</button>
+            <button type="button" :class="{ active: !settings.reader.continuousScroll }" :aria-pressed="!settings.reader.continuousScroll" @click="settings.reader.continuousScroll = false">{{ t('reader.continuousScrollOff') }}</button>
+          </div>
+        </div>
+
+        <!-- 翻页: 分栏 (按保存的方式, 竖屏锁定时仍可预设横屏的分栏) -->
+        <template v-if="settings.reader.flow === 'paginated'">
+          <div class="rm-row">
+            <span class="rm-label">{{ t('reader.columns') }}</span>
+            <div class="segmented" role="group" :aria-label="t('reader.columns')">
+              <button type="button" :class="{ active: settings.reader.maxColumnCount === 1 }" :aria-pressed="settings.reader.maxColumnCount === 1" @click="settings.reader.maxColumnCount = 1">{{ t('reader.singleColumn') }}</button>
+              <button type="button" :class="{ active: settings.reader.maxColumnCount === 2 }" :aria-pressed="settings.reader.maxColumnCount === 2" @click="settings.reader.maxColumnCount = 2">{{ t('reader.autoTwoColumns') }}</button>
+            </div>
+          </div>
+          <p v-if="modes.forceSingleColumn.value && settings.reader.maxColumnCount === 2 && !modeLocked" class="rm-hint rm-indent" role="note">{{ t('reader.forcedSingleColumn') }}</p>
+        </template>
+
+        <div class="rm-row">
+          <span class="rm-label" :title="t('reader.portraitScrollTitle')">{{ t('reader.portrait') }}</span>
+          <div class="segmented" role="group" :aria-label="t('reader.portraitScrollMenu')" :title="t('reader.portraitScrollTitle')">
+            <button type="button" :class="{ active: settings.reader.portraitScroll }" :aria-pressed="settings.reader.portraitScroll" @click="settings.reader.portraitScroll = true">{{ t('reader.portraitScrollOn') }}</button>
+            <button type="button" :class="{ active: !settings.reader.portraitScroll }" :aria-pressed="!settings.reader.portraitScroll" @click="settings.reader.portraitScroll = false">{{ t('reader.portraitScrollOff') }}</button>
+          </div>
+        </div>
+      </template>
+
+      <!-- 带读: 同一时间只运行一个; 在上面的版式下各自怎么动, 见页签下的说明 -->
+      <h4 class="rm-subtitle">{{ t('readingMode.groupGuide') }}</h4>
+      <div class="segmented rm-tabs" role="group" :aria-label="t('readingMode.groupGuide')">
         <button
           v-for="g in guideTabs"
           :key="g.value"
@@ -382,6 +464,7 @@ function onSpeedInput(e: Event) {
           {{ t(g.key) }}
         </button>
       </div>
+      <p v-if="guideLayoutNote" class="rm-hint rm-guide-note">{{ guideLayoutNote }}</p>
 
       <!-- 自动翻页 (原自动阅读): 行为不变, 秒/页 3–60 -->
       <div v-if="tab === 'auto'" class="auto-panel rm-body">
@@ -1221,6 +1304,17 @@ function onSpeedInput(e: Event) {
 }
 .rm-self-start {
   align-self: flex-start;
+}
+.rm-subtitle {
+  margin: 6px 0 0;
+  padding-top: 10px;
+  border-top: 1px dashed color-mix(in srgb, var(--border) 80%, transparent);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-3);
+}
+.rm-guide-note {
+  margin-top: -2px;
 }
 .rm-tune {
   align-self: flex-start;

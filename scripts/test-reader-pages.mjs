@@ -10,10 +10,19 @@ import { effectiveReaderLayout, effectivePdfLayout, portraitSpacing, isPortraitV
 // ---- 竖屏单页滚动 (services/portraitLayout.ts) ----
 test('竖屏且开启时生效为单栏滚动, 横屏 / 关闭时用用户设置', () => {
   const base = { flow: 'paginated', maxColumnCount: 2, portraitScroll: true }
-  assert.deepEqual(effectiveReaderLayout({ ...base, portrait: true }), { flow: 'scrolled', maxColumnCount: 1, portraitLocked: true })
-  assert.deepEqual(effectiveReaderLayout({ ...base, portrait: false }), { flow: 'paginated', maxColumnCount: 2, portraitLocked: false })
-  assert.deepEqual(effectiveReaderLayout({ ...base, portraitScroll: false, portrait: true }), { flow: 'paginated', maxColumnCount: 2, portraitLocked: false })
+  assert.deepEqual(effectiveReaderLayout({ ...base, portrait: true }), { flow: 'scrolled', maxColumnCount: 1, portraitLocked: true, modeLocked: false })
+  assert.deepEqual(effectiveReaderLayout({ ...base, portrait: false }), { flow: 'paginated', maxColumnCount: 2, portraitLocked: false, modeLocked: false })
+  assert.deepEqual(effectiveReaderLayout({ ...base, portraitScroll: false, portrait: true }), { flow: 'paginated', maxColumnCount: 2, portraitLocked: false, modeLocked: false })
   assert.equal(effectiveReaderLayout({ ...base, portrait: false, forceSingleColumn: true }).maxColumnCount, 1)
+})
+
+test('带读要求滚动 (歌词): 只改生效值为单栏滚动, 竖屏本就滚动 / 用户本就选滚动时不算临时锁定', () => {
+  const base = { flow: 'paginated', maxColumnCount: 2, portraitScroll: true, forceScrolled: true }
+  assert.deepEqual(effectiveReaderLayout({ ...base, portrait: false }), { flow: 'scrolled', maxColumnCount: 1, portraitLocked: false, modeLocked: true })
+  assert.deepEqual(effectiveReaderLayout({ ...base, portrait: true }), { flow: 'scrolled', maxColumnCount: 1, portraitLocked: true, modeLocked: false })
+  assert.equal(effectiveReaderLayout({ ...base, flow: 'scrolled', portrait: false }).modeLocked, false)
+  // 解除后回到用户自己的翻页双栏
+  assert.deepEqual(effectiveReaderLayout({ ...base, forceScrolled: false, portrait: false }), { flow: 'paginated', maxColumnCount: 2, portraitLocked: false, modeLocked: false })
 })
 
 test('竖屏判定: 占满屏宽时按屏幕方向, 屏幕键盘压矮视口不翻成横屏', () => {

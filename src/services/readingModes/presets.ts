@@ -1,7 +1,7 @@
 /**
  * 「显示」类模式的预设引擎 (纯函数, docs/research/reading-modes-landscape.md §5.1 §6)。
  *
- * 夜间、护眼、墨水屏、大字、歌词都不新增一套设置, 而是「预设开关」: 开启时记下被改动键的原值 (before),
+ * 夜间、护眼、墨水屏、大字都不新增一套设置, 而是「预设开关」(歌词的字号 / 滚动改为生效值, 见 lyricValues): 开启时记下被改动键的原值 (before),
  * 写入预设值 (applied); 关闭时把原值写回。键是设置路径字符串 ('reader.fontSize'、'typewriter.unit' …),
  * 读写由调用方 (useReadingModes) 负责, 这里只算该写什么, 便于 node --test。
  *
@@ -148,9 +148,13 @@ export function largeTextValues(size: 'large' | 'xlarge', custom: PresetValues =
   return base
 }
 
-/** 歌词 §4.2: 临时切到滚动排版; 字号 × scale (1.0–1.6), 行距至少 2.0 */
+/**
+ * 歌词 §4.2: 字号 × scale (1.0–1.6), 行距至少 2.0。
+ * 滚动排版不在这里: 版式是排版面板的值, 歌词运行时由 effectiveReaderLayout 的 forceScrolled 临时生效,
+ * 不写入 (也不同步) reader.flow。旧版本留下的含 reader.flow 的记录照常按快照写回。
+ */
 export function lyricValues(read: ReadValue, scale: number): PresetValues {
-  const out: PresetValues = { 'reader.flow': 'scrolled' }
+  const out: PresetValues = {}
   const s = Math.min(1.6, Math.max(1, Number.isFinite(scale) ? scale : 1.2))
   const fs = Number(read('reader.fontSize')) || 18
   if (s > 1.001) out['reader.fontSize'] = Math.min(64, Math.round(fs * s))

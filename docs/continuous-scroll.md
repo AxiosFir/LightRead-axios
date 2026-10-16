@@ -114,6 +114,7 @@ fork 仍注册为 `foliate-paginator`（view.js 按名字创建，且运行时�
 | `start` / `end` / `size` / `viewSize` | 主章内的相对值：`start = scrollTop − 主章槽顶`，`viewSize = 主章高度`，`size = 视口高` |
 | `containerPosition` get/set | 同样相对主章（set 时加上主章槽顶）；越出主章范围的值照样生效（连续滚过去） |
 | `scrollBy(dx, dy)` | 原始滚动 `scrollTop += dy`（不夹在单章内），供自动滚动按帧推进 |
+| `driftBy(dy)` / `driftEnd()` | 亚像素推进（2026-10-16）：整数部分写 scrollTop，不足 1px 的余数用容器的 `translateY` 显示；连续与单章滚动都可用，单章时滚动中每 250ms 报一次 `relocate`。读者滚动、导航、补偿滚动、手指按下、切换 flow 都会丢掉余数；`driftEnd()` 回到整像素（暂停 / 停止时调用）。翻页、竖排返回 `false`，调用方退回 `scrollBy` |
 | `atStart` / `atEnd` | 全书开头 / 结尾（第一个 / 最后一个线性章且到顶 / 到底） |
 | `getContents()` | 所有已载槽 `{ index, doc, overlayer }`，**主章排第一** |
 | `relocate` | `{ reason, range, index, fraction, size }`：index = 主章，range 只在主章文档内，fraction = 主章内比例。滚动中**节流**派发（约 250ms 一次，取代原来停下 250ms 后才发的防抖），主章切换时立即派发一次 |
@@ -216,3 +217,24 @@ fork 仍注册为 `foliate-paginator`（view.js 按名字创建，且运行时�
   - 往上甩得比预载快时，会短暂看到占位块的空白。
   - D↑ ≤ size 时的紧急插入仍会在甩动中写 scrollTop。
   - 横屏测试必须把轻阅设置切到「滚动」，不能只强制渲染器的 `flow`，否则轻阅会把竖向滑动当翻页并调用 `next()`。
+
+## 13. 亚像素推进（2026-10-16）
+
+**现象**：滚动版式下自动滚动、打字机跟随时文字「一直闪烁跳动」。
+
+**病根**：Chromium 的 `scrollTop` 只接受整 CSS 像素（`scrollTop = 10.5` 读回 11，`+= 0.5` 每次进 1）。自动滚动的速度换算到每帧多半不是整数：适中（15 秒一屏）约 1px/帧还算匀，慢（40 秒一屏）是 0.38px/帧，实际位移成了 `0 1 0 0 1 0 1…`；极慢（5 分钟一屏）每 20 帧突然跳 1px，在 3 倍屏上就是 3 个物理像素。打字机跟随则是出字行越过 65% 时一帧瞬移约 27% 屏。
+
+**做法**：渲染器 `driftBy(dy)` 记住精确位置，整数部分写 scrollTop，余数用 `#container` 的 `translateY(-余数px)` 显示（不加 `will-change`，文字按物理像素重绘、不会糊）。自动滚动（连续 / 单章）、打字机跟随、歌词换行动画（连续）都走它。打字机跟随改为平滑滑动：时长按 `readingFocus.scrollMotion` 再放慢到 1.6 倍（约 350–670ms），墨水屏 / 减少动态效果时瞬移。墨水屏下的自动滚动改为每隔 N 秒整屏推进（`autoReadMotion` = `screen`）。
+
+**实测**（Playwright，412×915 @2x，逐帧量阅读线处文字的位置）：
+
+| 速度 | 修改前每帧位移 (px) | 修改后 |
+|---|---|---|
+| 适中 15 秒/屏 | 1 ×470，2 ×8 | 1.01–1.02 恒定 |
+| 慢 40 秒/屏 | 0 ×185，1 ×114 交替 | 0.38 恒定 |
+| 极慢 300 秒/屏 | 每 20 帧 1 | 0.05 恒定 |
+
+CPU 降速 4 倍无 >25ms 的帧；`e2e:continuous-scroll`（全部场景）与冒烟 e2e 通过。
+
+顺带：`applyPrefs` 只在属性值变了时 `setAttribute`（自定义元素对同值也回调 `render()`，连续模式下会同步重排所有已载章节）；阅读进度保存由防抖改为节流（滚动中 relocate 每 250ms 一次，防抖要等停下才保存）。
+

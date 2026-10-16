@@ -72,3 +72,16 @@ export function autoSpeedKey(seconds: number): string {
 export function stepAutoSpeed(seconds: number, dir: 1 | -1, step = 5): number {
   return secondsAtPosition(speedPosition(seconds) + dir * step)
 }
+
+/**
+ * 自动阅读按什么方式推进 (引擎与面板说明共用一个判断):
+ *  - page: 翻页版式 (或固定版式) 每隔 N 秒翻一页;
+ *  - scroll: 滚动版式匀速平滑滚动, 约 N 秒一屏;
+ *  - screen: 滚动版式但开着墨水屏 — 平滑滚动在墨水屏上是一串残影, 改为每隔 N 秒整屏推进。
+ */
+export type AutoReadMotion = 'page' | 'scroll' | 'screen'
+
+export function autoReadMotion(flow: 'paginated' | 'scrolled', opts: { eink?: boolean; fixedLayout?: boolean } = {}): AutoReadMotion {
+  if (flow !== 'scrolled' || opts.fixedLayout) return 'page'
+  return opts.eink ? 'screen' : 'scroll'
+}

@@ -1,12 +1,13 @@
 <script setup lang="ts">
 /**
- * 「排版」面板 (docs/reader-panels.md §3.1): 书页长什么样 —— 所有静态的外观与版式值只在这里调。
+ * 「排版」面板 (docs/reader-panels.md §3.1): 书页长什么样 —— 字和颜色的值只在这里调。
  * 桌面为顶栏下的浮层卡片, 手机为底部抽屉 (遮罩由 ReaderView 的 sheet-scrim 提供)。
  *   文字 (字号 / 行距 / 边距 / 字体; 更多: 字距 / 对齐 / 导入字体)
  *   配色 (主题 / 调暗)
- *   版式 (翻页·滚动 / 跨章 / 分栏; 更多: 竖屏 / 进度)
+ *   页面 (版式: 只显示当前值, 点了去「模式 › 阅读方式」; 进度显示)
+ * 书页怎么动 (翻页 / 滚动 / 跨章 / 分栏 / 竖屏 + 带读) 只在「模式 › 阅读方式」设置, 这里不重复。
  * 「模式」里的场景 (夜读、大字…) 只是一键套用这里的值, 本面板顶部提示哪些场景开着, 可跳去管理。
- * e2e 依赖: .theme-btn (5 个, 第 3 个护眼绿)、.seg 按钮文案「翻页」「滚动」(见 scripts/e2e-full.mjs)。
+ * e2e 依赖: .theme-btn (5 个, 第 3 个护眼绿)、.tp-jump (版式入口, 见 scripts/e2e-full.mjs)。
  */
 import { computed, nextTick, onMounted, ref } from 'vue'
 import { t } from '../i18n'
@@ -28,6 +29,8 @@ const props = defineProps<{
   fixedLayout: boolean
   /** 竖屏单栏滚动锁定生效中 */
   portraitLocked: boolean
+  /** 带读 (歌词) 临时改成了单栏滚动, 结束后恢复保存的版式 */
+  modeLocked?: boolean
   /** 打开时滚到这个分区 (从「模式」的「在排版里微调」跳来) */
   focus?: TypographySection | null
 }>()
@@ -35,7 +38,8 @@ const props = defineProps<{
 const emit = defineEmits<{
   close: []
   /** 打开「模式」面板管理场景 */
-  'open-modes': []
+  /** 打开「模式」面板: 管理场景, 或 'layout' 定位到「阅读方式」的版式 */
+  'open-modes': [section?: 'layout']
 }>()
 
 const settings = useSettings()
@@ -83,6 +87,15 @@ function onLetterSpacing(e: Event) {
   if (Number.isFinite(n)) settings.reader.letterSpacing = Math.min(0.2, Math.max(0, Math.round(n * 100) / 100))
 }
 
+// ---- 页面: 当前生效的版式 (竖屏锁定 / 歌词临时滚动时注明原因) ----
+const flowName = computed(() => {
+  if (props.fixedLayout) return t('reader.flowFixed')
+  const name = t(props.effectiveFlow === 'scrolled' ? 'reader.scrolled' : 'reader.paginated')
+  if (props.portraitLocked) return t('reader.flowNamePortrait', { name })
+  if (props.modeLocked) return t('reader.flowNameLyric', { name })
+  return name
+})
+
 // ---- 配色 ----
 function onDim(e: Event) {
   const n = Number((e.target as HTMLInputElement).value)
@@ -100,16 +113,16 @@ const sceneNames = computed(() => {
 
 // ---- 「更多」折叠: 按设备记住展开状态 (只是便利, 读不到就收起) ----
 const MORE_KEY = 'lightread-typography-more'
-function loadMore(): { text: boolean; layout: boolean } {
+function loadMore(): { text: boolean } {
   try {
     const v = JSON.parse(localStorage.getItem(MORE_KEY) || 'null')
-    return { text: !!v?.text, layout: !!v?.layout }
+    return { text: !!v?.text }
   } catch {
-    return { text: false, layout: false }
+    return { text: false }
   }
 }
 const more = ref(loadMore())
-function onMoreToggle(which: 'text' | 'layout', e: Event) {
+function onMoreToggle(which: 'text', e: Event) {
   more.value = { ...more.value, [which]: (e.target as HTMLDetailsElement).open }
   try { localStorage.setItem(MORE_KEY, JSON.stringify(more.value)) } catch { /* 存储不可用 */ }
 }
@@ -259,61 +272,25 @@ let systemFontsLoading = false
       <p v-if="modes.einkActive.value" class="set-note" role="note">{{ t('reader.einkColorNote') }}</p>
     </section>
 
-    <!-- 版式 -->
-    <section class="tp-group" data-section="layout" :aria-label="t('reader.groupLayout')">
-      <h3 class="tp-title">{{ t('reader.groupLayout') }}</h3>
+    <!-- 页面: 页眉页脚的进度; 翻页 / 滚动等版式与带读同在「模式 › 阅读方式」, 这里只显示当前值并跳过去 -->
+    <section class="tp-group" data-section="layout" :aria-label="t('reader.groupPage')">
+      <h3 class="tp-title">{{ t('reader.groupPage') }}</h3>
       <div class="set-row">
-        <span class="tp-label">{{ t('reader.flow') }}</span>
-        <div class="seg" role="group" :aria-label="t('reader.flow')">
-          <button type="button" :class="{ active: settings.reader.flow === 'paginated' }" :aria-pressed="settings.reader.flow === 'paginated'" @click="settings.reader.flow = 'paginated'">{{ t('reader.paginated') }}</button>
-          <button type="button" :class="{ active: settings.reader.flow === 'scrolled' }" :aria-pressed="settings.reader.flow === 'scrolled'" @click="settings.reader.flow = 'scrolled'">{{ t('reader.scrolled') }}</button>
+        <span class="tp-label">{{ t('reader.groupLayout') }}</span>
+        <button type="button" class="tp-jump" :aria-label="t('reader.flowJump', { name: flowName })" @click="emit('open-modes', 'layout')">
+          <span>{{ flowName }}</span>
+          <span class="tp-jump-hint">{{ t('reader.flowJumpHint') }}</span>
+          <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M9.3 6.3a1 1 0 0 1 1.4 0l5 5a1 1 0 0 1 0 1.4l-5 5a1 1 0 1 1-1.4-1.4L13.58 12 9.3 7.7a1 1 0 0 1 0-1.4z"/></svg>
+        </button>
+      </div>
+      <div class="set-row">
+        <span class="tp-label">{{ t('reader.progressDisplay') }}</span>
+        <div class="seg" role="group" :aria-label="t('reader.progressDisplay')">
+          <button type="button" :class="{ active: settings.reader.progressDisplay === 'both' }" :aria-pressed="settings.reader.progressDisplay === 'both'" @click="settings.reader.progressDisplay = 'both'">{{ t('reader.progressBoth') }}</button>
+          <button type="button" :class="{ active: settings.reader.progressDisplay === 'page' }" :aria-pressed="settings.reader.progressDisplay === 'page'" @click="settings.reader.progressDisplay = 'page'">{{ t('reader.progressPage') }}</button>
+          <button type="button" :class="{ active: settings.reader.progressDisplay === 'percent' }" :aria-pressed="settings.reader.progressDisplay === 'percent'" @click="settings.reader.progressDisplay = 'percent'">{{ t('reader.progressPercent') }}</button>
         </div>
       </div>
-      <p v-if="portraitLocked" class="set-note" role="note">{{ t('reader.portraitLockedNote') }}</p>
-      <template v-if="effectiveFlow === 'scrolled' && !fixedLayout">
-        <div class="set-row">
-          <span class="tp-label" :title="t('reader.continuousScrollTitle')">{{ t('reader.continuousScroll') }}</span>
-          <div class="seg" role="group" :aria-label="t('reader.continuousScroll')" :title="t('reader.continuousScrollTitle')">
-            <button type="button" :class="{ active: settings.reader.continuousScroll }" :aria-pressed="settings.reader.continuousScroll" @click="settings.reader.continuousScroll = true">{{ t('reader.continuousScrollOn') }}</button>
-            <button type="button" :class="{ active: !settings.reader.continuousScroll }" :aria-pressed="!settings.reader.continuousScroll" @click="settings.reader.continuousScroll = false">{{ t('reader.continuousScrollOff') }}</button>
-          </div>
-        </div>
-        <p v-if="settings.reader.continuousScroll" class="set-note" role="note">{{ t('reader.continuousScrollNote') }}</p>
-      </template>
-      <!-- 分栏只对翻页有意义; 按保存的方式判断 (竖屏锁定时仍可预设横屏的分栏) -->
-      <template v-if="settings.reader.flow === 'paginated'">
-        <div class="set-row">
-          <span class="tp-label">{{ t('reader.columns') }}</span>
-          <div class="seg" role="group" :aria-label="t('reader.columns')">
-            <button type="button" :class="{ active: settings.reader.maxColumnCount === 1 }" :aria-pressed="settings.reader.maxColumnCount === 1" @click="settings.reader.maxColumnCount = 1">{{ t('reader.singleColumn') }}</button>
-            <button type="button" :class="{ active: settings.reader.maxColumnCount === 2 }" :aria-pressed="settings.reader.maxColumnCount === 2" @click="settings.reader.maxColumnCount = 2">{{ t('reader.autoTwoColumns') }}</button>
-          </div>
-        </div>
-        <p v-if="modes.forceSingleColumn.value && settings.reader.maxColumnCount === 2" class="set-note" role="note">{{ t('reader.forcedSingleColumn') }}</p>
-      </template>
-      <details class="tp-more" :open="more.layout" @toggle="onMoreToggle('layout', $event)">
-        <summary>
-          <span>{{ t('reader.more') }}</span>
-          <svg class="tp-chev" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M6.3 9.3a1 1 0 0 1 1.4 0L12 13.58l4.3-4.3a1 1 0 1 1 1.4 1.42l-5 5a1 1 0 0 1-1.4 0l-5-5a1 1 0 0 1 0-1.4z"/></svg>
-        </summary>
-        <div class="tp-more-body">
-          <div class="set-row">
-            <span class="tp-label" :title="t('reader.portraitScrollTitle')">{{ t('reader.portrait') }}</span>
-            <div class="seg" role="group" :aria-label="t('reader.portraitScrollMenu')" :title="t('reader.portraitScrollTitle')">
-              <button type="button" :class="{ active: settings.reader.portraitScroll }" :aria-pressed="settings.reader.portraitScroll" @click="settings.reader.portraitScroll = true">{{ t('reader.portraitScrollOn') }}</button>
-              <button type="button" :class="{ active: !settings.reader.portraitScroll }" :aria-pressed="!settings.reader.portraitScroll" @click="settings.reader.portraitScroll = false">{{ t('reader.portraitScrollOff') }}</button>
-            </div>
-          </div>
-          <div class="set-row">
-            <span class="tp-label">{{ t('reader.progressDisplay') }}</span>
-            <div class="seg" role="group" :aria-label="t('reader.progressDisplay')">
-              <button type="button" :class="{ active: settings.reader.progressDisplay === 'both' }" :aria-pressed="settings.reader.progressDisplay === 'both'" @click="settings.reader.progressDisplay = 'both'">{{ t('reader.progressBoth') }}</button>
-              <button type="button" :class="{ active: settings.reader.progressDisplay === 'page' }" :aria-pressed="settings.reader.progressDisplay === 'page'" @click="settings.reader.progressDisplay = 'page'">{{ t('reader.progressPage') }}</button>
-              <button type="button" :class="{ active: settings.reader.progressDisplay === 'percent' }" :aria-pressed="settings.reader.progressDisplay === 'percent'" @click="settings.reader.progressDisplay = 'percent'">{{ t('reader.progressPercent') }}</button>
-            </div>
-          </div>
-        </div>
-      </details>
     </section>
   </section>
 </template>
@@ -447,6 +424,33 @@ let systemFontsLoading = false
   line-height: 1.5;
   color: var(--text-3);
 }
+.tp-jump {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  margin-left: auto;
+  padding: 0 4px 0 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 13px;
+}
+.tp-jump-hint {
+  color: var(--text-3);
+  font-size: 12px;
+}
+.tp-jump svg {
+  color: var(--text-3);
+}
+.tp-jump:hover {
+  border-color: var(--brand);
+}
+.tp-jump:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
 .font-hint {
   font-size: 12px;
   color: var(--text-3);
@@ -578,6 +582,9 @@ let systemFontsLoading = false
   .seg button,
   .step-btn {
     height: 44px;
+  }
+  .tp-jump {
+    min-height: 44px;
   }
   .step-btn {
     width: 44px;

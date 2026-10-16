@@ -28,7 +28,7 @@ import {
   type Token,
 } from './pacing.ts'
 import { clearReadingModeMarks, createRevealLayer, type RevealColors, type RevealLayer } from './revealLayer.ts'
-import { FOCUS_BAND_BOTTOM, FOCUS_LINE } from '../readingFocus.ts'
+import { FOCUS_BAND_BOTTOM, FOCUS_LINE, scrollMotion, type Motion } from '../readingFocus.ts'
 
 export type TypewriterState = 'idle' | 'running' | 'paused' | 'turning'
 
@@ -58,8 +58,12 @@ export interface TypewriterHost {
   /** 翻到下一页 (到节末时进入下一节) */
   nextPage(): unknown
   nextSection(): unknown
-  /** 滚动模式: 向前滚动 px; 单章渲染时实现方需保证只在本节内滚动, 不跨节 */
+  /** 滚动模式: 向前滚动 px (可为小数, 平滑跟随每帧调用); 单章渲染时实现方需保证只在本节内滚动, 不跨节 */
   scrollForward(px: number): void
+  /** 跟随滚动停下 (暂停 / 退出 / 翻页): 渲染器回到整像素。可选 */
+  scrollSettle?(): void
+  /** 跟随一次挪多远时怎么动 (墨水屏 / 减少动态效果时瞬移); 不提供时按 readingFocus.scrollMotion */
+  followMotion?(distance: number, viewport: number): Motion
   /** 阅读区视口在宿主窗口中的位置 (滚动跟随用) */
   viewportRect(): DOMRect | null
   colors(): RevealColors
@@ -109,6 +113,8 @@ export class TypewriterController {
   #atomShown = 0
   #atomRevealedAt = 0
   #lastFollow = 0
+  /** 滚动跟随的平滑挪动: 每帧按缓动推进, 不再一下跳过大半屏 */
+  #glide: { t0: number; dur: number; total: number; done: number } | null = null
 
   constructor(host: TypewriterHost, cfg: TypewriterConfig, ev: TypewriterEvents = {}) {
     this.#host = host
@@ -151,6 +157,7 @@ export class TypewriterController {
     clearTimeout(this.#turnTimer)
     this.#turnTimer = undefined
     this.#cancelFrame()
+    this.#endGlide()
     this.#pausedAt = performance.now()
     this.#setState('paused')
   }
@@ -170,6 +177,7 @@ export class TypewriterController {
     this.#watchdog = undefined
     this.#awaitingTurn = false
     this.#cancelFrame()
+    this.#endGlide()
     const doc = this.#text?.doc
     try { this.#layer?.dispose() } catch { /* 文档已卸载 */ }
     clearReadingModeMarks(doc)
@@ -466,9 +474,10 @@ export class TypewriterController {
       this.#beginTurn(now)
       return
     }
-    if (scrolled && !this.#vertical && now - this.#lastFollow > FOLLOW_INTERVAL_MS) {
+    if (this.#glide) this.#stepGlide(now)
+    else if (scrolled && !this.#vertical && now - this.#lastFollow > FOLLOW_INTERVAL_MS) {
       this.#lastFollow = now
-      this.#follow()
+      this.#follow(now)
     }
     if (elapsed >= s.total) {
       // 窗口打完 (含末尾停顿): 窗口末尾的开引号等零宽内容一并显示, 再接下一个窗口
@@ -560,8 +569,11 @@ export class TypewriterController {
     return groupLines(pos, lineSize).map(([a, b]) => [weighted[a].start, weighted[b - 1].end] as [number, number])
   }
 
-  /** 滚动模式的打字机滚动: 与听书跟随同一套阅读焦点 (services/readingFocus) — 出字行越过舒适区下沿 (65%) 时挪回焦点线 (38%) */
-  #follow() {
+  /**
+   * 滚动模式的打字机滚动: 与听书跟随同一套阅读焦点 (services/readingFocus) — 出字行越过舒适区下沿 (65%) 时挪回焦点线 (38%)。
+   * 挪动是平滑的 (220–420ms 缓动, 每帧亚像素推进); 以前一次瞬移大半屏, 正在读的字整块跳走。
+   */
+  #follow(now: number) {
     const text = this.#text!
     if (this.#cursor <= 0) return
     const r = text.range(Math.max(0, this.#cursor - 1), this.#cursor)
@@ -572,11 +584,37 @@ export class TypewriterController {
     const vp = this.#host.viewportRect()
     if (!frame || !vp || vp.height <= 0) return
     const y = frame.top + rect.bottom
-    if ((y - vp.top) / vp.height > FOCUS_BAND_BOTTOM) this.#host.scrollForward(y - vp.top - vp.height * FOCUS_LINE)
+    if ((y - vp.top) / vp.height <= FOCUS_BAND_BOTTOM) return
+    const distance = y - vp.top - vp.height * FOCUS_LINE
+    const m = this.#host.followMotion?.(distance, vp.height) ?? scrollMotion(distance, vp.height)
+    if (m.behavior === 'auto' || m.duration <= 0) this.#host.scrollForward(distance)
+    else {
+      this.#glide = { t0: now, dur: m.duration, total: distance, done: 0 }
+      this.#stepGlide(now)
+    }
+  }
+
+  #stepGlide(now: number) {
+    const g = this.#glide
+    if (!g) return
+    const f = Math.min(1, Math.max(0, (now - g.t0) / g.dur))
+    const eased = f < 0.5 ? 2 * f * f : 1 - (-2 * f + 2) ** 2 / 2
+    const target = g.total * eased
+    if (target > g.done) {
+      this.#host.scrollForward(target - g.done)
+      g.done = target
+    }
+    if (f >= 1) this.#glide = null
+  }
+
+  #endGlide() {
+    this.#glide = null
+    try { this.#host.scrollSettle?.() } catch { /* 渲染器已销毁 */ }
   }
 
   #beginTurn(now: number) {
     this.#cancelFrame()
+    this.#endGlide()
     this.#setState('turning')
     const atomWait = this.#atomRevealedAt ? this.#atomRevealedAt + ATOM_MS - now : 0
     const dwell = Math.max(this.#cfg.pageDwellMs, atomWait, 0)

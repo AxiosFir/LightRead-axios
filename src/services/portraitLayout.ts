@@ -52,6 +52,8 @@ export interface ReaderLayoutInput {
   portrait: boolean
   /** 大字 / 歌词等阅读模式要求单栏 */
   forceSingleColumn?: boolean
+  /** 带读要求滚动 (歌词运行中): 只改生效值, 不写用户保存的版式 */
+  forceScrolled?: boolean
 }
 
 export interface ReaderLayout {
@@ -59,15 +61,24 @@ export interface ReaderLayout {
   maxColumnCount: 1 | 2
   /** 竖屏锁定生效中 (界面可据此提示「横屏后恢复」) */
   portraitLocked: boolean
+  /** 带读临时改成了滚动 (界面提示「结束后恢复」); 竖屏锁定本来就是滚动时为 false */
+  modeLocked: boolean
 }
 
-/** 重排书 (EPUB / TXT …) 的生效排版 */
+/**
+ * 重排书 (EPUB / TXT …) 的生效排版。版式只有这一个出口: 用户保存的值 (排版面板) + 临时约束
+ * (竖屏锁定、带读要求的滚动、场景要求的单栏), 约束一律不回写设置, 解除后自然回到用户的选择。
+ */
 export function effectiveReaderLayout(input: ReaderLayoutInput): ReaderLayout {
   const locked = input.portraitScroll && input.portrait
+  const modeLocked = !!input.forceScrolled && !locked && input.flow !== 'scrolled'
+  const flow: ReaderFlow = locked || input.forceScrolled ? 'scrolled' : input.flow
   return {
-    flow: locked ? 'scrolled' : input.flow,
-    maxColumnCount: locked || input.forceSingleColumn ? 1 : input.maxColumnCount,
+    flow,
+    // 竖屏 / 歌词的滚动都是单栏; 翻页时大字等场景也要单栏
+    maxColumnCount: locked || input.forceScrolled || input.forceSingleColumn ? 1 : input.maxColumnCount,
     portraitLocked: locked,
+    modeLocked,
   }
 }
 

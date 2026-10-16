@@ -352,11 +352,10 @@ test('预设叠加: 大字之上开歌词 (×1.2), 先关下层或先关上层�
   s.engage('largeText', largeTextValues('large'))
   s.engage('lyric', lyricValues(s.read, 1.2))
   assert.equal(s.state.reader.fontSize, 29)
-  assert.equal(s.state.reader.flow, 'scrolled')
+  assert.equal(s.state.reader.flow, 'paginated') // 版式不经预设: 歌词的滚动只是生效值
   assert.equal(holderOf(s.records, 'reader.fontSize'), 'lyric')
   s.release('lyric')
   assert.equal(s.state.reader.fontSize, 24)
-  assert.equal(s.state.reader.flow, 'paginated')
   s.release('largeText')
   assert.deepEqual(s.state.reader, READER)
 
@@ -393,9 +392,9 @@ test('预设: 主题类键被用户改过时不恢复 (尊重用户的选择)', 
   s.state.reader.theme = 'green'
   s.release('night')
   assert.equal(s.state.reader.theme, 'green')
-  // 歌词期间用户改回分页: 退出歌词不再改
+  // 旧版本歌词记录 (含 reader.flow) 期间用户改回分页: 退出歌词不再改
   const s2 = fakeSettings({ reader: READER })
-  s2.engage('lyric', lyricValues(s2.read, 1))
+  s2.engage('lyric', { 'reader.flow': 'scrolled', ...lyricValues(s2.read, 1) })
   assert.equal(s2.state.reader.fontSize, 18) // ×1.0 不改字号
   assert.equal(s2.state.reader.lineHeight, 2) // 行距至少 2.0
   s2.state.reader.flow = 'paginated'
@@ -406,10 +405,18 @@ test('预设: 主题类键被用户改过时不恢复 (尊重用户的选择)', 
 
 test('预设: 歌词字号倍数收敛到 1.0–1.6, 已经 ≥2 的行距不动; 墨水屏把逐字改为逐句', () => {
   const read = k => ({ 'reader.fontSize': 20, 'reader.lineHeight': 2.2 })[k]
-  assert.deepEqual(lyricValues(read, 3), { 'reader.flow': 'scrolled', 'reader.fontSize': 32 })
-  assert.deepEqual(lyricValues(read, 0.5), { 'reader.flow': 'scrolled' })
+  assert.deepEqual(lyricValues(read, 3), { 'reader.fontSize': 32 })
+  assert.deepEqual(lyricValues(read, 0.5), {})
   assert.deepEqual(einkValues(k => (k === 'typewriter.unit' ? 'char' : undefined)), { 'typewriter.unit': 'sentence' })
   assert.deepEqual(einkValues(k => (k === 'typewriter.unit' ? 'line' : undefined)), {})
+})
+
+test('预设: 旧版本歌词记录里的 reader.flow 关闭时照常写回', () => {
+  const s = fakeSettings({ reader: READER })
+  s.engage('lyric', { 'reader.flow': 'scrolled', 'reader.lineHeight': 2 })
+  assert.equal(s.state.reader.flow, 'scrolled')
+  s.release('lyric')
+  assert.deepEqual(s.state.reader, READER)
 })
 
 test('夜间 / 护眼: 判定与关闭后的主题', () => {
@@ -837,7 +844,7 @@ test('打字声合成兜底: 每个音色都能生成, 结果确定、无 NaN、
 })
 
 // ---- 自动翻页 / 滚动速度: 1–100 档 (services/autoReadSpeed.ts) ----
-import { AUTO_SPEED_LEVELS, AUTO_SPEED_STEPS, autoSpeedKey, stepAutoSpeed, speedPosition, secondsAtPosition } from '../src/services/autoReadSpeed.ts'
+import { AUTO_SPEED_LEVELS, AUTO_SPEED_STEPS, autoSpeedKey, stepAutoSpeed, speedPosition, secondsAtPosition, autoReadMotion } from '../src/services/autoReadSpeed.ts'
 
 test('自动速度: 100 档, 刻度从极慢到极快, 默认 15 秒落在正中间「适中」', () => {
   assert.equal(AUTO_SPEED_STEPS, 100)
@@ -895,4 +902,12 @@ test('点睛阅读两个版本的文案: 中英都有; 界面里不再出现旧�
   for (const w of ['Bionic', 'Clear Words', 'Word guide']) assert.ok(!enText.includes(w), `en 界面文案不应出现「${w}」`)
   const panel = readFileSync(new URL('../src/components/ReadingModePanel.vue', import.meta.url), 'utf8')
   assert.doesNotMatch(panel, /wordGuide\.enabled|setWordGuide|groupLab/, '阅读模式面板里不再有单独的按词着色开关')
+})
+
+test('自动阅读的推进方式: 翻页 / 固定版式按页, 滚动匀速滚, 墨水屏滚动整屏推进', () => {
+  assert.equal(autoReadMotion('paginated'), 'page')
+  assert.equal(autoReadMotion('paginated', { eink: true }), 'page')
+  assert.equal(autoReadMotion('scrolled'), 'scroll')
+  assert.equal(autoReadMotion('scrolled', { eink: true }), 'screen')
+  assert.equal(autoReadMotion('scrolled', { fixedLayout: true }), 'page')
 })

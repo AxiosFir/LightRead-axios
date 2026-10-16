@@ -128,6 +128,7 @@ import { normalizeLevel, smartOnFor } from '../services/dianjing/level'
 import { KeyWordLayer, looksChinese, type KwSmartInput } from '../services/readingModes/keyWordsLayer'
 import { disposeKeyWordService, keyWordService, type KwBookHost } from '../services/readingModes/keyWordsClient'
 import type { KwLevel } from '../services/readingModes/keyWords'
+import { prefersReducedMotion, scrollMotion } from '../services/readingFocus'
 
 /**
  * 「重点词」的数据来源 (由阅读器在点睛阅读接好后设置, 见 setKeyWordSource):
@@ -445,14 +446,23 @@ export function useReadingModes(opts: UseReadingModesOptions) {
     nextSection: () => guideNextSection(controller.value?.section ?? -1),
     scrollForward: px => {
       const r = renderer()
-      if (!r || px <= 0) return
+      if (!r || !(px > 0)) return
+      // 亚像素推进 (平滑跟随每帧调用); 单章渲染时 driftBy 本就停在本节末尾, 跨节交给节末逻辑
+      if (r.driftBy?.(px)) return
       // 跨章连续滚动: 原始滚动即可 (光标在阅读线之下, 主章不会因此越过本节)
       if (r.continuous) {
-        r.scrollBy?.(0, px)
+        r.scrollBy?.(0, Math.round(px))
         return
       }
       // 只在本节内滚动: 到底时 renderer.next 会跨节, 交给节末逻辑
-      if (r.viewSize - r.end > 2) void r.next(px)
+      if (r.viewSize - r.end > 2 && px >= 1) void r.next(px)
+    },
+    scrollSettle: () => renderer()?.driftEnd?.(),
+    // 墨水屏上平滑滚动是一串残影, 系统要求减少动态效果时也瞬移。
+    // 视线正停在出字的那一行上, 比听书跟随放慢一些 (约 350–670ms), 眼睛能跟着走
+    followMotion: (distance, viewport) => {
+      const m = scrollMotion(distance, viewport, einkActive.value || prefersReducedMotion())
+      return m.behavior === 'smooth' ? { ...m, duration: Math.round(m.duration * 1.6) } : m
     },
     viewportRect: () => renderer()?.getBoundingClientRect?.() ?? null,
     colors: () => opts.getColors(),
@@ -618,7 +628,8 @@ export function useReadingModes(opts: UseReadingModesOptions) {
         const frame = lyricFrameRect()
         if (vp && frame) {
           const delta = px - (vp.top - frame.top)
-          if (Math.abs(delta) >= 0.5) r.scrollBy?.(0, delta)
+          // 亚像素推进: 换行动画逐帧的小数位移不再被取整成 0/1px 的抖动 (frame 位置已含余数)
+          if (Math.abs(delta) >= 0.01 && !r.driftBy?.(delta) && Math.abs(delta) >= 0.5) r.scrollBy?.(0, delta)
           return
         }
       }
@@ -688,7 +699,7 @@ export function useReadingModes(opts: UseReadingModesOptions) {
 
   /**
    * 开始歌词。driver 不传时: 听书正在播放 → 跟听书, 否则用设置里的驱动。
-   * 互斥: 退出打字机、停自动翻页; 非跟听书时暂停听书。临时切到滚动排版 (歌词预设), 退出时恢复。
+   * 互斥: 退出打字机、停自动翻页; 非跟听书时暂停听书。临时用滚动排版 (forceScrolled, 只是生效值) 并套用歌词字号预设, 退出时恢复。
    */
   async function startLyric(driver?: LyricDriver): Promise<boolean> {
     refreshBookInfo()
@@ -717,8 +728,9 @@ export function useReadingModes(opts: UseReadingModesOptions) {
     lyricDriver.value = drv
     lyricStarting.value = true
     try {
-      const changed = engage('lyric', lyricValues(read, ly.value.scale))
-      if (changed) {
+      // 滚动 (forceScrolled) 与字号 (typographyOverride) 都只是生效值: lyricStarting 已为 true,
+      // ReaderView 的生效排版 / renderKey 随之重排; 不写 reader.flow / fontSize, 也就不会同步到别的设备
+      if (lyricTypography.value || !renderer()?.scrolled) {
         // ReaderView 的 applyPrefs 有 120ms 防抖, 之后 foliate 重排并 relocate
         await waitRelocate(1500)
         for (let i = 0; i < 20 && !renderer()?.scrolled; i++) await waitRelocate(100)
@@ -749,23 +761,25 @@ export function useReadingModes(opts: UseReadingModesOptions) {
     return ok
   }
 
-  /** 恢复排版: 先让渲染器以当前行为锚点, 再撤销歌词预设 (切回分页后停在这一行所在的页) */
+  /**
+   * 恢复排版: 歌词的滚动与字号都是生效值, lyricActive 变 false 后 ReaderView 自动重排回读者自己的版式;
+   * 这里先让渲染器以当前行为锚点 (切回分页 / 原字号后停在这一行所在的页)。旧版本残留的歌词预设顺带撤销
+   */
   function restoreLyricLayout(range: Range | null) {
     listenScroll(false)
     lyricDetached.value = null
-    if (!settings.readingMode.presets.lyric) return
-    try { if (range) void renderer()?.scrollToAnchor?.(range) } catch { /* 忽略 */ }
-    release('lyric')
+    const relayout = settings.reader.flow !== 'scrolled' || Object.keys(lyricValues(read, ly.value.scale)).length > 0 || !!settings.readingMode.presets.lyric
+    try { if (range && relayout) void renderer()?.scrollToAnchor?.(range) } catch { /* 忽略 */ }
+    if (settings.readingMode.presets.lyric) release('lyric')
   }
 
   function stopLyric() {
     lyricToken++
-    const wasStarting = lyricStarting.value
     lyricStarting.value = false
     const c = lyric.value
     const range = c?.active ? c.currentRange() : null
     c?.stop()
-    if (wasStarting || range || settings.readingMode.presets.lyric) restoreLyricLayout(range)
+    restoreLyricLayout(range)
     lyricDriver.value = settings.readingMode.lyric.driver
   }
 
@@ -825,14 +839,7 @@ export function useReadingModes(opts: UseReadingModesOptions) {
     lyricDriver.value = d
     lyric.value?.setConfig({ driver: d })
   })
-  // 歌词字号变化: 运行中重新套用预设
-  watch(() => ly.value.scale, () => {
-    if (lyricActive.value && settings.readingMode.presets.lyric) {
-      const before = settings.readingMode.presets.lyric.before
-      const base = (key: string) => (key in before ? before[key] : read(key))
-      engage('lyric', lyricValues(base, ly.value.scale))
-    }
-  })
+  // 歌词字号变化: typographyOverride 随之变, renderKey 触发 ReaderView 重排
 
   // =====================================================================
   // 带读的统一控制 (迷你条、面板、快捷键、自动暂停)
@@ -949,11 +956,24 @@ export function useReadingModes(opts: UseReadingModesOptions) {
 
   /** 大字、歌词运行时强制单栏 (不改用户的双栏设置) */
   const forceSingleColumn = computed(() => largeTextOn.value || lyricActive.value)
+  /** 歌词运行时 (含启动中) 临时滚动排版: 只是生效值 (effectiveReaderLayout), 不改用户保存的翻页方式 */
+  const forceScrolled = computed(() => lyricActive.value)
+  /** 歌词的字号 × 倍数、行距至少 2.0: 同样只是生效值, 不写 settings.reader (不同步、不污染排版面板) */
+  const lyricTypography = computed<{ fontSize?: number; lineHeight?: number } | null>(() => {
+    if (!lyricActive.value) return null
+    const v = lyricValues(read, ly.value.scale)
+    const out: { fontSize?: number; lineHeight?: number } = {}
+    if (typeof v['reader.fontSize'] === 'number') out.fontSize = v['reader.fontSize']
+    if (typeof v['reader.lineHeight'] === 'number') out.lineHeight = v['reader.lineHeight']
+    return Object.keys(out).length ? out : null
+  })
+  /** 阅读器传给 getReaderCSS 前叠加到 settings.reader 上的生效排版值 */
+  const typographyOverride = computed(() => lyricTypography.value ?? {})
 
   /** 传给 getReaderCSS / resolveReaderColors 的附加样式 */
   const readerStyle = computed<ReaderModeStyle>(() => ({ eink: einkActive.value, largeText: largeTextOn.value, wordGuideIntensity: guideIntensity(settings.readingMode.wordGuide), wordGuideColor: settings.readingMode.wordGuide.color }))
   /** 影响排版 / 样式的模式状态: 阅读器 watch 它来重新 applyPrefs */
-  const renderKey = computed(() => `${einkActive.value ? 1 : 0}${largeTextOn.value ? 1 : 0}${forceSingleColumn.value ? 1 : 0}|${guideIntensity(settings.readingMode.wordGuide).toFixed(2)}|${settings.readingMode.wordGuide.color ?? ''}`)
+  const renderKey = computed(() => `${einkActive.value ? 1 : 0}${largeTextOn.value ? 1 : 0}${forceSingleColumn.value ? 1 : 0}|${JSON.stringify(typographyOverride.value)}|${guideIntensity(settings.readingMode.wordGuide).toFixed(2)}|${settings.readingMode.wordGuide.color ?? ''}`)
   /** 阅读器根元素的类名 (样式在 ReadingModeLayer.vue 里) */
   const shellClass = computed(() => ({
     'lr-eink': einkActive.value,
@@ -1522,6 +1542,8 @@ export function useReadingModes(opts: UseReadingModesOptions) {
     toggleImmersive,
     marginalsPolicy,
     forceSingleColumn,
+    forceScrolled,
+    typographyOverride,
     // ---- 带读: 统一控制 ----
     activeGuide,
     progressActive,

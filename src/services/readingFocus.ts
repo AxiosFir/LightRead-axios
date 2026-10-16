@@ -130,6 +130,11 @@ export function scrollMotion(distance: number, viewport: number, reducedMotion =
   return { behavior: 'smooth', duration: Math.round(clamp(220 + 200 * (d / vp), 220, 420)) }
 }
 
+/** 系统要求减少动态效果 (prefers-reduced-motion) */
+export function prefersReducedMotion(): boolean {
+  try { return !!globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches } catch { return false }
+}
+
 function clamp(x: number, lo: number, hi: number) {
   return Math.min(hi, Math.max(lo, Number.isFinite(x) ? x : 0))
 }
