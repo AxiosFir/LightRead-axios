@@ -1,0 +1,931 @@
+{
+  "project": "https://github.com/yzfly/LightRead",
+  "account": "yzfly",
+  "campaign_date": "2026-10-15",
+  "checked_at_utc": "2026-10-16T01:02:18.253815+00:00",
+  "submissions": [
+    {
+      "kind": "pr",
+      "repo": "jaywcjlove/awesome-mac",
+      "title": "Add LightRead to Ebooks",
+      "body": "### Types of Changes\n\n- [x] New addition to list\n- [ ] Fixing bug in existing item in list\n- [ ] Removing item from list\n- [ ] Changing structure (organization) of list\n\n### Proposed Changes\n\nAdd [LightRead](https://github.com/yzfly/LightRead), an open-source, local-first ebook and paper reader, to the ebook sections in the English, Chinese, Japanese, and Korean READMEs. It supports EPUB/PDF reading, annotations, and text-to-speech; local reading works without an account or network connection.\n\n[Published releases](https://github.com/yzfly/LightRead/releases/latest) include macOS installers for both Apple Silicon and Intel. Source code is licensed under AGPL-3.0-or-later. Screenshots and installation instructions are in the project README.\n\n### PR Checklist\n\n- [x] I have read the CONTRIBUTING guide\n- [x] I have explained why this PR is important\n- [x] I have added necessary documentation (if appropriate)\n\n### Further Comments\n\nSelf-submission from the project owner, prepared with AI assistance using this repository's awesome-mac-maintainer skill. Checked for duplicate entries and submissions, kept one sentence per language, matched the existing OSS/freeware icons, and ran `git diff --check`. Only the four new listing lines are changed.\n",
+      "url": "https://github.com/jaywcjlove/awesome-mac/pull/3520",
+      "status": "submitted",
+      "fork": "yzfly/awesome-mac",
+      "branch": "add-lightread-20261015",
+      "verification": {
+        "files": [
+          {
+            "path": "README-ja.md",
+            "additions": 1,
+            "deletions": 0,
+            "changeType": "MODIFIED"
+          },
+          {
+            "path": "README-ko.md",
+            "additions": 1,
+            "deletions": 0,
+            "changeType": "MODIFIED"
+          },
+          {
+            "path": "README-zh.md",
+            "additions": 1,
+            "deletions": 0,
+            "changeType": "MODIFIED"
+          },
+          {
+            "path": "README.md",
+            "additions": 1,
+            "deletions": 0,
+            "changeType": "MODIFIED"
+          }
+        ],
+        "mergeable": "MERGEABLE",
+        "state": "OPEN",
+        "statusCheckRollup": [
+          {
+            "__typename": "StatusContext",
+            "context": "License Compliance",
+            "startedAt": "2026-10-16T00:37:50Z",
+            "state": "PENDING",
+            "targetUrl": "https://app.fossa.com/projects/git%2Bgithub.com%2Fjaywcjlove%2Fawesome-mac/refs/branch/master/790f2cb608a3ad81135c9c12276dd260a6455241"
+          }
+        ],
+        "url": "https://github.com/jaywcjlove/awesome-mac/pull/3520"
+      }
+    },
+    {
+      "kind": "pr",
+      "repo": "1c7/chinese-independent-developer",
+      "title": "添加 LightRead 轻阅：开源本地电子书与论文阅读器",
+      "body": "自荐开源应用 [LightRead 轻阅](https://github.com/yzfly/LightRead)，添加到 2026 年 10 月 15 日的项目列表。\n\n轻阅用于管理和阅读本地电子书、PDF 论文，支持批注与听书，本地阅读不需要注册或联网。已有可直接下载安装的 macOS、Windows、Linux 版本，因此放在主版面；条目链接直接指向 Releases，另附源码与使用说明。\n\n已阅读贡献指南，按“先定性，再加分”的格式写一句话介绍，并检查了现有条目和历史投稿，无重复。改动仅新增作者和应用条目，通过 `git diff --check`。本次投稿由项目作者使用 AI 辅助整理。\n",
+      "url": "https://github.com/1c7/chinese-independent-developer/pull/1567",
+      "status": "submitted",
+      "fork": "yzfly/chinese-independent-developer",
+      "branch": "add-lightread-20261015",
+      "verification": {
+        "files": [
+          {
+            "path": "README.md",
+            "additions": 3,
+            "deletions": 0,
+            "changeType": "MODIFIED"
+          }
+        ],
+        "mergeable": "MERGEABLE",
+        "state": "OPEN",
+        "statusCheckRollup": [],
+        "url": "https://github.com/1c7/chinese-independent-developer/pull/1567"
+      }
+    },
+    {
+      "kind": "pr",
+      "repo": "chrysler-stone/awesome-tauri-apps",
+      "title": "Add LightRead (Productivity)",
+      "body": "Add [LightRead](https://github.com/yzfly/LightRead) to Productivity, alongside the existing ebook reader entry and in alphabetical order.\n\nLightRead is a free, open-source ebook and paper reader built with Tauri 2 and Vue 3. It supports local EPUB/PDF reading, annotations, and text-to-speech. Local reading requires neither an account nor a network connection. Optional online AI services are configured separately and may charge their own usage fees.\n\n- Source: https://github.com/yzfly/LightRead (AGPL-3.0-or-later)\n- Downloadable macOS, Windows, and Linux builds: https://github.com/yzfly/LightRead/releases/latest\n- Tauri configuration: https://github.com/yzfly/LightRead/blob/main/src-tauri/tauri.conf.json\n\nSelf-submission from the project owner, prepared with AI assistance. Read the contribution guidelines, checked for duplicates, and validated the one-line change with `git diff --check`.\n",
+      "url": "https://github.com/chrysler-stone/awesome-tauri-apps/pull/24",
+      "status": "submitted",
+      "fork": "yzfly/awesome-tauri-apps",
+      "branch": "add-lightread-20261015",
+      "verification": {
+        "files": [
+          {
+            "path": "README.md",
+            "additions": 1,
+            "deletions": 0,
+            "changeType": "MODIFIED"
+          }
+        ],
+        "mergeable": "MERGEABLE",
+        "state": "OPEN",
+        "statusCheckRollup": [],
+        "url": "https://github.com/chrysler-stone/awesome-tauri-apps/pull/24"
+      }
+    },
+    {
+      "kind": "issue",
+      "repo": "ruanyf/weekly",
+      "title": "【开源自荐】LightRead 轻阅：本地优先的电子书与论文阅读器",
+      "body": "项目地址：https://github.com/yzfly/LightRead\n下载地址：https://github.com/yzfly/LightRead/releases/latest\n\n自荐一个开源阅读工具 LightRead（轻阅），面向同时阅读电子书和 PDF 论文的用户。它把藏书、阅读进度和批注默认保存在本机，本地阅读不需要注册或联网，提供 macOS、Windows、Linux 安装包，另有实验性 Android 版本。\n\n几个主要用途：\n\n- 阅读 EPUB、MOBI、AZW3、PDF 等格式，在同一个本地书库中管理电子书和论文。\n- PDF 原版页面阅读、划线批注、书签和听书；支持离线语音模型。\n- 从 arXiv、古登堡计划、OPDS / Calibre 等来源找书或论文。\n- 可选论文翻译和 Agent 精读；“论文十问”分别保留 AI 初答、自己的修订和 AI 再答，方便形成自己的理解。\n- 支持开放藏书包导入导出和 WebDAV 备份，便于迁移自己的数据。\n\n技术栈是 Tauri 2 + Rust + Vue 3，许可证为 AGPL-3.0-or-later。AI、在线书源和在线语音属于可选联网功能，模型服务可能产生费用；不配置 AI 也可正常阅读。\n\n![轻阅书库](https://raw.githubusercontent.com/yzfly/LightRead/main/docs/screenshots/library.png)\n\n![PDF 双页阅读](https://raw.githubusercontent.com/yzfly/LightRead/main/docs/screenshots/pdf-spread.png)\n\n欢迎试用与反馈。\n",
+      "url": "https://github.com/ruanyf/weekly/issues/12421",
+      "status": "submitted",
+      "verification": {
+        "state": "OPEN",
+        "url": "https://github.com/ruanyf/weekly/issues/12421"
+      }
+    },
+    {
+      "kind": "issue",
+      "repo": "521xueweihan/HelloGitHub",
+      "title": "[开源推荐] LightRead：本地优先的电子书与论文阅读器",
+      "body": "### 项目地址\n\nhttps://github.com/yzfly/LightRead\n\n### 类别\n\nJS\n\n### 项目标题\n\n本地优先的跨平台电子书与论文阅读器\n\n### 项目描述\n\nLightRead（轻阅）是用 Vue 3、TypeScript 和 Tauri 2 构建的开源阅读器。它将电子书与 PDF 论文放进本地书库，支持批注、听书和阅读进度管理，本地阅读无需注册或联网。已有 macOS、Windows、Linux 安装包，适合希望保留自己藏书与阅读数据的用户。\n\n### 亮点\n\n- 同时照顾普通电子书阅读和论文精读：支持 EPUB、MOBI、AZW3、PDF 等格式，论文有独立工作区。\n- 论文十问将 AI 初答、人工修订和 AI 再答分开保存，避免生成结果覆盖读者自己的理解；AI 为可选功能，需要配置相应服务，可能产生费用。\n- 支持本地离线听书、OPDS / Calibre 书源、arXiv 检索、开放藏书包迁移和 WebDAV 备份。\n- 开发者可以参考 Vue 前端与 Tauri/Rust 桌面能力的整合，以及桌面文件存储、SQLite 和浏览器 IndexedDB 的平台适配。\n\n这是作者自荐。许可证为 AGPL-3.0-or-later，安装和使用说明见项目 README，安装包在 [Releases](https://github.com/yzfly/LightRead/releases/latest)。Android 目前为实验版本。\n\n### 示例代码\n\n这是面向用户的桌面应用，可以直接下载安装包，无需写代码。\n\n### 截图或演示视频\n\n![本地书库](https://raw.githubusercontent.com/yzfly/LightRead/main/docs/screenshots/library.png)\n\n![PDF 论文阅读](https://raw.githubusercontent.com/yzfly/LightRead/main/docs/screenshots/pdf-spread.png)\n",
+      "url": "https://github.com/521xueweihan/HelloGitHub/issues/3991",
+      "status": "submitted",
+      "verification": {
+        "state": "OPEN",
+        "url": "https://github.com/521xueweihan/HelloGitHub/issues/3991"
+      }
+    },
+    {
+      "kind": "issue",
+      "repo": "GitHubDaily/GitHubDaily",
+      "title": "【开源自荐】LightRead 轻阅：跨平台本地电子书与论文阅读器",
+      "body": "- 项目名称：LightRead 轻阅\n\n- 项目地址：https://github.com/yzfly/LightRead\n\n- 项目简介（100 字以内）：开源、本地优先的电子书与论文阅读器，支持 EPUB、MOBI、PDF、批注和听书，本地阅读无需注册或联网；可选论文翻译与 AI 精读，提供 macOS、Windows、Linux 安装包。\n\n- 项目截图：\n\n![本地藏书](https://raw.githubusercontent.com/yzfly/LightRead/main/docs/screenshots/library.png)\n\n![PDF 论文双页阅读](https://raw.githubusercontent.com/yzfly/LightRead/main/docs/screenshots/pdf-spread.png)\n\n作者自荐。基于 Tauri 2 + Vue 3，采用 AGPL-3.0-or-later 许可证；[下载最新版](https://github.com/yzfly/LightRead/releases/latest)。AI 与在线书源是可选联网功能，AI 服务可能产生费用，Android 目前为实验版本。\n",
+      "url": "https://github.com/GitHubDaily/GitHubDaily/issues/1220",
+      "status": "submitted",
+      "verification": {
+        "state": "OPEN",
+        "url": "https://github.com/GitHubDaily/GitHubDaily/issues/1220"
+      }
+    },
+    {
+      "kind": "pr",
+      "repo": "Axorax/awesome-free-apps",
+      "title": "Add: LightRead",
+      "files": [
+        "README.md"
+      ],
+      "body": "## Type of change\n\n* [x] Add a new app\n* [ ] Update an existing app\n* [ ] Remove an app\n* [ ] Other\n\n## App information\n\n**App name:** LightRead\n\n**Official website:** https://github.com/yzfly/LightRead\n\n**Category:** Office / E-book\n\n<!-- Example: Category / Sub-category (Communication / Messaging) -->\n\n<u>**Description:**</u> Local-first ebook and paper reader with EPUB/PDF support, annotations and text-to-speech.\n\n<!-- Keep it concise, describe what the app does, and end with a period. -->\n\n## Platform\n\nSelect **all** that apply:\n\n* [x] Windows\n* [x] macOS\n* [x] Linux\n* [ ] Android\n* [ ] iOS\n\n## Repository section\n\n* [x] `README.md` — Desktop app\n* [ ] `MOBILE.md` — Mobile app\n\n## Availability\n\n* [x] The app is free to use.\n* [x] The app is **not** already listed in the repository.\n* [x] I checked `archived.md`.\n\n**Was this app previously archived?**\n\n* [x] No\n* [ ] Yes\n\n**If the app was previously archived, please explain why it should be restored:**\n\n## Open source\n\n* [x] Open source\n* [ ] Not open source\n\n**Repository URL (if open source):** https://github.com/yzfly/LightRead\n\n<!-- GitHub/GitLab/etc. -->\n\n## Changes\n\n**What did you change?** Appended one entry to the E-book category in README.md, with desktop platform icons and a source-code link.\n\n<!-- Briefly explain exactly what you changed and why. -->\n\n## Checklist\n\n* [x] I added the app to the correct category.\n* [x] I added it to the bottom of the category as required.\n* [x] I did not reorder existing apps.\n* [x] My description is concise and ends with a period.\n* [x] I did not modify the table of contents.\n* [x] I did not modify the `filter` folder.\n* [x] I followed the repository contribution guidelines.\n* [x] My commit message follows the format `Add: name`, `Update: name`, or `Remove: name`.\n\n## Additional notes\n\n<!-- Anything else the maintainer should know? -->\n\n\nSelf-submission from the project owner, prepared with AI assistance. Checked existing entries and submissions for duplicates; ran `git diff --check`. The app is licensed under AGPL-3.0-or-later. Local reading works without an account or network connection; optional AI services may have provider fees.\n",
+      "commit": "Add: LightRead",
+      "fork_name": "awesome-free-apps",
+      "url": "https://github.com/Axorax/awesome-free-apps/pull/398",
+      "status": "submitted",
+      "fork": "yzfly/awesome-free-apps",
+      "branch": "add-lightread-20261015-wave2",
+      "verification": {
+        "url": "https://github.com/Axorax/awesome-free-apps/pull/398",
+        "state": "OPEN",
+        "files": [
+          {
+            "path": "README.md",
+            "additions": 1,
+            "deletions": 0,
+            "changeType": "MODIFIED"
+          }
+        ],
+        "statusCheckRollup": [],
+        "mergeable": "MERGEABLE"
+      }
+    },
+    {
+      "kind": "pr",
+      "repo": "serhii-londar/open-source-mac-os-apps",
+      "title": "Add LightRead to Productivity",
+      "files": [
+        "applications.json"
+      ],
+      "body": "## Project URL\nhttps://github.com/yzfly/LightRead\n\n## Category\nproductivity\n\n## Description\nLightRead is a local-first ebook and research paper reader with EPUB/PDF support, annotations, and text-to-speech. Published releases include both Apple Silicon and Intel macOS installers.\n\n## Why it should be included to `Awesome macOS open source applications`\nIt combines an offline library and ebook reader with a dedicated PDF paper workspace. The source uses Vue 3/TypeScript and Tauri 2/Rust. The English README includes screenshots, setup instructions, privacy details, and contribution guidance: https://github.com/yzfly/LightRead/blob/main/README.en.md\n\n## Checklist\n- [x] Edit applications.json instead of README.md.\n- [x] Only one project/change is in this pull request\n- [x] Screenshots(s) added if any\n- [x] Has a commit from less than 2 years ago\n- [x] Has a **clear** README in English\n\nValidation: parsed applications.json, confirmed the existing entries are unchanged, used the existing productivity category, and checked the icon URL. README generation is left to the repository's tooling.\n\n\nSelf-submission from the project owner, prepared with AI assistance. Checked existing entries and submissions for duplicates; ran `git diff --check`. The app is licensed under AGPL-3.0-or-later. Local reading works without an account or network connection; optional AI services may have provider fees.\n",
+      "commit": "Add LightRead to Productivity",
+      "fork_name": "open-source-mac-os-apps",
+      "url": "https://github.com/serhii-londar/open-source-mac-os-apps/pull/1638",
+      "status": "submitted",
+      "fork": "yzfly/open-source-mac-os-apps",
+      "branch": "add-lightread-20261015-wave2",
+      "verification": {
+        "url": "https://github.com/serhii-londar/open-source-mac-os-apps/pull/1638",
+        "state": "OPEN",
+        "files": [
+          {
+            "path": "applications.json",
+            "additions": 18,
+            "deletions": 0,
+            "changeType": "MODIFIED"
+          }
+        ],
+        "statusCheckRollup": [],
+        "mergeable": "MERGEABLE"
+      }
+    },
+    {
+      "kind": "pr",
+      "repo": "vuejs/awesome-vue",
+      "title": "Add LightRead to Open Source",
+      "files": [
+        "README.md"
+      ],
+      "body": "### `General`\n> ✏️ Mark the necessary items without changing the structure of the PR template.\n\n- [x] Pull request template structure not broken\n\n### `Type`\n\n> ℹ️  What types of changes does your code introduce?\n\n> 👉 _Put an `x` in the boxes that apply_\n\n- [ ] Fix\n- [x] Feature \n\n### `Checklist`\n\n> ℹ️  Check all checkboxes - this will indicate that you have done everything in accordance with the rules in [CONTRIBUTING](https://github.com/vuejs/awesome-vue/blob/master/.github/contributing.md).\n\n> 👉  _Put an `x` in the boxes that apply._\n\n- [x] Title as described\n- [x] Make sure you put things in the right category!\n- [x] Always add your items to the end of a list\n\n#### `Open Source`\n\n- [x] Link description does not contain a link to an author / third-party resource\n- [x] The documentation (README) contains a description of the project, illustration of the project with a demo or screenshots and a CONTRIBUTING section\n- [x] The documentation is in English.\n- [x] The project is active and maintained.\n- [x] The project accepts contributions.\n- [x] Not a commercial product\n\n#### `Apps/Websites`\n\n- [ ] The website is available without errors or ssl certificate problems, and load in a reasonable amount of time.\n- [ ] The website is using vuejs intensively. It should detect vue with [vue-devtools](https://github.com/vuejs/vue-devtools).\n  > If you cannot detect vue with `vue-devtools` due to work at non public pages (e.g. for enterprise website), you can send Pull Request with screenshot that detected it.\n- [ ] The website is original and not too simple. For that reason, blogs and simple landing pages are rejected.\n- [ ] A commercial product using Vue, provided that guests could reasonably check out how Vue was used (i.e. A headless CMS which uses Vue for the Admin/editor Area and offers a free tier).\n\n\nLightRead is appended to Projects Using Vue.js / Open Source. It demonstrates a Vue 3/TypeScript reading interface with Tauri 2/Rust desktop integration, file/SQLite storage on desktop, and IndexedDB storage in the web frontend.\n\nEnglish README with screenshots, build instructions, and contribution guidance: https://github.com/yzfly/LightRead/blob/main/README.en.md (linked from the main README).\n\nFor the AI/agentic coding policy, this is a maintained project with more than three published releases spanning over a month, including:\n- v1.0.0: July 15, 2026 — https://github.com/yzfly/LightRead/releases/tag/v1.0.0\n- v1.1.18: September 24, 2026 — https://github.com/yzfly/LightRead/releases/tag/v1.1.18\n- v1.15.0: October 8, 2026 — https://github.com/yzfly/LightRead/releases/tag/v1.15.0\n\nThis submission is for the open-source application, so the Apps/Websites checkboxes are not applicable.\n\n\nSelf-submission from the project owner, prepared with AI assistance. Checked existing entries and submissions for duplicates; ran `git diff --check`. The app is licensed under AGPL-3.0-or-later. Local reading works without an account or network connection; optional AI services may have provider fees.\n",
+      "commit": "Add LightRead to Open Source",
+      "fork_name": "awesome-vue",
+      "url": "https://github.com/vuejs/awesome-vue/pull/4577",
+      "status": "submitted",
+      "fork": "yzfly/awesome-vue",
+      "branch": "add-lightread-20261015-wave2",
+      "verification": {
+        "url": "https://github.com/vuejs/awesome-vue/pull/4577",
+        "state": "OPEN",
+        "files": [
+          {
+            "path": "README.md",
+            "additions": 1,
+            "deletions": 0,
+            "changeType": "MODIFIED"
+          }
+        ],
+        "statusCheckRollup": [],
+        "mergeable": "MERGEABLE"
+      }
+    },
+    {
+      "kind": "pr",
+      "repo": "py-pdf/awesome-pdf",
+      "title": "Add LightRead to Viewers",
+      "files": [
+        "README.md"
+      ],
+      "body": "Add [LightRead](https://github.com/yzfly/LightRead) to Viewers. It is an open-source desktop PDF and ebook reader with original-layout MuPDF/PDFium rendering, annotations, and text-to-speech.\n\nDownloadable macOS, Windows, and Linux builds are available in [Releases](https://github.com/yzfly/LightRead/releases/latest). The [English README](https://github.com/yzfly/LightRead/blob/main/README.en.md) documents installation and limitations, including the need for a text layer for text-based features. Only one viewer entry is added.\n\n\nSelf-submission from the project owner, prepared with AI assistance. Checked existing entries and submissions for duplicates; ran `git diff --check`. The app is licensed under AGPL-3.0-or-later. Local reading works without an account or network connection; optional AI services may have provider fees.\n",
+      "commit": "Add LightRead to Viewers",
+      "fork_name": "awesome-pdf",
+      "url": "https://github.com/py-pdf/awesome-pdf/pull/59",
+      "status": "submitted",
+      "fork": "yzfly/awesome-pdf",
+      "branch": "add-lightread-20261015-wave2",
+      "verification": {
+        "url": "https://github.com/py-pdf/awesome-pdf/pull/59",
+        "state": "OPEN",
+        "files": [
+          {
+            "path": "README.md",
+            "additions": 1,
+            "deletions": 0,
+            "changeType": "MODIFIED"
+          }
+        ],
+        "statusCheckRollup": [],
+        "mergeable": "MERGEABLE"
+      }
+    },
+    {
+      "kind": "pr",
+      "repo": "chenyl8848/great-open-source-project",
+      "title": "添加 LightRead 轻阅到阅读工具",
+      "files": [
+        "README.md"
+      ],
+      "body": "自荐 [LightRead 轻阅](https://github.com/yzfly/LightRead)，新增到“阅读工具”分类。\n\n轻阅使用 Tauri 2 + Vue 3，支持本地 EPUB/MOBI/PDF 阅读、批注、听书和独立论文工作区。macOS、Windows、Linux 已有可下载的安装包，本地阅读无需账号或联网。\n\n条目仅包含实际功能、技术栈和下载入口；未添加公众号推荐标记或未经验证的在线体验地址。已检查重复条目与投稿，改动只有一行，并通过 `git diff --check`。本次为作者使用 AI 辅助整理的自荐。\n\n\nSelf-submission from the project owner, prepared with AI assistance. Checked existing entries and submissions for duplicates; ran `git diff --check`. The app is licensed under AGPL-3.0-or-later. Local reading works without an account or network connection; optional AI services may have provider fees.\n",
+      "commit": "添加 LightRead 轻阅到阅读工具",
+      "fork_name": "great-open-source-project",
+      "url": "https://github.com/chenyl8848/great-open-source-project/pull/26",
+      "status": "submitted",
+      "fork": "yzfly/great-open-source-project",
+      "branch": "add-lightread-20261015-wave2",
+      "verification": {
+        "url": "https://github.com/chenyl8848/great-open-source-project/pull/26",
+        "state": "OPEN",
+        "files": [
+          {
+            "path": "README.md",
+            "additions": 1,
+            "deletions": 0,
+            "changeType": "MODIFIED"
+          }
+        ],
+        "statusCheckRollup": [],
+        "mergeable": "MERGEABLE"
+      }
+    },
+    {
+      "kind": "pr",
+      "repo": "abordage/awesome-mac",
+      "title": "Add LightRead to Ebooks",
+      "files": [
+        "repositories.yaml"
+      ],
+      "body": "Filling out the template is required. Any pull request that does not include enough information to be reviewed in a timely manner may be closed at the maintainers' discretion.\n\n**Mark the following tasks as done:**\n- [x] Checked `repositories.yaml` to ensure that your repository is not already listed.\n- [x] Checked the pull requests to ensure that another person hasn't already submitted the same repository.\n- [x] Take note of the [contributing guidelines](https://github.com/abordage/awesome-mac/blob/main/.github/CONTRIBUTING.md).\n- [x] Modified only the `repositories.yaml` file (README.md is automatically generated).\n- [x] Repository being added is actively maintained (recent commits).\n- [x] Repository being added has an open source license.\n\n### Thanks for contributing!\n\nAdd [LightRead](https://github.com/yzfly/LightRead) to Reading & Writing / Ebooks. It is a local-first reader for ebooks and research papers, with annotations and text-to-speech. Releases include Apple Silicon and Intel macOS builds.\n\nOnly repositories.yaml is changed. The YAML parses successfully and contains exactly one LightRead entry in Ebooks; generated README files are untouched.\n\n\nSelf-submission from the project owner, prepared with AI assistance. Checked existing entries and submissions for duplicates; ran `git diff --check`. The app is licensed under AGPL-3.0-or-later. Local reading works without an account or network connection; optional AI services may have provider fees.\n",
+      "commit": "Add LightRead to Ebooks",
+      "fork_name": "awesome-mac-abordage",
+      "url": "https://github.com/abordage/awesome-mac/pull/38",
+      "status": "submitted",
+      "fork": "yzfly/awesome-mac-abordage",
+      "branch": "add-lightread-20261015-wave2",
+      "verification": {
+        "url": "https://github.com/abordage/awesome-mac/pull/38",
+        "state": "OPEN",
+        "files": [
+          {
+            "path": "repositories.yaml",
+            "additions": 2,
+            "deletions": 0,
+            "changeType": "MODIFIED"
+          }
+        ],
+        "statusCheckRollup": [
+          {
+            "__typename": "CheckRun",
+            "completedAt": "2026-10-16T01:01:29Z",
+            "conclusion": "SUCCESS",
+            "detailsUrl": "https://github.com/abordage/awesome-mac/actions/runs/38832814479/job/116755163831",
+            "name": "Validate changed files",
+            "startedAt": "2026-10-16T01:01:25Z",
+            "status": "COMPLETED",
+            "workflowName": "Check PR"
+          }
+        ],
+        "mergeable": "MERGEABLE"
+      }
+    },
+    {
+      "kind": "pr",
+      "repo": "emptymalei/awesome-research",
+      "title": "Add LightRead for paper reading and annotation",
+      "files": [
+        "README.md"
+      ],
+      "body": "Add [LightRead](https://github.com/yzfly/LightRead), an open-source desktop paper reader, under a small Paper Reading subsection of Academic, with a matching TOC link.\n\nIt supports original-layout PDF viewing, annotations, arXiv discovery, and text-to-speech. Optional translation and agent-assisted analysis can help with paper reading; a question workflow preserves the user's own answers separately from generated responses. The [English README](https://github.com/yzfly/LightRead/blob/main/README.en.md) explains setup and limitations.\n\nA dedicated reading subsection keeps the entry distinct from literature search services and bibliography/citation managers. It does not claim to generate citations or replace reference management software. Installers are available for macOS, Windows, and Linux.\n\n\nSelf-submission from the project owner, prepared with AI assistance. Checked existing entries and submissions for duplicates; ran `git diff --check`. The app is licensed under AGPL-3.0-or-later. Local reading works without an account or network connection; optional AI services may have provider fees.\n",
+      "commit": "Add LightRead for paper reading and annotation",
+      "fork_name": "awesome-research",
+      "url": "https://github.com/emptymalei/awesome-research/pull/132",
+      "status": "submitted",
+      "fork": "yzfly/awesome-research",
+      "branch": "add-lightread-20261015-wave2",
+      "verification": {
+        "url": "https://github.com/emptymalei/awesome-research/pull/132",
+        "state": "OPEN",
+        "files": [
+          {
+            "path": "README.md",
+            "additions": 5,
+            "deletions": 0,
+            "changeType": "MODIFIED"
+          }
+        ],
+        "statusCheckRollup": [],
+        "mergeable": "MERGEABLE"
+      }
+    },
+    {
+      "kind": "issue",
+      "repo": "eryajf/learning-weekly",
+      "title": "【开源自荐】LightRead 轻阅：本地电子书与论文阅读器",
+      "body": "- 项目地址：https://github.com/yzfly/LightRead\n- 项目官网：项目说明与安装包均在 GitHub，[下载最新版](https://github.com/yzfly/LightRead/releases/latest)\n- 语言类别：TypeScript / Vue 3 / Rust（Tauri 2）\n- 项目标题：LightRead 轻阅——本地优先的电子书与论文阅读器\n- 项目描述：这是作者自荐的免费开源阅读工具。支持 EPUB、MOBI、AZW3、PDF 等格式，本地书库、阅读进度和批注默认留在设备上，本地阅读不需要注册或联网。除普通读书和听书外，还提供独立论文工作区、arXiv 书源与可选翻译/Agent 精读。论文十问分别保存 AI 初答、人工回答、AI 再答，便于保留自己的理解。桌面安装包覆盖 macOS、Windows、Linux；Android 为实验版本。\n\n项目采用 AGPL-3.0-or-later。在线书源、在线听书、AI 和 WebDAV 为可选联网功能，AI 模型服务可能产生费用。\n\n- 截图：\n\n![本地书库](https://raw.githubusercontent.com/yzfly/LightRead/main/docs/screenshots/library.png)\n\n![PDF 论文阅读](https://raw.githubusercontent.com/yzfly/LightRead/main/docs/screenshots/pdf-spread.png)\n",
+      "url": "https://github.com/eryajf/learning-weekly/issues/154",
+      "status": "submitted",
+      "verification": {
+        "url": "https://github.com/eryajf/learning-weekly/issues/154",
+        "state": "OPEN"
+      }
+    },
+    {
+      "kind": "issue",
+      "repo": "ljinkai/weekly",
+      "title": "【产品自荐】LightRead 轻阅：免费开源的本地电子书与论文阅读器",
+      "body": "自荐一个面向读书和论文阅读场景的独立开发产品：[LightRead 轻阅](https://github.com/yzfly/LightRead)。\n\n它把电子书阅读、PDF 论文批注和听书放进同一个本地书库，适合既读书又读论文、希望自己保留阅读数据的用户。本地阅读不需要账号或网络，项目免费开源，桌面版可直接下载安装。\n\n主要特点：\n\n- EPUB、MOBI、PDF 等多格式阅读，本地进度、书签与批注。\n- 独立论文工作区，支持原版布局阅读；翻译和 Agent 精读按需启用。\n- 论文十问把读者自己的回答与 AI 初答、AI 再答分开保存。\n- 开放藏书包导入导出和 WebDAV 备份，便于迁移数据。\n\n技术栈为 Tauri 2 + Vue 3，许可证 AGPL-3.0-or-later。已发布 macOS / Windows / Linux 安装包，Android 仍为实验版本。在线 AI 使用配置的模型服务，可能产生服务费用。\n\n源码与说明：https://github.com/yzfly/LightRead\n下载：https://github.com/yzfly/LightRead/releases/latest\n\n![轻阅书库](https://raw.githubusercontent.com/yzfly/LightRead/main/docs/screenshots/library.png)\n\n欢迎读者试用并反馈阅读和论文整理中的实际需求。\n",
+      "url": "https://github.com/ljinkai/weekly/issues/416",
+      "status": "submitted",
+      "verification": {
+        "url": "https://github.com/ljinkai/weekly/issues/416",
+        "state": "OPEN"
+      }
+    },
+    {
+      "kind": "issue",
+      "repo": "Jackpopc/DevWeekly",
+      "title": "【开源自荐】LightRead：用 Vue 3 + Tauri 2 构建的电子书与论文阅读器",
+      "body": "自荐 [LightRead 轻阅](https://github.com/yzfly/LightRead)，一个开源、本地优先的电子书与论文阅读器。\n\n使用场景是把自己的 EPUB、MOBI、PDF 等文件导入本地书库，统一管理进度、书签、批注和听书；论文可以进入独立工作区，按需使用翻译和 Agent 精读。本地阅读不需要账号或网络，macOS、Windows、Linux 都有安装包。\n\n从开发者视角，可以参考这些实现：\n\n- Vue 3 / TypeScript 界面与 Tauri 2 / Rust 原生能力的组合。\n- 桌面文件 + SQLite 与浏览器 IndexedDB 之间的存储适配。\n- foliate-js 电子书渲染与 MuPDF / PDFium 原版 PDF 阅读。\n- 本机论文 Agent 的上下文组织，以及 AI 初答、人工回答、AI 再答的分离保存。\n\n项目采用 AGPL-3.0-or-later；在线书源、AI、在线语音与 WebDAV 属于可选联网功能，AI 服务可能产生费用。Android 为实验版本。\n\n[下载安装](https://github.com/yzfly/LightRead/releases/latest) · [English README](https://github.com/yzfly/LightRead/blob/main/README.en.md)\n\n![PDF 阅读界面](https://raw.githubusercontent.com/yzfly/LightRead/main/docs/screenshots/pdf-spread.png)\n",
+      "url": "https://github.com/Jackpopc/DevWeekly/issues/53",
+      "status": "submitted",
+      "verification": {
+        "url": "https://github.com/Jackpopc/DevWeekly/issues/53",
+        "state": "OPEN"
+      }
+    },
+    {
+      "kind": "issue",
+      "repo": "OpenGithubs/weekly",
+      "title": "【开源自荐】LightRead 轻阅：本地优先的多格式阅读器",
+      "body": "项目：https://github.com/yzfly/LightRead\n\n作者自荐 LightRead（轻阅），免费开源的电子书与论文阅读器，基于 Tauri 2 + Rust + Vue 3，采用 AGPL-3.0-or-later 许可证。\n\n它支持 EPUB、MOBI、AZW3、PDF 等格式，将藏书、阅读进度和批注默认保存在本机，本地阅读无需账号或联网。已有 macOS、Windows、Linux 安装包，另有实验性 Android 版本。\n\n值得介绍的功能包括原版 PDF 页面阅读、批注、离线听书、OPDS / Calibre 和 arXiv 书源，以及开放藏书包迁移。论文工作区可选翻译与 Agent 精读，并把读者自己的回答和 AI 生成结果分别保存。\n\nAI、在线书源和在线语音为可选联网功能；使用模型服务可能产生费用，不影响普通本地阅读。\n\n下载：https://github.com/yzfly/LightRead/releases/latest\n英文说明：https://github.com/yzfly/LightRead/blob/main/README.en.md\n\n![书库](https://raw.githubusercontent.com/yzfly/LightRead/main/docs/screenshots/library.png)\n\n![论文阅读](https://raw.githubusercontent.com/yzfly/LightRead/main/docs/screenshots/pdf-spread.png)\n",
+      "url": "https://github.com/OpenGithubs/weekly/issues/172",
+      "status": "submitted",
+      "verification": {
+        "url": "https://github.com/OpenGithubs/weekly/issues/172",
+        "state": "OPEN"
+      }
+    }
+  ],
+  "skipped": [
+    {
+      "repository": "tauri-apps/awesome-tauri",
+      "reason": "Contribution guide explicitly no longer accepts applications. Submitted to chrysler-stone/awesome-tauri-apps instead.",
+      "policy_url": "https://github.com/tauri-apps/awesome-tauri/blob/dev/.github/contributing.md"
+    },
+    {
+      "repository": "luong-komorebi/Awesome-Linux-Software",
+      "reason": "Repository archived."
+    },
+    {
+      "repository": "alexanderop/awesome-local-first",
+      "reason": "README explicitly closes contributions and project submissions."
+    },
+    {
+      "repository": "0PandaDEV/awesome-windows",
+      "reason": "AGENTS.md explicitly prohibits AI-generated issues and PRs. No edits or submissions made.",
+      "policy_url": "https://github.com/0PandaDEV/awesome-windows/blob/main/AGENTS.md"
+    },
+    {
+      "repository": "sereneblue/awesome-oss",
+      "reason": "Requires at least 100 GitHub stars; LightRead had 40 at initial inspection."
+    },
+    {
+      "repository": "mustbeperfect/definitive-opensource",
+      "reason": "Requires at least 1000 GitHub stars without exceptions."
+    },
+    {
+      "repository": "rust-unofficial/awesome-rust",
+      "reason": "Requires 50+ stars, 2000 crates.io downloads, or documented equivalent traction. No submission made without qualifying evidence."
+    },
+    {
+      "repository": "bestxtools/weekly-cn",
+      "reason": "Official submission link points to an external discussion forum; no GitHub submission created."
+    },
+    {
+      "repository": "Geekhyt/weekly",
+      "reason": "README shows publication history ending in 2024; prioritized more active outlets with explicit self-submission invitations."
+    },
+    {
+      "repository": "zhaoolee/ChromeAppHeroes",
+      "reason": "Browser-extension directory; LightRead is not a browser extension."
+    },
+    {
+      "repository": "timqian/chinese-independent-blogs",
+      "reason": "Blog directory; LightRead is an application."
+    }
+  ],
+  "existing_submission": {
+    "url": "https://github.com/AppImage/appimage.github.io/pull/6492",
+    "author": "probonopd",
+    "state": "OPEN",
+    "created_by_this_campaign": false,
+    "issue": "Automated test for v1.1.18 failed: AppRun.wrapped permission denied; compatibility check reported glibc 2.35 dependency. Current v1.15.0 has not been validated in that catalog test by this campaign.",
+    "next_step": "Inspect current AppImage permissions and launch behavior, then request /retest in the existing PR if fixed. Do not create a duplicate PR."
+  },
+  "validation": [
+    "Searched target repository issues and PRs for duplicates before submitting.",
+    "Checked release assets and project documentation for described functionality.",
+    "Verified screenshot and release links returned HTTP 200.",
+    "Ran git diff --check on each PR; only intended listing lines changed.",
+    "Re-fetched all six submissions; confirmed yzfly authorship, OPEN status, and project link.",
+    "All three PRs mergeable at verification; Awesome Mac license check pending.",
+    "Wave 2: checked all seven PR diffs and git diff --check; JSON parsed with existing application entries unchanged; YAML parsed and placed exactly one entry under Ebooks.",
+    "Wave 2: all eleven submissions re-fetched successfully and OPEN, with yzfly authorship. All seven PRs mergeable; abordage/awesome-mac changed-file validation passed; other six PRs reported no checks at verification."
+  ],
+  "follow_up": "Await maintainer review; submission does not mean inclusion or guaranteed exposure. Address feedback in the same PR/issue rather than posting duplicates.",
+  "preparation_changes": [
+    {
+      "commit": "cd53268",
+      "url": "https://github.com/yzfly/LightRead/commit/cd53268",
+      "description": "Published README.en.md with installation, screenshots, features, privacy limitations, build instructions and contributing guidance; linked it from the Chinese README."
+    }
+  ],
+  "resolved_prerequisites": [
+    {
+      "repository": "vuejs/awesome-vue",
+      "resolution": "English README published; submitted PR #4577. Release history meets the at-least-three-releases/one-month requirement."
+    },
+    {
+      "repository": "serhii-londar/open-source-mac-os-apps",
+      "resolution": "English README published; submitted applications.json entry in PR #1638."
+    }
+  ],
+  "wave2_repositories_inspected": [
+    {
+      "full_name": "Axorax/awesome-free-apps",
+      "stargazers_count": 7900,
+      "archived": false,
+      "pushed_at": "2026-10-13T19:03:45Z",
+      "html_url": "https://github.com/Axorax/awesome-free-apps"
+    },
+    {
+      "full_name": "DataDaoDe/awesome-foss-apps",
+      "stargazers_count": 392,
+      "archived": false,
+      "pushed_at": "2024-08-07T12:45:04Z",
+      "html_url": "https://github.com/DataDaoDe/awesome-foss-apps"
+    },
+    {
+      "full_name": "Geekhyt/weekly",
+      "stargazers_count": 1476,
+      "archived": false,
+      "pushed_at": "2025-03-14T18:53:04Z",
+      "html_url": "https://github.com/Geekhyt/weekly"
+    },
+    {
+      "full_name": "Jackpopc/DevWeekly",
+      "stargazers_count": 1895,
+      "archived": false,
+      "pushed_at": "2023-12-23T16:02:08Z",
+      "html_url": "https://github.com/Jackpopc/DevWeekly"
+    },
+    {
+      "full_name": "OpenGithubs/weekly",
+      "stargazers_count": 1850,
+      "archived": false,
+      "pushed_at": "2026-09-29T00:29:55Z",
+      "html_url": "https://github.com/OpenGithubs/weekly"
+    },
+    {
+      "full_name": "abhi18av/awesome-pdf",
+      "stargazers_count": 57,
+      "archived": false,
+      "pushed_at": "2026-08-14T08:11:13Z",
+      "html_url": "https://github.com/abhi18av/awesome-pdf"
+    },
+    {
+      "full_name": "abordage/awesome-mac",
+      "stargazers_count": 27,
+      "archived": false,
+      "pushed_at": "2026-10-15T09:10:10Z",
+      "html_url": "https://github.com/abordage/awesome-mac"
+    },
+    {
+      "full_name": "bestxtools/weekly-cn",
+      "stargazers_count": 299,
+      "archived": false,
+      "pushed_at": "2023-04-21T00:39:48Z",
+      "html_url": "https://github.com/bestxtools/weekly-cn"
+    },
+    {
+      "full_name": "bestxtools/weekly-cn",
+      "stargazers_count": 299,
+      "archived": false,
+      "pushed_at": "2023-04-21T00:39:48Z",
+      "html_url": "https://github.com/bestxtools/weekly-cn"
+    },
+    {
+      "full_name": "chenyl8848/great-open-source-project",
+      "stargazers_count": 1786,
+      "archived": false,
+      "pushed_at": "2026-10-05T08:50:22Z",
+      "html_url": "https://github.com/chenyl8848/great-open-source-project"
+    },
+    {
+      "full_name": "easychen/one-person-businesses-methodology",
+      "stargazers_count": 8386,
+      "archived": false,
+      "pushed_at": "2024-03-28T04:20:41Z",
+      "html_url": "https://github.com/easychen/one-person-businesses-methodology"
+    },
+    {
+      "full_name": "emptymalei/awesome-research",
+      "stargazers_count": 2792,
+      "archived": false,
+      "pushed_at": "2026-05-19T11:43:56Z",
+      "html_url": "https://github.com/emptymalei/awesome-research"
+    },
+    {
+      "full_name": "eryajf/learning-weekly",
+      "stargazers_count": 614,
+      "archived": false,
+      "pushed_at": "2026-10-04T03:44:29Z",
+      "html_url": "https://github.com/eryajf/learning-weekly"
+    },
+    {
+      "full_name": "jyguyomarch/awesome-productivity",
+      "stargazers_count": 3375,
+      "archived": false,
+      "pushed_at": "2024-08-14T18:07:32Z",
+      "html_url": "https://github.com/jyguyomarch/awesome-productivity"
+    },
+    {
+      "full_name": "ljinkai/weekly",
+      "stargazers_count": 3792,
+      "archived": false,
+      "pushed_at": "2026-10-15T06:27:37Z",
+      "html_url": "https://github.com/ljinkai/weekly"
+    },
+    {
+      "full_name": "mustbeperfect/definitive-opensource",
+      "stargazers_count": 3613,
+      "archived": false,
+      "pushed_at": "2026-10-15T02:31:18Z",
+      "html_url": "https://github.com/mustbeperfect/definitive-opensource"
+    },
+    {
+      "full_name": "py-pdf/awesome-pdf",
+      "stargazers_count": 161,
+      "archived": false,
+      "pushed_at": "2024-08-02T05:35:42Z",
+      "html_url": "https://github.com/py-pdf/awesome-pdf"
+    },
+    {
+      "full_name": "ruanyf/weekly",
+      "stargazers_count": 106239,
+      "archived": false,
+      "pushed_at": "2026-10-16T00:05:12Z",
+      "html_url": "https://github.com/ruanyf/weekly"
+    },
+    {
+      "full_name": "rust-unofficial/awesome-rust",
+      "stargazers_count": 59879,
+      "archived": false,
+      "pushed_at": "2026-10-15T06:14:57Z",
+      "html_url": "https://github.com/rust-unofficial/awesome-rust"
+    },
+    {
+      "full_name": "sereneblue/awesome-oss",
+      "stargazers_count": 1955,
+      "archived": false,
+      "pushed_at": "2026-08-15T00:06:54Z",
+      "html_url": "https://github.com/sereneblue/awesome-oss"
+    },
+    {
+      "full_name": "serhii-londar/open-source-mac-os-apps",
+      "stargazers_count": 50809,
+      "archived": false,
+      "pushed_at": "2026-10-15T22:56:22Z",
+      "html_url": "https://github.com/serhii-londar/open-source-mac-os-apps"
+    },
+    {
+      "full_name": "timqian/chinese-independent-blogs",
+      "stargazers_count": 24158,
+      "archived": false,
+      "pushed_at": "2026-10-16T00:39:38Z",
+      "html_url": "https://github.com/timqian/chinese-independent-blogs"
+    },
+    {
+      "full_name": "zhaoolee/ChromeAppHeroes",
+      "stargazers_count": 25869,
+      "archived": false,
+      "pushed_at": "2026-10-06T03:55:27Z",
+      "html_url": "https://github.com/zhaoolee/ChromeAppHeroes"
+    },
+    {
+      "full_name": "zhaoolee/StarsAndClown",
+      "stargazers_count": 2315,
+      "archived": false,
+      "pushed_at": "2022-07-07T17:46:27Z",
+      "html_url": "https://github.com/zhaoolee/StarsAndClown"
+    }
+  ],
+  "fork_cleanup": {
+    "requested_at_utc": "2026-10-16T11:42:42.371483+00:00",
+    "scope": "Delete the ten forks created for this campaign; preserve original project and pre-existing repositories.",
+    "status": "complete",
+    "deleted": [
+      "yzfly/awesome-mac",
+      "yzfly/chinese-independent-developer",
+      "yzfly/awesome-tauri-apps",
+      "yzfly/awesome-free-apps",
+      "yzfly/open-source-mac-os-apps",
+      "yzfly/awesome-vue",
+      "yzfly/awesome-pdf",
+      "yzfly/great-open-source-project",
+      "yzfly/awesome-mac-abordage",
+      "yzfly/awesome-research"
+    ],
+    "audit": [
+      {
+        "fork": "yzfly/awesome-mac",
+        "parent": "jaywcjlove/awesome-mac",
+        "created_at": "2026-10-16T00:37:43Z",
+        "pushed_at": "2026-10-16T00:37:46Z",
+        "is_fork": true,
+        "branches": [
+          "add-lightread-20261015",
+          "encryption",
+          "gh-pages",
+          "master",
+          "renovate/fs-extra-11.x",
+          "renovate/major-remark",
+          "renovate/to-vfile-8.x",
+          "revert-340-Removed-duplicate-rishiqing-entry",
+          "revert-429-master"
+        ],
+        "pr": {
+          "headRefName": "add-lightread-20261015",
+          "state": "OPEN"
+        }
+      },
+      {
+        "fork": "yzfly/chinese-independent-developer",
+        "parent": "1c7/chinese-independent-developer",
+        "created_at": "2026-10-16T00:37:50Z",
+        "pushed_at": "2026-10-16T00:37:53Z",
+        "is_fork": true,
+        "branches": [
+          "add-lightread-20261015",
+          "master",
+          "traffic-data"
+        ],
+        "pr": {
+          "headRefName": "add-lightread-20261015",
+          "state": "MERGED"
+        }
+      },
+      {
+        "fork": "yzfly/awesome-tauri-apps",
+        "parent": "chrysler-stone/awesome-tauri-apps",
+        "created_at": "2026-10-16T00:37:56Z",
+        "pushed_at": "2026-10-16T00:37:59Z",
+        "is_fork": true,
+        "branches": [
+          "add-lightread-20261015",
+          "main"
+        ],
+        "pr": {
+          "headRefName": "add-lightread-20261015",
+          "state": "OPEN"
+        }
+      },
+      {
+        "fork": "yzfly/awesome-free-apps",
+        "parent": "Axorax/awesome-free-apps",
+        "created_at": "2026-10-16T01:00:41Z",
+        "pushed_at": "2026-10-16T01:00:44Z",
+        "is_fork": true,
+        "branches": [
+          "add/blockmosaic-graphics",
+          "add-lightread-20261015-wave2",
+          "main",
+          "maint/reliable-link-audit",
+          "maint/replace-simple-gallery-fossify"
+        ],
+        "pr": {
+          "headRefName": "add-lightread-20261015-wave2",
+          "state": "OPEN"
+        }
+      },
+      {
+        "fork": "yzfly/open-source-mac-os-apps",
+        "parent": "serhii-londar/open-source-mac-os-apps",
+        "created_at": "2026-10-16T01:00:48Z",
+        "pushed_at": "2026-10-16T01:00:51Z",
+        "is_fork": true,
+        "branches": [
+          "add-lightread-20261015-wave2",
+          "gh-pages-v1",
+          "github-pages-redesign",
+          "master",
+          "redesign-app"
+        ],
+        "pr": {
+          "headRefName": "add-lightread-20261015-wave2",
+          "state": "OPEN"
+        }
+      },
+      {
+        "fork": "yzfly/awesome-vue",
+        "parent": "vuejs/awesome-vue",
+        "created_at": "2026-10-16T01:00:54Z",
+        "pushed_at": "2026-10-16T01:00:57Z",
+        "is_fork": true,
+        "branches": [
+          "add-lightread-20261015-wave2",
+          "master"
+        ],
+        "pr": {
+          "headRefName": "add-lightread-20261015-wave2",
+          "state": "OPEN"
+        }
+      },
+      {
+        "fork": "yzfly/awesome-pdf",
+        "parent": "py-pdf/awesome-pdf",
+        "created_at": "2026-10-16T01:01:01Z",
+        "pushed_at": "2026-10-16T01:01:04Z",
+        "is_fork": true,
+        "branches": [
+          "add-lightread-20261015-wave2",
+          "main"
+        ],
+        "pr": {
+          "headRefName": "add-lightread-20261015-wave2",
+          "state": "OPEN"
+        }
+      },
+      {
+        "fork": "yzfly/great-open-source-project",
+        "parent": "chenyl8848/great-open-source-project",
+        "created_at": "2026-10-16T01:01:08Z",
+        "pushed_at": "2026-10-16T01:01:10Z",
+        "is_fork": true,
+        "branches": [
+          "add-lightread-20261015-wave2",
+          "master"
+        ],
+        "pr": {
+          "headRefName": "add-lightread-20261015-wave2",
+          "state": "OPEN"
+        }
+      },
+      {
+        "fork": "yzfly/awesome-mac-abordage",
+        "parent": "abordage/awesome-mac",
+        "created_at": "2026-10-16T01:01:13Z",
+        "pushed_at": "2026-10-16T01:01:16Z",
+        "is_fork": true,
+        "branches": [
+          "add-lightread-20261015-wave2",
+          "main"
+        ],
+        "pr": {
+          "headRefName": "add-lightread-20261015-wave2",
+          "state": "OPEN"
+        }
+      },
+      {
+        "fork": "yzfly/awesome-research",
+        "parent": "emptymalei/awesome-research",
+        "created_at": "2026-10-16T01:01:20Z",
+        "pushed_at": "2026-10-16T01:01:22Z",
+        "is_fork": true,
+        "branches": [
+          "add-lightread-20261015-wave2",
+          "master"
+        ],
+        "pr": {
+          "headRefName": "add-lightread-20261015-wave2",
+          "state": "OPEN"
+        }
+      }
+    ],
+    "deleted_at_utc": "2026-10-16T11:45:12.184725+00:00",
+    "verified_at_utc": "2026-10-16T11:45:23.580684+00:00",
+    "verification": [
+      {
+        "repo": "yzfly/awesome-mac",
+        "deleted_verified": true
+      },
+      {
+        "repo": "yzfly/chinese-independent-developer",
+        "deleted_verified": true
+      },
+      {
+        "repo": "yzfly/awesome-tauri-apps",
+        "deleted_verified": true
+      },
+      {
+        "repo": "yzfly/awesome-free-apps",
+        "deleted_verified": true
+      },
+      {
+        "repo": "yzfly/open-source-mac-os-apps",
+        "deleted_verified": true
+      },
+      {
+        "repo": "yzfly/awesome-vue",
+        "deleted_verified": true
+      },
+      {
+        "repo": "yzfly/awesome-pdf",
+        "deleted_verified": true
+      },
+      {
+        "repo": "yzfly/great-open-source-project",
+        "deleted_verified": true
+      },
+      {
+        "repo": "yzfly/awesome-mac-abordage",
+        "deleted_verified": true
+      },
+      {
+        "repo": "yzfly/awesome-research",
+        "deleted_verified": true
+      }
+    ],
+    "project_preserved": {
+      "nameWithOwner": "yzfly/LightRead",
+      "url": "https://github.com/yzfly/LightRead"
+    },
+    "upstream_pr_states": [
+      {
+        "state": "CLOSED",
+        "url": "https://github.com/jaywcjlove/awesome-mac/pull/3520"
+      },
+      {
+        "state": "MERGED",
+        "url": "https://github.com/1c7/chinese-independent-developer/pull/1567"
+      },
+      {
+        "state": "CLOSED",
+        "url": "https://github.com/chrysler-stone/awesome-tauri-apps/pull/24"
+      },
+      {
+        "state": "CLOSED",
+        "url": "https://github.com/Axorax/awesome-free-apps/pull/398"
+      },
+      {
+        "state": "CLOSED",
+        "url": "https://github.com/serhii-londar/open-source-mac-os-apps/pull/1638"
+      },
+      {
+        "state": "CLOSED",
+        "url": "https://github.com/vuejs/awesome-vue/pull/4577"
+      },
+      {
+        "state": "CLOSED",
+        "url": "https://github.com/py-pdf/awesome-pdf/pull/59"
+      },
+      {
+        "state": "CLOSED",
+        "url": "https://github.com/chenyl8848/great-open-source-project/pull/26"
+      },
+      {
+        "state": "CLOSED",
+        "url": "https://github.com/abordage/awesome-mac/pull/38"
+      },
+      {
+        "state": "CLOSED",
+        "url": "https://github.com/emptymalei/awesome-research/pull/132"
+      }
+    ]
+  }
+}
