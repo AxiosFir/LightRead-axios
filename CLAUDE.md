@@ -107,7 +107,7 @@ sync-server/           轻阅账号后端 (Cloudflare Worker + D1 + R2, sync.jia
 
 ## 发版流程
 
-**本地构建优先（2026-10-16 用户要求）**：后续可在本地完成构建、校验后再上传 GitHub Release，以减少 Actions 用量。平台、版本、Android 固定签名、校验清单和公开门禁保持不变；Linux 本机产物不能代替 macOS / Windows 的对应构建。当前 `release.yml` 仍在推送 `v*` tag 时自动构建，采用本地发版前必须先配置明确的自动构建跳过机制，避免同时启动两套发布。v1.18.1 已由 CI 完整成功发布，无需重建或覆盖。
+**本地构建优先（2026-10-16 用户要求）**：后续可在本地完成构建、校验后再上传 GitHub Release，以减少 Actions 用量。平台、版本、Android 固定签名、校验清单和公开门禁保持不变；Linux 本机产物不能代替 macOS / Windows 的对应构建。本地发版先设 GitHub 仓库变量 `RELEASE_BUILD_MODE=manual`，此时推送 `v*` tag 的自动构建会跳过；显式 `workflow_dispatch` 不受影响。Android 本地构建后上传到草稿，附原有 APK 校验报告和 `.apk.build.json`（`tag`、`commit`、`sha256`），再手动运行 Release（`tag=vX.Y.Z`、`full_release=true`、`reuse_android=true`）；CI 复核本地 APK 并构建桌面平台，全部门禁通过才公开。未设置该变量时保留原来的 tag 自动构建；`reuse_android=false` 保留 CI Android 构建。v1.18.1 已由 CI 完整成功发布，无需重建或覆盖。
 
 1. 发版前检查工作区、需求清单与变更范围；同步修改 `package.json`、`package-lock.json`（顶层和根包两处）、`src-tauri/Cargo.toml`、`src-tauri/Cargo.lock`（lightread 包）、`src-tauri/tauri.conf.json`。执行 `node scripts/check-release.mjs --self-test` 和 `node scripts/check-release.mjs --tag vX.Y.Z`，版本或 tag 不一致即停止。
 2. 完成相关单测、`npm run build`、阅读器/更新流程冒烟；Rust 变更执行相应原生测试。桌面分别确认 macOS arm64/x64、Windows NSIS、Linux AppImage/deb 的目标平台。CI 的 Rust 最低版本检查也必须通过。资源密集任务使用 `flock /tmp/heavy.lock nice -n 10 ...` 串行执行。

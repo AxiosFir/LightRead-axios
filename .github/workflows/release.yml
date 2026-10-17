@@ -16,6 +16,12 @@ on:
         type: boolean
         default: false
 
+      reuse_android:
+        description: '复用本地构建并上传到草稿的 Android APK（须附源码提交与 SHA256 报告）'
+        required: false
+        type: boolean
+        default: false
+
 permissions:
   contents: write
 
@@ -26,6 +32,8 @@ concurrency:
 
 jobs:
   preflight:
+    # 本地发版先设仓库变量 RELEASE_BUILD_MODE=manual；推 tag 不启动重复构建。
+    if: ${{ github.event_name == 'workflow_dispatch' || vars.RELEASE_BUILD_MODE != 'manual' }}
     runs-on: ubuntu-22.04
     steps:
       # 审核策略来自本次 workflow 的固定 SHA；目标旧 tag 不必自带新版脚本。
@@ -211,6 +219,7 @@ jobs:
   # Android 仍为实验性 debug 包，但签名/验证失败必须阻止正式发布。
   android:
     needs: preflight
+    if: ${{ !inputs.reuse_android }}
     runs-on: ubuntu-22.04
     env:
       RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
@@ -352,10 +361,63 @@ jobs:
         if: ${{ always() }}
         run: rm -f "$LIGHTREAD_ANDROID_KEYSTORE" "$RUNNER_TEMP/lightread-signing.der"
 
+  android-local:
+    needs: preflight
+    if: ${{ inputs.reuse_android }}
+    runs-on: ubuntu-22.04
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_REPO: ${{ github.repository }}
+      RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.workflow_sha }}
+      - name: 保存当前审核脚本
+        run: cp scripts/check-release.mjs "$RUNNER_TEMP/check-release.mjs"
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: build-tools;35.0.0
+      - name: 下载并验证本地 APK 的源码、摘要与固定签名
+        env:
+          AAPT: ${{ env.ANDROID_SDK_ROOT }}/build-tools/35.0.0/aapt
+          APKSIGNER: ${{ env.ANDROID_SDK_ROOT }}/build-tools/35.0.0/apksigner
+          CERT_SHA256: ${{ vars.ANDROID_CERT_SHA256 }}
+        run: |
+          mkdir local-apk
+          gh release download "$RELEASE_TAG" --dir local-apk --pattern "LightRead_${RELEASE_TAG}_android_arm64.apk*"
+          export LOCAL_APK="local-apk/LightRead_${RELEASE_TAG}_android_arm64.apk"
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict';
+          import { readFileSync } from 'node:fs';
+          import { createHash } from 'node:crypto';
+          import { execFileSync } from 'node:child_process';
+          const apk = process.env.LOCAL_APK;
+          const build = JSON.parse(readFileSync(`${apk}.build.json`, 'utf8'));
+          const report = JSON.parse(readFileSync(`${apk}.json`, 'utf8'));
+          const sha256 = createHash('sha256').update(readFileSync(apk)).digest('hex');
+          assert.equal(build.tag, process.env.RELEASE_TAG);
+          assert.equal(build.commit, execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim());
+          assert.equal(build.sha256, sha256);
+          assert.equal(report.sha256, sha256);
+          JS
+          (cd local-apk && sha256sum -c "LightRead_${RELEASE_TAG}_android_arm64.apk.sha256")
+          node "$RUNNER_TEMP/check-release.mjs" --tag "$RELEASE_TAG" --apk "$LOCAL_APK" --cert "$CERT_SHA256"
+
   publish:
-    needs: [desktop, desktop-linux, rust-floor, android]
+    needs: [desktop, desktop-linux, rust-floor, android, android-local]
     # tag 默认只修补 Android；full_release 必须等待全部平台成功后才能公开草稿。
-    if: ${{ !cancelled() && needs.android.result == 'success' && ((inputs.tag && !inputs.full_release) || (needs.desktop.result == 'success' && needs.desktop-linux.result == 'success' && needs.rust-floor.result == 'success')) }}
+    if: ${{ !cancelled() && (needs.android.result == 'success' || needs.android-local.result == 'success') && ((inputs.tag && !inputs.full_release) || (needs.desktop.result == 'success' && needs.desktop-linux.result == 'success' && needs.rust-floor.result == 'success')) }}
     runs-on: ubuntu-22.04
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
