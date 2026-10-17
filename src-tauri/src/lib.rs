@@ -1,5 +1,6 @@
 mod agent;
 mod app_update;
+mod background_process;
 mod babeldoc;
 mod calibre;
 mod edge_tts;

@@ -9,7 +9,7 @@ use std::collections::VecDeque;
 use std::ffi::OsString;
 use std::io::{BufReader, Read};
 use std::path::{Path, PathBuf};
-use std::process::{Child, Command, Stdio};
+use std::process::{Child, Stdio};
 use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Emitter, State};
 
@@ -178,7 +178,7 @@ fn resolve_python(bin: &Path) -> Option<PathBuf> {
 pub fn babeldoc_status() -> BabeldocInfo {
   match find_binary() {
     Some(path) => {
-      let version = Command::new(&path)
+      let version = crate::background_process::command(&path)
         .arg("--version")
         .output()
         .ok()
@@ -396,14 +396,14 @@ fn run_translation(
     std::fs::write(&runner_path, RUNNER_PY).map_err(|e| e.to_string())?;
     let cfg = build_python_runner_config(&request, &src, &out_dir, pages_arg);
     std::fs::write(&cfg_path, cfg.to_string()).map_err(|e| e.to_string())?;
-    cmd = Command::new(py);
+    cmd = crate::background_process::command(py);
     cmd.arg(&runner_path).arg(&cfg_path);
   } else {
     // CLI 回退: 进度不精确但功能可用; key 走 TOML 不进参数
     let escaped_key = request.api_key.replace('\\', "\\\\").replace('"', "\\\"");
     std::fs::write(&cfg_path, format!("[babeldoc]\nopenai-api-key = \"{escaped_key}\"\n"))
       .map_err(|e| e.to_string())?;
-    cmd = Command::new(&bin);
+    cmd = crate::background_process::command(&bin);
     cmd.args(build_cli_arguments(&request, &src, &cfg_path, &out_dir, pages_arg));
   }
   cmd.stdout(Stdio::piped()).stderr(Stdio::piped()).stdin(Stdio::null());

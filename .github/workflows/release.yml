@@ -138,6 +138,9 @@ jobs:
       - name: 验证论文 Agent 原生契约
         run: cargo test --locked --manifest-path src-tauri/Cargo.toml agent
 
+      - name: 验证后台进程无控制台启动与输出管道
+        run: cargo test --locked --manifest-path src-tauri/Cargo.toml background_process
+
       - name: 验证离线语音后台调度与错误传播
         run: cargo test --locked --manifest-path src-tauri/Cargo.toml local_tts::desktop::tests::engine_task
 

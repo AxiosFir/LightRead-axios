@@ -102,12 +102,12 @@ pub(super) fn engine_command(executable: &Path) -> Command {
   if executable.extension().and_then(|value| value.to_str())
     .is_some_and(|value| value.eq_ignore_ascii_case("cmd") || value.eq_ignore_ascii_case("bat"))
   {
-    let mut command = Command::new("cmd.exe");
+    let mut command = crate::background_process::command("cmd.exe");
     command.args(["/D", "/S", "/C"]).arg(executable);
     configure_engine_environment(&mut command, executable);
     return command;
   }
-  let mut command = Command::new(executable);
+  let mut command = crate::background_process::command(executable);
   configure_engine_environment(&mut command, executable);
   command
 }
