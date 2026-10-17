@@ -1,0 +1,105 @@
+{
+  "date": "2026-10-16",
+  "baseline": {
+    "steady": {
+      "frames": 359,
+      "stepMedian": 0.15249292826335298,
+      "stepMax": 0.15431919087729193,
+      "visualStepMax": 0.3284440040588379,
+      "backward": 0.15157699584960938,
+      "frameP50": 16.700000001117587,
+      "frameP95": 19.100000001490116,
+      "frameMax": 36.59999999962747,
+      "over33ms": 2
+    },
+    "stall": {
+      "frames": 68,
+      "stepMedian": 0.15249292826335298,
+      "stepMax": 0.9131313069661458,
+      "visualStepMax": 0.9131298065185547,
+      "backward": 0.15157318115234375,
+      "frameP50": 16.90000000037253,
+      "frameP95": 22.199999999254942,
+      "frameMax": 39.5,
+      "over33ms": 1
+    },
+    "speedRestarts": 1,
+    "paused": true,
+    "fullConcept": false,
+    "fragment": true,
+    "distance": {
+      "requestedPx": 54.656387509765636,
+      "visualPx": 57.21994590759277,
+      "relativeErrorPercent": 4.6903180298352165
+    }
+  },
+  "candidateCommit": "b66bade",
+  "device": "Redmi K30 Pro",
+  "android": "12 / API 31",
+  "webview": "135.0.7049.113",
+  "screenRefreshHz": 60,
+  "viewportCss": [
+    392,
+    872
+  ],
+  "devicePixelRatio": 2.75,
+  "candidateApkSha256": "cc4ce50e79f129044f79e0c4902b4c76a41e58bedeb3ab763184ce566e9f2435",
+  "secondsPerScreen": 90,
+  "steadySampleSeconds": 6,
+  "injectedBusyWaitMs": 180,
+  "candidate": {
+    "steady": {
+      "frames": 359,
+      "stepMedian": 0.15249292826335298,
+      "stepMax": 0.15431919087729193,
+      "visualStepMax": 0.15431976318359375,
+      "backward": 0.15157699584960938,
+      "frameP50": 16.799999998882413,
+      "frameP95": 19.700000001117587,
+      "frameMax": 33.19999999925494,
+      "over33ms": 0
+    },
+    "stall": {
+      "frames": 68,
+      "stepMedian": 0.15249292826335298,
+      "stepMax": 0.30437710232204856,
+      "visualStepMax": 0.30438232421875,
+      "backward": 0.1515789031982422,
+      "frameP50": 16.799999998882413,
+      "frameP95": 20.799999998882413,
+      "frameMax": 33.100000001490116,
+      "over33ms": 0
+    },
+    "speedRestarts": 0,
+    "paused": true,
+    "fullConcept": true,
+    "fragment": false,
+    "distance": {
+      "requestedPx": 54.64451680277505,
+      "visualPx": 54.644514083862305,
+      "relativeErrorPercent": -4.9756369135955936e-06
+    }
+  },
+  "interactions": {
+    "touch": {
+      "events": [
+        {
+          "name": "touchstart",
+          "t": 51587.09999999963
+        },
+        {
+          "name": "touchend",
+          "t": 51948.5
+        }
+      ],
+      "advanceWhileHeld": 0,
+      "resumeDelay": 1214.9000000003725
+    },
+    "resume": {
+      "hidden": false,
+      "gapMs": 2542.9000000003725,
+      "firstMoveAfterGap": 0.17648359283406242
+    }
+  },
+  "limits": "One device, synthetic reflowable text, short sample. DOM geometry and rAF are not hardware presentation timestamps. Injected stall is synthetic. No Surface or Android PDF validation in this session."
+}
