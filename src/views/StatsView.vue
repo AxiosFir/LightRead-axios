@@ -95,12 +95,14 @@ const showHow = ref(false)
       <button
         type="button"
         class="btn btn-ghost btn-sm how-btn"
+        :aria-label="t('stats.howTitle')"
+        :title="t('stats.howTitle')"
         :aria-expanded="showHow"
         aria-controls="stats-how"
         @click="showHow = !showHow"
       >
         <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M12 2a10 10 0 1 1 0 20 10 10 0 0 1 0-20zm0 2a8 8 0 1 0 0 16 8 8 0 0 0 0-16zm0 7a1 1 0 0 1 1 1v4a1 1 0 1 1-2 0v-4a1 1 0 0 1 1-1zm0-4a1.25 1.25 0 1 1 0 2.5A1.25 1.25 0 0 1 12 7z" /></svg>
-        {{ t('stats.howTitle') }}
+        <span class="how-label">{{ t('stats.howTitle') }}</span>
       </button>
     </header>
     <div v-if="showHow" id="stats-how" class="how">
@@ -320,6 +322,26 @@ h1 {
 @media (max-width: 720px) {
   .page-head {
     margin-bottom: 14px;
+    min-height: 44px;
+  }
+  h1 {
+    font-size: 26px;
+    letter-spacing: 0.02em;
+  }
+  /* 手机: 「如何计时」只留图标 */
+  .how-btn {
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    justify-content: center;
+    border-radius: 50%;
+  }
+  .how-btn svg {
+    width: 20px;
+    height: 20px;
+  }
+  .how-label {
+    display: none;
   }
   .layout {
     gap: 12px;

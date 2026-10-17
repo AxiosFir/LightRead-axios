@@ -260,12 +260,18 @@ for (const device of devices) {
     await go(path)
     await check(path.slice(1))
     if (path === '/settings') {
+      // 手机设置首页是分组列表, AI 设置在二级页里
+      await page.locator('.pl-row', { hasText: 'AI 助手' }).click()
+      await page.waitForSelector('#ai-provider')
+      await check('settings-ai')
       await page.locator('#ai-provider').click()
       await check('settings-ai-picker')
       await page.evaluate(() => document.documentElement.dataset.theme = 'dark')
       await check('settings-ai-picker-dark')
       await page.getByRole('dialog').getByRole('button', { name: '关闭', exact: true }).click()
       await page.evaluate(() => document.documentElement.dataset.theme = 'light')
+      await page.locator('.pl-back').click()
+      await page.waitForSelector('.phone-settings')
     }
   }
 

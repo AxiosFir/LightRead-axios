@@ -1030,9 +1030,9 @@ async function removeSource(s: CatalogSourceRec) {
           <h1>{{ t('catalog.title') }}</h1>
           <p>{{ t('catalog.subtitle') }}</p>
         </div>
-        <button class="btn btn-primary" @click="openAdd">
+        <button class="btn btn-primary add-source-btn" :aria-label="t('catalog.add')" :title="t('catalog.add')" @click="openAdd">
           <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M11 13H5a1 1 0 1 1 0-2h6V5a1 1 0 1 1 2 0v6h6a1 1 0 1 1 0 2h-6v6a1 1 0 1 1-2 0v-6z"/></svg>
-          {{ t('catalog.add') }}
+          <span class="add-source-label">{{ t('catalog.add') }}</span>
         </button>
       </header>
 
@@ -3144,6 +3144,295 @@ async function removeSource(s: CatalogSourceRec) {
   .pub-cover {
     width: 64px;
     height: 90px;
+  }
+}
+/* ---- 手机书源页 (原型 2026-10-17): 圆形「＋」、搜索条去卡片、范围一行横滑、书单横滑、书源与网站合成分组列表 ---- */
+@media (max-width: 720px) {
+  .page-head {
+    align-items: center;
+    margin: 0 0 8px;
+    min-height: 44px;
+  }
+  .page-title h1 {
+    font-size: 26px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+  }
+  .add-source-btn {
+    position: relative;
+    width: 36px;
+    height: 36px;
+    min-height: 0;
+    padding: 0;
+    border-radius: 50%;
+    justify-content: center;
+    box-shadow: 0 2px 8px -2px color-mix(in srgb, var(--brand) 60%, transparent);
+  }
+  .add-source-btn::before {
+    content: '';
+    position: absolute;
+    inset: -4px;
+  }
+  .add-source-btn svg {
+    width: 20px;
+    height: 20px;
+  }
+  .add-source-label {
+    display: none;
+  }
+
+  .uni-section {
+    margin: 0 0 8px;
+    padding: 0;
+    border: none;
+    background: none;
+    box-shadow: none;
+  }
+  .uni-search {
+    position: relative;
+  }
+  .uni-input {
+    height: 44px;
+    padding-right: 72px;
+    border-color: transparent;
+    background: var(--card);
+    box-shadow: var(--shadow-sm);
+    font-size: 16px;
+  }
+  :root[data-theme='dark'] .uni-input {
+    background: var(--surface-2);
+    box-shadow: none;
+  }
+  .uni-submit {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    height: 36px;
+    padding: 0 14px;
+    border: none;
+    border-radius: var(--radius);
+    font-size: 14px;
+  }
+  .uni-submit:disabled {
+    background: none;
+    color: var(--text-3);
+    opacity: 1;
+  }
+  .uni-scope-row {
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+    margin: 10px calc(-1 * var(--page-x)) 0;
+    padding: 0 var(--page-x) 2px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .uni-scope-row::-webkit-scrollbar {
+    display: none;
+  }
+  .uni-scopes {
+    flex-wrap: nowrap;
+  }
+  .check-chip {
+    flex-shrink: 0;
+    white-space: nowrap;
+    border-color: transparent;
+    background: var(--card);
+    box-shadow: var(--shadow-sm);
+  }
+  :root[data-theme='dark'] .check-chip {
+    background: var(--surface-2);
+    box-shadow: none;
+  }
+  .check-chip.on {
+    border-color: transparent;
+    box-shadow: none;
+  }
+  .uni-hint {
+    margin-top: 8px;
+  }
+  .uni-group {
+    padding: 4px 14px 6px;
+    border: none;
+    border-radius: var(--radius-xl);
+    background: var(--card);
+    box-shadow: var(--shadow-sm);
+  }
+
+  /* 区块标题: 标题一行, 说明收成一行小字, 操作按钮变成文字按钮 */
+  .cat-section {
+    margin-top: 24px;
+  }
+  .section-head {
+    flex-wrap: nowrap;
+    align-items: center;
+    margin-bottom: 10px;
+  }
+  .section-head > div:first-child {
+    min-width: 0;
+  }
+  .section-head h2 {
+    font-size: 17px;
+    font-weight: 700;
+  }
+  .section-desc {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 12px;
+  }
+  .section-actions {
+    flex-wrap: nowrap;
+    gap: 0;
+    flex-shrink: 0;
+  }
+  .gh-section .section-head {
+    flex-wrap: wrap;
+  }
+  .gh-section .section-actions {
+    margin-left: -8px;
+  }
+  .section-actions .btn {
+    height: 32px;
+    padding: 0 8px;
+    border: none;
+    background: none;
+    box-shadow: none;
+    color: var(--brand);
+    font-size: 13px;
+  }
+
+  /* 书单推荐: 一行横滑 */
+  .curated-grid {
+    display: flex;
+    gap: 12px;
+    margin: 0 calc(-1 * var(--page-x));
+    padding: 2px var(--page-x) 6px;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scroll-padding-inline: var(--page-x);
+    scrollbar-width: none;
+  }
+  .curated-grid::-webkit-scrollbar {
+    display: none;
+  }
+  .curated-card {
+    flex: none;
+    width: 228px;
+    scroll-snap-align: start;
+    border: none;
+    box-shadow: var(--shadow-sm);
+  }
+  .curated-card .curated-desc {
+    -webkit-line-clamp: 2;
+  }
+  .curated-card .source-chevron {
+    display: none;
+  }
+  .curated-updated {
+    display: none;
+  }
+
+  /* 书源 / 下载网站: 一张卡片里的分组列表 */
+  .source-grid,
+  .web-grid {
+    display: block;
+    border-radius: var(--radius-xl);
+    background: var(--card);
+    box-shadow: var(--shadow-sm);
+    overflow: hidden;
+  }
+  .source-card,
+  .web-source-card {
+    position: relative;
+    gap: 6px;
+    padding: 12px 14px;
+    border: none;
+    border-radius: 0;
+    background: none;
+    box-shadow: none;
+  }
+  .source-card:hover {
+    transform: none;
+    box-shadow: none;
+  }
+  .source-card:active,
+  .add-source-card:active {
+    background: var(--surface-2);
+  }
+  .source-card + .source-card::before,
+  .source-grid > .add-source-card::before,
+  .web-source-card + .web-source-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 66px;
+    right: 0;
+    height: 1px;
+    background: var(--border);
+  }
+  .source-icon {
+    width: 40px;
+    height: 40px;
+  }
+  .source-foot {
+    min-height: 0;
+  }
+  .add-source-card {
+    position: relative;
+    width: 100%;
+    min-height: 56px;
+    justify-content: center;
+    border: none;
+    border-radius: 0;
+    color: var(--brand);
+  }
+  .add-source-card::before {
+    left: 14px !important;
+  }
+  .add-source-card .add-icon {
+    width: auto;
+    height: auto;
+    background: none;
+  }
+  .add-source-card .add-text strong {
+    color: var(--brand);
+  }
+  .add-source-card .add-text span {
+    display: none;
+  }
+  .web-source-card {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: 2px 12px;
+  }
+  .web-head {
+    display: contents;
+  }
+  .web-avatar {
+    grid-row: 1 / 3;
+    width: 40px;
+    height: 40px;
+    border-radius: var(--radius-lg);
+    font-size: 15px;
+  }
+  .web-head .source-title {
+    grid-column: 2;
+    grid-row: 1;
+  }
+  .web-desc {
+    grid-column: 2;
+    grid-row: 2;
+    -webkit-line-clamp: 1;
+    line-height: 1.5;
+  }
+  .web-open {
+    grid-column: 3;
+    grid-row: 1 / 3;
+    height: 36px;
+    padding: 0 12px;
+    border: none;
+    background: var(--brand-soft);
+    color: var(--brand);
   }
 }
 </style>

@@ -17,6 +17,7 @@ import { ACCEPT_READABLE } from '../services/plainText'
 import { toast } from '../services/toast'
 import { formatReadingTime } from '../composables/useReadingTimer'
 import { readerPath } from '../services/readerRoute'
+import { paperState, type PaperState } from '../services/paperState'
 import { loadDaily, localDay, onReadingLogChange } from '../services/readingLog'
 import BookCard from '../components/BookCard.vue'
 import LibraryUploadDialog from '../components/LibraryUploadDialog.vue'
@@ -43,9 +44,12 @@ watch(paperMode, () => {
   tagFilter.value = ''
   activeBooklistId.value = ''
   keyword.value = ''
+  paperStatus.value = ''
 })
 
 const keyword = ref('')
+/** 手机论文页的阅读状态筛选 */
+const paperStatus = ref<'' | PaperState>('')
 const sortBy = ref<'recent' | 'added' | 'title' | 'author'>('recent')
 const fileInput = ref<HTMLInputElement>()
 const dragging = ref(false)
@@ -221,6 +225,7 @@ const filtered = computed(() => {
     list = list.filter(book => ids.has(book.id))
   }
   if (tagFilter.value) list = list.filter(b => b.tags.includes(tagFilter.value))
+  if (paperMode.value && paperStatus.value) list = list.filter(b => paperState(b) === paperStatus.value)
   const kw = keyword.value.trim().toLowerCase()
   if (kw) {
     list = list.filter(b =>
@@ -444,16 +449,18 @@ async function togglePin(book: BookMeta) {
   toast(pinnedAt ? t('library.pinned') : t('library.unpinned'), 'success')
 }
 
-async function batchMoveKind() {
+async function batchMoveKind(ids: Iterable<string> = selectedIds.value) {
   const target: 'book' | 'paper' = paperMode.value ? 'book' : 'paper'
   const storage = await (await import('../storage')).getStorage()
-  for (const id of selectedIds.value) {
+  let count = 0
+  for (const id of ids) {
     const book = library.books.find(b => b.id === id)
     if (!book) continue
     await storage.updateBook(id, { kind: target })
     book.kind = target
+    count++
   }
-  toast(t(target === 'paper' ? 'library.movedToPapers' : 'library.movedToBooks', { count: selectedIds.value.size }), 'success')
+  toast(t(target === 'paper' ? 'library.movedToPapers' : 'library.movedToBooks', { count }), 'success')
   selectedIds.value = new Set()
 }
 
@@ -645,8 +652,8 @@ const menuBook = computed(() => library.books.find(book => book.id === menuBookI
 
 /** 最近打开的书; 搜索 / 筛选 / 书单 / 选择时不显示 */
 const resumeBook = computed(() => {
-  if (!phone.value || paperMode.value || manageMode.value) return undefined
-  if (keyword.value.trim() || tagFilter.value || activeBooklistId.value) return undefined
+  if (!phone.value || manageMode.value) return undefined
+  if (keyword.value.trim() || tagFilter.value || activeBooklistId.value || paperStatus.value) return undefined
   let last: BookMeta | undefined
   for (const book of kindBooks.value) if (book.lastReadAt && (!last || book.lastReadAt > (last.lastReadAt ?? 0))) last = book
   return last
@@ -660,9 +667,59 @@ function agoText(at: number) {
   return t('library.agoDays', { n: Math.floor(minutes / 1440) })
 }
 
+/** 论文页码: PDF 阅读器存 location=当前页, progress=当前页/总页数 */
+function paperPages(book: BookMeta): { current: number; total: number } | undefined {
+  const current = parseInt(book.location ?? '', 10)
+  if (!current || !book.progress) return undefined
+  return { current, total: Math.max(current, Math.round(current / book.progress)) }
+}
+function paperProgressText(book: BookMeta) {
+  const pages = paperPages(book)
+  if (pages) return t('library.paperPages', pages)
+  return book.progress ? t('library.readPercent', { pct: Math.round(book.progress * 100) }) : t('library.unread')
+}
+const PAPER_STATES: PaperState[] = ['reading', 'unread', 'done']
+const paperStateCounts = computed(() => {
+  const counts: Record<PaperState, number> = { reading: 0, unread: 0, done: 0 }
+  for (const book of kindBooks.value) counts[paperState(book)]++
+  return counts
+})
+const PAPER_STATE_LABEL: Record<PaperState, string> = { reading: 'library.paperReading', unread: 'library.paperUnread', done: 'library.paperDone' }
+
+/** 论文行长按进入选择 (书卡的长按在 BookCard 里) */
+let pressTimer = 0
+let pressPoint: { x: number; y: number } | null = null
+let pressFired = false
+function rowPressStart(book: BookMeta, event: PointerEvent) {
+  if (manageMode.value || event.button > 0) return
+  pressFired = false
+  pressPoint = { x: event.clientX, y: event.clientY }
+  clearTimeout(pressTimer)
+  pressTimer = window.setTimeout(() => {
+    pressFired = true
+    onLongPress(book)
+  }, 500)
+}
+function rowPressMove(event: PointerEvent) {
+  if (pressPoint && Math.hypot(event.clientX - pressPoint.x, event.clientY - pressPoint.y) > 10) rowPressEnd()
+}
+function rowPressEnd() {
+  clearTimeout(pressTimer)
+  pressPoint = null
+}
+function onPaperRowClick(book: BookMeta) {
+  if (pressFired) {
+    pressFired = false
+    return
+  }
+  if (manageMode.value) toggleSelect(book.id)
+  else openBook(book)
+}
+
 const listScope = computed(() => {
   const count = t(paperMode.value ? 'library.paperCount' : 'library.bookCount', { count: filtered.value.length })
-  const scope = keyword.value.trim() ? t('library.searchResults') : activeBooklist.value?.name ?? tagFilter.value ?? ''
+  const status = paperMode.value && paperStatus.value ? t(PAPER_STATE_LABEL[paperStatus.value]) : ''
+  const scope = keyword.value.trim() ? t('library.searchResults') : activeBooklist.value?.name ?? (tagFilter.value || status)
   return t('library.listScope', { scope: scope || t('library.filterAll'), count })
 })
 
@@ -851,10 +908,10 @@ async function batchClearTags() {
       <div class="resume-info">
         <span class="resume-eyebrow">{{ t('library.continueReadingAgo', { time: agoText(resumeBook.lastReadAt!) }) }}</span>
         <span class="resume-title">{{ shortTitle(resumeBook.title) }}</span>
-        <span class="resume-author">{{ shortAuthor(resumeBook.author) || t('common.anonymous') }}</span>
+        <span class="resume-author">{{ (paperMode ? resumeBook.author : shortAuthor(resumeBook.author)) || t('common.anonymous') }}</span>
         <span class="resume-foot">
           <span class="resume-track" aria-hidden="true"><span class="resume-fill" :style="{ width: `${Math.max(resumePercent, 2)}%` }" /></span>
-          <span class="resume-pct">{{ resumePercent }}%</span>
+          <span class="resume-pct">{{ paperMode ? paperProgressText(resumeBook) : `${resumePercent}%` }}</span>
           <span class="resume-go" aria-hidden="true">{{ t('library.continue') }}</span>
         </span>
       </div>
@@ -904,8 +961,32 @@ async function batchClearTags() {
       </div>
     </section>
 
+    <!-- 手机论文页: 阅读状态 + 标签合成一行可横滑的筛选 -->
+    <div v-if="phone && paperMode && kindBooks.length && !manageMode" class="paper-chips" role="group" :aria-label="t('library.paperFilter')">
+      <button class="paper-chip" :class="{ active: !paperStatus && !tagFilter }" :aria-pressed="!paperStatus && !tagFilter" @click="paperStatus = ''; tagFilter = ''">
+        {{ t('library.filterAll') }}<span class="paper-chip-n">{{ kindBooks.length }}</span>
+      </button>
+      <button
+        v-for="state in PAPER_STATES"
+        :key="state"
+        class="paper-chip"
+        :class="{ active: paperStatus === state }"
+        :aria-pressed="paperStatus === state"
+        @click="paperStatus = paperStatus === state ? '' : state"
+      >{{ t(PAPER_STATE_LABEL[state]) }}<span class="paper-chip-n">{{ paperStateCounts[state] }}</span></button>
+      <button
+        v-for="tag in allTags"
+        :key="tag"
+        class="paper-chip"
+        :class="{ active: tagFilter === tag }"
+        :aria-pressed="tagFilter === tag"
+        @click="tagFilter = tagFilter === tag ? '' : tag"
+      >{{ tag }}</button>
+      <button v-if="allTags.length" class="paper-chip ghost" @click="openTagManage">{{ t('library.manageTags') }}</button>
+    </div>
+
     <!-- 标签筛选 -->
-    <div v-if="allTags.length" class="tag-row">
+    <div v-if="allTags.length && !(phone && paperMode)" class="tag-row">
       <button class="tag-chip" :class="{ active: !tagFilter }" :aria-pressed="!tagFilter" @click="tagFilter = ''">{{ t('library.filterAll') }}</button>
       <button
         v-for="tag in allTags"
@@ -1015,9 +1096,65 @@ async function batchClearTags() {
       </div>
       <p class="empty-title">{{ t('reader.noResults') }}</p>
       <div class="empty-actions">
-        <button class="btn" @click="keyword = ''; tagFilter = ''">{{ t('common.clear') }}</button>
+        <button class="btn" @click="keyword = ''; tagFilter = ''; paperStatus = ''">{{ t('common.clear') }}</button>
       </div>
     </div>
+
+    <!-- 手机论文页: 列表 (论文首页缩略图大同小异, 标题长, 列表更好扫) -->
+    <ul v-else-if="filtered.length && phone && paperMode" class="paper-list card" :class="{ selecting: manageMode }">
+      <li
+        v-for="book in filtered"
+        :key="book.id"
+        class="paper-row"
+        :class="{ selected: selectedIds.has(book.id) }"
+        role="button"
+        tabindex="0"
+        :aria-pressed="manageMode ? selectedIds.has(book.id) : undefined"
+        :aria-label="book.title"
+        @click="onPaperRowClick(book)"
+        @keydown.enter.prevent="onPaperRowClick(book)"
+        @pointerdown="rowPressStart(book, $event)"
+        @pointermove="rowPressMove"
+        @pointerup="rowPressEnd"
+        @pointercancel="rowPressEnd"
+        @contextmenu.prevent
+      >
+        <span v-if="manageMode" class="paper-check" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="14" height="14"><path fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" d="m5 12.5 4.5 4.5L19 7.5"/></svg>
+        </span>
+        <span class="paper-thumb" aria-hidden="true">
+          <img v-if="library.coverUrls[book.id]" :src="library.coverUrls[book.id]" alt="" loading="lazy" decoding="async" />
+          <template v-else><b /><i /><i class="short" /><i /><i /><i /></template>
+        </span>
+        <span class="paper-text">
+          <span class="paper-title">
+            <svg v-if="book.pinnedAt" class="paper-pin" viewBox="0 0 24 24" width="12" height="12" :aria-label="t('library.pin')"><path fill="currentColor" d="M14.6 2.6a2 2 0 0 1 2.83 0l4 4a2 2 0 0 1 0 2.82l-3.18 3.18.35 2.47a2 2 0 0 1-.56 1.7l-1.1 1.1a1 1 0 0 1-1.42 0L11.6 13.9l-5.9 5.9a1 1 0 0 1-1.4-1.42l5.88-5.89-3.95-3.95a1 1 0 0 1 0-1.41l1.1-1.1a2 2 0 0 1 1.7-.57l2.47.35 3.1-3.2z"/></svg>
+            {{ book.title }}
+          </span>
+          <span class="paper-author">{{ book.author || t('common.anonymous') }}</span>
+          <span class="paper-meta">
+            <template v-if="paperState(book) === 'done'"><span class="paper-done">{{ t('library.paperDone') }}</span></template>
+            <template v-else-if="book.progress">
+              <span class="paper-track"><span :style="{ width: `${Math.max(2, Math.round(book.progress * 100))}%` }" /></span>
+              <span>{{ paperProgressText(book) }}</span>
+            </template>
+            <span v-else>{{ t('library.unread') }}</span>
+            <span v-if="book.noSync" class="paper-badge">{{ t('library.privateBadge') }}</span>
+            <span v-for="tag in book.tags.slice(0, 2)" :key="tag" class="paper-badge">{{ tag }}</span>
+          </span>
+        </span>
+        <button
+          v-if="!manageMode"
+          class="paper-more"
+          :title="t('common.moreActions')"
+          :aria-label="t('common.moreActions')"
+          @click.stop="menuBookId = book.id"
+          @pointerdown.stop
+        >
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><circle cx="5" cy="12" r="1.7" fill="currentColor"/><circle cx="12" cy="12" r="1.7" fill="currentColor"/><circle cx="19" cy="12" r="1.7" fill="currentColor"/></svg>
+        </button>
+      </li>
+    </ul>
 
     <div v-else-if="filtered.length" class="grid">
       <BookCard
@@ -1061,7 +1198,7 @@ async function batchClearTags() {
       </button>
       <button class="btn btn-sm" :disabled="!selectedIds.size" @click="uploadBooks([...selectedIds])">{{ t('library.uploadToCloud') }}</button>
       <button v-if="anyConvertible" class="btn btn-sm" :disabled="!selectedIds.size || !!converting" @click="convertBooks([...selectedIds])">{{ t('book.convertToEpub') }}</button>
-      <button class="btn btn-sm" :disabled="!selectedIds.size" @click="batchMoveKind">
+      <button class="btn btn-sm" :disabled="!selectedIds.size" @click="batchMoveKind()">
         {{ paperMode ? t('library.moveToBooks') : t('library.moveToPapers') }}
       </button>
       <button
@@ -1120,6 +1257,10 @@ async function batchClearTags() {
           <span class="sheet-ico"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.66 0l3-3a4 4 0 0 0-5.66-5.66l-1 1M14 10a4 4 0 0 0-5.66 0l-3 3a4 4 0 0 0 5.66 5.66l1-1"/></svg></span>
           <span class="sheet-text"><span class="sheet-label">{{ t('library.urlImportTitle') }}</span><span class="sheet-desc">{{ t('library.addUrlDesc') }}</span></span>
         </button>
+        <button v-if="paperMode" class="sheet-row" @click="addAction(() => router.push('/catalogs'))">
+          <span class="sheet-ico"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg></span>
+          <span class="sheet-text"><span class="sheet-label">{{ t('library.addArxiv') }}</span><span class="sheet-desc">{{ t('library.addArxivDesc') }}</span></span>
+        </button>
         <button class="sheet-row" @click="addAction(() => uploadBooks())">
           <span class="sheet-ico"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M7 18H5a4 4 0 0 1-.6-8 7 7 0 0 1 13.4-2 5 5 0 0 1 1.2 10h-2M12 20V10m-4 4 4-4 4 4"/></svg></span>
           <span class="sheet-text"><span class="sheet-label">{{ t('library.uploadToCloud') }}</span><span class="sheet-desc">{{ t('library.addCloudDesc') }}</span></span>
@@ -1147,7 +1288,7 @@ async function batchClearTags() {
     </AppModal>
 
     <!-- 手机: 单本书操作面板 (书卡「⋯」) -->
-    <AppModal v-if="menuBook" :title="shortTitle(menuBook.title)" :description="[menuBook.format.toUpperCase(), menuBook.progress ? t('library.readPercent', { pct: Math.round(menuBook.progress * 100) }) : t('library.unread'), shortAuthor(menuBook.author) || t('common.anonymous')].join(' · ')" @close="menuBookId = ''">
+    <AppModal v-if="menuBook" :title="shortTitle(menuBook.title)" :description="[menuBook.format.toUpperCase(), paperMode ? paperProgressText(menuBook) : menuBook.progress ? t('library.readPercent', { pct: Math.round(menuBook.progress * 100) }) : t('library.unread'), shortAuthor(menuBook.author) || t('common.anonymous')].join(' · ')" @close="menuBookId = ''">
       <div class="sheet-list">
         <button v-if="!paperMode" class="sheet-row" @click="bookMenuAction(book => openBooklistPicker([book.id]))">
           <span class="sheet-ico"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h12a1 1 0 0 1 1 1v17l-7-3.5L5 21V4a1 1 0 0 1 1-1z"/></svg></span>
@@ -1168,6 +1309,10 @@ async function batchClearTags() {
         <button v-if="canConvertToEpub(menuBook.format)" class="sheet-row" :disabled="!!converting" @click="bookMenuAction(book => convertBooks([book.id]))">
           <span class="sheet-ico"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9h13l-3.5-3.5M20 15H7l3.5 3.5"/></svg></span>
           <span class="sheet-text"><span class="sheet-label">{{ t('book.convertToEpub') }}</span></span>
+        </button>
+        <button class="sheet-row" @click="bookMenuAction(book => batchMoveKind([book.id]))">
+          <span class="sheet-ico"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8zM14 3v5h5M9 13h6M9 17h6"/></svg></span>
+          <span class="sheet-text"><span class="sheet-label">{{ paperMode ? t('library.moveToBooks') : t('library.moveToPapers') }}</span></span>
         </button>
         <button class="sheet-row" @click="bookMenuAction(book => setPrivate([book.id], !book.noSync))">
           <span class="sheet-ico"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M6 11h12v9H6zM8.5 11V8a3.5 3.5 0 0 1 7 0v3"/></svg></span>
@@ -1195,7 +1340,7 @@ async function batchClearTags() {
           <span class="sheet-ico"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h12a1 1 0 0 1 1 1v17l-7-3.5L5 21V4a1 1 0 0 1 1-1zM9 10h6"/></svg></span>
           <span class="sheet-text"><span class="sheet-label">{{ t('library.removeFromBooklist') }}</span></span>
         </button>
-        <button class="sheet-row" @click="batchMoreAction(batchMoveKind)">
+        <button class="sheet-row" @click="batchMoreAction(() => batchMoveKind())">
           <span class="sheet-ico"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8zM14 3v5h5M9 13h6M9 17h6"/></svg></span>
           <span class="sheet-text"><span class="sheet-label">{{ paperMode ? t('library.moveToBooks') : t('library.moveToPapers') }}</span></span>
         </button>
@@ -2375,6 +2520,231 @@ async function batchClearTags() {
   }
   .phone-actionbar button:active:not(:disabled) {
     background: var(--surface-2);
+  }
+  /* 论文: 状态 + 标签筛选 */
+  .paper-chips {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    margin: 0 calc(-1 * var(--page-x)) 14px;
+    padding: 0 var(--page-x);
+  }
+  .paper-chips::-webkit-scrollbar {
+    display: none;
+  }
+  .paper-chip {
+    flex: none;
+    height: var(--control-h-sm);
+    padding: 0 14px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border: none;
+    border-radius: var(--radius-pill);
+    background: var(--card);
+    box-shadow: var(--shadow-sm);
+    color: var(--text-2);
+    font-size: 14px;
+    white-space: nowrap;
+  }
+  :root[data-theme='dark'] .paper-chip {
+    background: var(--surface-2);
+    box-shadow: none;
+  }
+  .paper-chip.active,
+  :root[data-theme='dark'] .paper-chip.active {
+    background: var(--text);
+    color: var(--bg);
+  }
+  .paper-chip.ghost {
+    background: none;
+    box-shadow: inset 0 0 0 1px var(--border);
+    color: var(--text-3);
+  }
+  .paper-chip-n {
+    font-size: 12px;
+    color: var(--text-3);
+    font-variant-numeric: tabular-nums;
+  }
+  .paper-chip.active .paper-chip-n {
+    color: inherit;
+    opacity: 0.7;
+  }
+
+  /* 论文列表 */
+  .paper-list {
+    list-style: none;
+    margin: 0 0 24px;
+    padding: 0;
+    border: none;
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-sm);
+    overflow: hidden;
+  }
+  .paper-row {
+    position: relative;
+    display: flex;
+    gap: 12px;
+    padding: 14px 4px 14px 14px;
+    cursor: pointer;
+    -webkit-touch-callout: none;
+    user-select: none;
+  }
+  .paper-row + .paper-row::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 70px;
+    right: 0;
+    height: 1px;
+    background: var(--border);
+  }
+  .selecting .paper-row + .paper-row::before {
+    left: 106px;
+  }
+  .paper-row:active {
+    background: var(--surface-2);
+  }
+  .paper-row:focus-visible {
+    outline: none;
+    box-shadow: inset var(--ring);
+  }
+  .paper-check {
+    flex-shrink: 0;
+    align-self: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    border: 2px solid var(--border-strong);
+    display: grid;
+    place-items: center;
+    color: transparent;
+  }
+  .paper-row.selected .paper-check {
+    border-color: var(--brand);
+    background: var(--brand);
+    color: var(--on-brand);
+  }
+  .paper-thumb {
+    flex-shrink: 0;
+    width: 44px;
+    aspect-ratio: 1 / 1.3;
+    border-radius: 3px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    padding: 6px 5px;
+    background: var(--cover-paper-0);
+    box-shadow: 0 0 0 1px var(--cover-edge), var(--cover-shadow);
+  }
+  .paper-thumb img {
+    width: calc(100% + 10px);
+    height: calc(100% + 12px);
+    margin: -6px -5px;
+    object-fit: cover;
+    object-position: top;
+    display: block;
+  }
+  .paper-thumb b,
+  .paper-thumb i {
+    display: block;
+    border-radius: 1px;
+    background: var(--cover-ink-0);
+  }
+  .paper-thumb b {
+    height: 3px;
+    margin: 0 3px 2px;
+  }
+  .paper-thumb i {
+    height: 1.5px;
+    opacity: 0.35;
+  }
+  .paper-thumb i.short {
+    width: 60%;
+  }
+  .paper-text {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .paper-title {
+    font-size: 15px;
+    font-weight: 600;
+    line-height: 1.38;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    word-break: break-word;
+  }
+  .paper-pin {
+    display: inline-block;
+    vertical-align: -1px;
+    margin-right: 2px;
+    color: var(--brand);
+  }
+  .paper-author {
+    margin-top: 3px;
+    font-size: 12px;
+    color: var(--text-3);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .paper-meta {
+    margin-top: 7px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--text-3);
+    font-variant-numeric: tabular-nums;
+  }
+  .paper-track {
+    width: 44px;
+    height: 3px;
+    border-radius: 2px;
+    background: var(--surface-3);
+    overflow: hidden;
+  }
+  .paper-track span {
+    display: block;
+    height: 100%;
+    background: var(--brand);
+  }
+  .paper-done {
+    color: var(--success);
+  }
+  .paper-badge {
+    max-width: 9em;
+    padding: 0 6px;
+    border-radius: 5px;
+    background: var(--surface-2);
+    line-height: 18px;
+    font-size: 11px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .paper-more {
+    flex-shrink: 0;
+    align-self: flex-start;
+    width: 40px;
+    height: 36px;
+    margin-top: -6px;
+    display: grid;
+    place-items: center;
+    border: none;
+    border-radius: var(--radius);
+    background: none;
+    color: var(--text-3);
+  }
+  .paper-more:active {
+    background: var(--surface-3);
   }
   .grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));

@@ -3,7 +3,8 @@ import { askConfirm } from '../services/confirm'
 import AppSelect from '../components/AppSelect.vue'
 import AppModal from '../components/AppModal.vue'
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
+import { MQ, useMediaQuery } from '../composables/useMediaQuery'
 import { getStorage, isTauri } from '../storage'
 import { useSettings } from '../stores/settings'
 import { useLibrary } from '../stores/library'
@@ -433,13 +434,58 @@ function jumpTo(id: string) {
 }
 
 const route = useRoute()
+const router = useRouter()
+
+// ---- 手机 (≤720px): 分组列表 + 二级页; 二级页就是下面的各分区, 由 ?page= 驱动, 系统返回键退回列表 ----
+const phone = useMediaQuery(MQ.phone)
+const phonePage = computed(() => {
+  const page = route.query.page
+  return phone.value && typeof page === 'string' && navSections.value.some(s => s.id === page) ? page : ''
+})
+const phonePageTitle = computed(() => navSections.value.find(s => s.id === phonePage.value)?.label ?? '')
+const showSection = (id: string) => !phone.value || phonePage.value === id
+function openPhonePage(id: string) {
+  if (id === 'agents') setAgentsOpen(true)
+  void router.push({ query: { ...route.query, page: id } })
+}
+function closePhonePage() {
+  if (window.history.state?.back) router.back()
+  else void router.replace({ query: {} })
+}
+watch(phonePage, () => nextTick(() => scroller?.scrollTo({ top: 0 })))
+
+const phoneSheet = ref<'' | 'appearance' | 'language' | 'goal' | 'pdf' | 'backup'>('')
+const appearanceLabel = computed(() => t(APPEARANCE_OPTIONS.find(o => o.value === settings.appearance)?.labelKey ?? 'settings.appearanceSystem'))
+const GOAL_PRESETS = [0, 10, 15, 20, 30, 45, 60, 90, 120]
+const goalOptions = computed(() => [...new Set([...GOAL_PRESETS, settings.dailyGoalMinutes])].sort((a, b) => a - b))
+const accountEmail = computed(() => accountState.account?.email ?? '')
+const aiProviderLabel = computed(() => t(`aiProvider.${aiPreset.value.id}`))
+const proxyValue = computed(() => (isTauri() ? settings.httpProxy : settings.corsProxy) ? t('settings.proxyOn') : t('settings.proxyOff'))
+function pickSheet(run: () => void) {
+  run()
+  phoneSheet.value = ''
+}
+async function sheetThen(run: () => unknown) {
+  phoneSheet.value = ''
+  await nextTick()
+  await run()
+}
+async function resetTypographyConfirmed() {
+  if (!(await askConfirm(t('settings.resetTypographyConfirm')))) return
+  settings.resetReader()
+  toast(t('settings.resetDone'), 'success')
+}
 
 onMounted(() => {
   scroller = rootEl.value?.closest<HTMLElement>('.main') ?? null
   scroller?.addEventListener('scroll', onSettingsScroll, { passive: true })
-  // 深链: /settings?section=agents 直接定位 (并展开) 对应分区
+  // 深链: /settings?section=agents 直接定位 (并展开) 对应分区; 手机上直接进对应二级页
   const section = typeof route.query.section === 'string' ? route.query.section : ''
-  if (section && navSections.value.some(s => s.id === section)) nextTick(() => jumpTo(section))
+  if (!section || !navSections.value.some(s => s.id === section)) return
+  if (phone.value) {
+    if (section === 'agents') setAgentsOpen(true)
+    void router.replace({ query: { page: section } })
+  } else nextTick(() => jumpTo(section))
 })
 onBeforeUnmount(() => {
   scroller?.removeEventListener('scroll', onSettingsScroll)
@@ -806,24 +852,170 @@ const APPEARANCE_OPTIONS = [
 </script>
 
 <template>
-  <div ref="rootEl" class="settings">
-    <h1>{{ t('settings.title') }}</h1>
+  <div ref="rootEl" class="settings" :class="{ 'phone-sub': !!phonePage }">
+    <template v-if="!phone">
+      <h1>{{ t('settings.title') }}</h1>
 
-    <nav ref="navEl" class="settings-nav" :aria-label="t('settings.navLabel')">
-      <button
-        v-for="s in navSections"
-        :key="s.id"
-        type="button"
-        class="nav-chip"
-        :class="{ active: activeSection === s.id }"
-        :aria-current="activeSection === s.id ? 'true' : undefined"
-        :data-section="s.id"
-        @click="jumpTo(s.id)"
-      >{{ s.label }}</button>
+      <nav ref="navEl" class="settings-nav" :aria-label="t('settings.navLabel')">
+        <button
+          v-for="s in navSections"
+          :key="s.id"
+          type="button"
+          class="nav-chip"
+          :class="{ active: activeSection === s.id }"
+          :aria-current="activeSection === s.id ? 'true' : undefined"
+          :data-section="s.id"
+          @click="jumpTo(s.id)"
+        >{{ s.label }}</button>
+      </nav>
+    </template>
+
+    <!-- 手机二级页: 顶部返回栏 -->
+    <nav v-else-if="phonePage" class="pl-navbar" :aria-label="phonePageTitle">
+      <button type="button" class="pl-back" @click="closePhonePage">
+        <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="m15 6-6 6 6 6"/></svg>
+        {{ t('settings.title') }}
+      </button>
+      <span class="pl-navtitle">{{ phonePageTitle }}</span>
     </nav>
 
+    <!-- 手机设置首页: 账号卡 + 分组列表 -->
+    <div v-else class="phone-settings">
+      <h1>{{ t('settings.title') }}</h1>
+
+      <button type="button" class="pl-account" @click="openPhonePage('sync')">
+        <span class="pl-avatar" aria-hidden="true">
+          <template v-if="loggedIn && accountEmail">{{ accountEmail.charAt(0).toUpperCase() }}</template>
+          <svg v-else viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 4a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM4.5 20a7.5 7.5 0 0 1 15 0"/></svg>
+        </span>
+        <span class="pl-text">
+          <span class="pl-account-title">{{ loggedIn ? accountEmail : syncReady ? syncTargetNames : t('settings.phoneLogin') }}</span>
+          <span class="pl-account-sub" :class="{ error: syncStatus.error }">
+            <span v-if="syncReady && !syncStatus.error" class="pl-dot" aria-hidden="true" />
+            {{ syncReady ? syncStatus.text : t('settings.phoneLoginDesc') }}
+          </span>
+        </span>
+        <span
+          v-if="syncReady"
+          class="pl-sync"
+          role="button"
+          tabindex="0"
+          :class="{ spinning: syncState.running }"
+          :aria-label="t('sync.now')"
+          :title="t('sync.now')"
+          @click.stop="doSyncNow"
+          @keydown.enter.stop.prevent="doSyncNow"
+        ><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12a8 8 0 0 1 14-5.3M20 12a8 8 0 0 1-14 5.3M18 3v4h-4M6 21v-4h4"/></svg></span>
+        <template v-else><svg class="pl-chev" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="m9 6 6 6-6 6"/></svg></template>
+      </button>
+
+      <div class="pl-label">{{ t('settings.general') }}</div>
+      <div class="pl-group">
+        <button type="button" class="pl-row" @click="phoneSheet = 'appearance'">
+          <span class="pl-ico tone-ink" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg></span>
+          <span class="pl-text"><span class="pl-title">{{ t('settings.appearance') }}</span></span>
+          <span class="pl-value">{{ appearanceLabel }}</span><svg class="pl-chev" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="m9 6 6 6-6 6"/></svg>
+        </button>
+        <button type="button" class="pl-row" @click="phoneSheet = 'language'">
+          <span class="pl-ico tone-brand" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h9M8.5 3v2M6 5c1 4 4 7 7 8M11 5c-1 4-4 7-7 8M13 21l4-9 4 9M14.5 18h5"/></svg></span>
+          <span class="pl-text"><span class="pl-title">{{ t('settings.language') }}</span></span>
+          <span class="pl-value">{{ settings.language === 'en' ? 'English' : '中文' }}</span><svg class="pl-chev" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="m9 6 6 6-6 6"/></svg>
+        </button>
+      </div>
+
+      <div class="pl-label">{{ t('settings.navReading') }}</div>
+      <div class="pl-group">
+        <button type="button" class="pl-row" @click="phoneSheet = 'goal'">
+          <span class="pl-ico tone-success" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM12 7a5 5 0 1 0 0 10 5 5 0 0 0 0-10zM12 11a1 1 0 1 0 0 2 1 1 0 0 0 0-2z"/></svg></span>
+          <span class="pl-text"><span class="pl-title">{{ t('settings.dailyGoal') }}</span></span>
+          <span class="pl-value">{{ settings.dailyGoalMinutes ? t('settings.goalMinutes', { m: settings.dailyGoalMinutes }) : t('stats.goalOff') }}</span><svg class="pl-chev" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="m9 6 6 6-6 6"/></svg>
+        </button>
+        <button type="button" class="pl-row" @click="phoneSheet = 'pdf'">
+          <span class="pl-ico tone-danger" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8zM14 3v5h5M9 13h6M9 17h6"/></svg></span>
+          <span class="pl-text"><span class="pl-title">{{ t('settings.pdfRenderer') }}</span><span class="pl-desc">{{ t('settings.pdfRendererDesc') }}</span></span>
+          <span class="pl-value">{{ settings.pdf.renderer === 'pdfium' ? 'PDFium' : 'MuPDF' }}</span><svg class="pl-chev" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="m9 6 6 6-6 6"/></svg>
+        </button>
+        <button type="button" class="pl-row" @click="resetTypographyConfirmed">
+          <span class="pl-ico tone-gray" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12a8 8 0 1 0 2.3-5.6M4 4v4h4"/></svg></span>
+          <span class="pl-text"><span class="pl-title">{{ t('settings.resetTypography') }}</span><span class="pl-desc">{{ t('settings.resetTypographyDesc') }}</span></span>
+        </button>
+      </div>
+      <p class="pl-foot">{{ t('settings.phoneTypographyHint') }}</p>
+
+      <div class="pl-label">{{ t('settings.phoneAiGroup') }}</div>
+      <div class="pl-group">
+        <button type="button" class="pl-row" @click="openPhonePage('ai')">
+          <span class="pl-ico tone-purple" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8zM18.5 16l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8z"/></svg></span>
+          <span class="pl-text"><span class="pl-title">{{ t('settings.aiTitle') }}</span></span>
+          <span class="pl-value">{{ aiProviderLabel }}</span><svg class="pl-chev" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="m9 6 6 6-6 6"/></svg>
+        </button>
+        <button v-if="paperAgentRuntimeAvailable()" type="button" class="pl-row" @click="openPhonePage('agents')">
+          <span class="pl-ico tone-gray" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v11H4zM8 20h8M12 16v4M8 9l2 2-2 2M13 13h3"/></svg></span>
+          <span class="pl-text"><span class="pl-title">{{ t('settings.paperAgentsTitle') }}</span></span>
+          <span class="pl-value">{{ agentsSummary.label }}</span><svg class="pl-chev" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="m9 6 6 6-6 6"/></svg>
+        </button>
+      </div>
+
+      <div class="pl-label">{{ t('settings.features') }}</div>
+      <div class="pl-group">
+        <label class="pl-row">
+          <span class="pl-ico tone-warning" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"/></svg></span>
+          <span class="pl-text"><span class="pl-title">{{ t('settings.featureBooklists') }}</span><span class="pl-desc">{{ t('settings.featureBooklistsDesc') }}</span></span>
+          <span class="switch">
+            <input v-model="settings.features.recommendedBooklists" type="checkbox" role="switch" :aria-checked="settings.features.recommendedBooklists" />
+            <span class="switch-track" aria-hidden="true"></span>
+          </span>
+        </label>
+        <label class="pl-row">
+          <span class="pl-ico tone-brand" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3l3 3-3 3M20 6H5M7 21l-3-3 3-3M4 18h15"/></svg></span>
+          <span class="pl-text"><span class="pl-title">{{ t('settings.featureTransfer') }}</span><span class="pl-desc">{{ t('settings.featureTransferDesc') }}</span></span>
+          <span class="switch">
+            <input v-model="settings.features.transfer" type="checkbox" role="switch" :aria-checked="settings.features.transfer" />
+            <span class="switch-track" aria-hidden="true"></span>
+          </span>
+        </label>
+        <router-link v-if="settings.features.transfer" to="/transfer" class="pl-row pl-sub">
+          <span class="pl-text"><span class="pl-title">{{ t('transfer.settingsEntry') }}</span></span><svg class="pl-chev" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="m9 6 6 6-6 6"/></svg>
+        </router-link>
+      </div>
+      <p class="pl-foot">{{ t('settings.featuresDesc') }}</p>
+
+      <div class="pl-label">{{ t('settings.data') }}</div>
+      <div class="pl-group">
+        <button type="button" class="pl-row" @click="phoneSheet = 'backup'">
+          <span class="pl-ico tone-brand" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7.5 12 3l9 4.5v9L12 21l-9-4.5zM3 7.5l9 4.5 9-4.5M12 12v9"/></svg></span>
+          <span class="pl-text"><span class="pl-title">{{ t('settings.backupRestore') }}</span><span class="pl-desc">{{ t('settings.backupDesc') }}</span></span><svg class="pl-chev" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="m9 6 6 6-6 6"/></svg>
+        </button>
+        <button type="button" class="pl-row" @click="openPhonePage('data')">
+          <span class="pl-ico tone-gray" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6c0-1.7 3.6-3 8-3s8 1.3 8 3-3.6 3-8 3-8-1.3-8-3zM4 6v12c0 1.7 3.6 3 8 3s8-1.3 8-3V6M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/></svg></span>
+          <span class="pl-text"><span class="pl-title">{{ t('settings.storageBackend') }}</span><span class="pl-desc">{{ storageKind === 'filesystem' ? t('settings.storageDesktop') : t('settings.storageWeb') }}</span></span><svg class="pl-chev" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="m9 6 6 6-6 6"/></svg>
+        </button>
+        <button type="button" class="pl-row" @click="openPhonePage('network')">
+          <span class="pl-ico tone-gray" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg></span>
+          <span class="pl-text"><span class="pl-title">{{ t('settings.network') }}</span><span class="pl-desc">{{ t('settings.phoneNetworkDesc') }}</span></span>
+          <span class="pl-value">{{ proxyValue }}</span><svg class="pl-chev" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="m9 6 6 6-6 6"/></svg>
+        </button>
+      </div>
+      <div v-if="busy && busyScope === 'local'" class="busy pl-busy" role="status">{{ busy }}</div>
+
+      <div class="pl-label">{{ t('settings.about') }}</div>
+      <div class="pl-group">
+        <button type="button" class="pl-row" @click="openPhonePage('about')">
+          <img class="pl-app-icon" src="/icon-192.png" alt="" />
+          <span class="pl-text"><span class="pl-title">LightRead 轻阅</span><span class="pl-desc">{{ !isTauri() ? t('settings.webVersion') : isAndroid ? t('settings.androidVersion') : t('settings.desktopVersion') }} · v{{ CURRENT_VERSION }}</span></span>
+          <span v-if="updateInfo?.hasUpdate" class="pl-badge">{{ t('update.newVersion') }}</span>
+          <span v-else class="pl-value">{{ t('update.check') }}</span><svg class="pl-chev" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="m9 6 6 6-6 6"/></svg>
+        </button>
+        <button type="button" class="pl-row" @click="$router.push('/manual')">
+          <span class="pl-ico tone-success" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 6.5C10.5 5 8 4.5 4 4.5v13c4 0 6.5.5 8 2 1.5-1.5 4-2 8-2v-13c-4 0-6.5.5-8 2zM12 6.5v13"/></svg></span>
+          <span class="pl-text"><span class="pl-title">{{ t('manual.title') }}</span></span><svg class="pl-chev" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="m9 6 6 6-6 6"/></svg>
+        </button>
+      </div>
+      <div class="pl-end" />
+    </div>
+
     <!-- 账号与同步 -->
-    <section id="settings-sync" class="card section sync-section" :class="{ 'account-first': loggedIn }" aria-labelledby="settings-sync-heading">
+    <section v-show="showSection('sync')" id="settings-sync" class="card section sync-section" :class="{ 'account-first': loggedIn }" aria-labelledby="settings-sync-heading">
       <h2 id="settings-sync-heading" tabindex="-1">{{ t('settings.syncSection') }}</h2>
 
       <!-- 同步状态: 账号与 WebDAV 共用, 有同步目标时显示 -->
@@ -1041,7 +1233,7 @@ const APPEARANCE_OPTIONS = [
     </section>
 
     <!-- 通用 -->
-    <section id="settings-general" class="card section" aria-labelledby="settings-general-heading">
+    <section v-show="showSection('general')" id="settings-general" class="card section" aria-labelledby="settings-general-heading">
       <h2 id="settings-general-heading" tabindex="-1">{{ t('settings.general') }}</h2>
       <div class="row">
         <div class="row-text">
@@ -1073,7 +1265,7 @@ const APPEARANCE_OPTIONS = [
     </section>
 
     <!-- 功能: 可选功能开关 (默认关) -->
-    <section id="settings-features" class="card section" aria-labelledby="settings-features-heading">
+    <section v-show="showSection('features')" id="settings-features" class="card section" aria-labelledby="settings-features-heading">
       <h2 id="settings-features-heading" tabindex="-1">{{ t('settings.features') }}</h2>
       <p class="section-desc">{{ t('settings.featuresDesc') }}</p>
       <label class="toggle-row">
@@ -1099,7 +1291,7 @@ const APPEARANCE_OPTIONS = [
     </section>
 
     <!-- 阅读 -->
-    <section id="settings-reading" class="card section" aria-labelledby="settings-reading-heading">
+    <section v-show="showSection('reading')" id="settings-reading" class="card section" aria-labelledby="settings-reading-heading">
       <h2 id="settings-reading-heading" tabindex="-1">{{ t('settings.reading') }}</h2>
       <div class="row">
         <div class="row-text">
@@ -1121,7 +1313,7 @@ const APPEARANCE_OPTIONS = [
     </section>
 
     <!-- AI 助手 -->
-    <section id="settings-ai" class="card section" aria-labelledby="settings-ai-heading">
+    <section v-show="showSection('ai')" id="settings-ai" class="card section" aria-labelledby="settings-ai-heading">
       <h2 id="settings-ai-heading" tabindex="-1">{{ t('settings.aiTitle') }}</h2>
       <p class="section-desc">{{ t('settings.aiDesc') }}</p>
       <div class="field-grid ai-fields">
@@ -1155,6 +1347,7 @@ const APPEARANCE_OPTIONS = [
 
     <section
       v-if="paperAgentRuntimeAvailable()"
+      v-show="showSection('agents')"
       id="settings-agents"
       class="card section agents-section"
       :class="{ open: agentsOpen }"
@@ -1256,7 +1449,7 @@ const APPEARANCE_OPTIONS = [
     </section>
 
     <!-- 数据 -->
-    <section id="settings-data" class="card section" aria-labelledby="settings-data-heading">
+    <section v-show="showSection('data')" id="settings-data" class="card section" aria-labelledby="settings-data-heading">
       <h2 id="settings-data-heading" tabindex="-1">{{ t('settings.data') }}</h2>
       <div class="row">
         <div class="row-text">
@@ -1293,7 +1486,7 @@ const APPEARANCE_OPTIONS = [
     </section>
 
     <!-- 网络 -->
-    <section id="settings-network" class="card section" aria-labelledby="settings-network-heading">
+    <section v-show="showSection('network')" id="settings-network" class="card section" aria-labelledby="settings-network-heading">
       <h2 id="settings-network-heading" tabindex="-1">{{ t('settings.network') }}</h2>
       <template v-if="isTauri()">
         <div class="row">
@@ -1344,7 +1537,7 @@ const APPEARANCE_OPTIONS = [
     </section>
 
     <!-- 关于 -->
-    <section id="settings-about" class="card section" aria-labelledby="settings-about-heading">
+    <section v-show="showSection('about')" id="settings-about" class="card section" aria-labelledby="settings-about-heading">
       <h2 id="settings-about-heading" tabindex="-1">{{ t('settings.about') }}</h2>
 
       <div class="app-identity">
@@ -1457,6 +1650,77 @@ const APPEARANCE_OPTIONS = [
       </div>
     </section>
 
+    <!-- 手机设置: 选择面板 -->
+    <AppModal v-if="phoneSheet === 'appearance'" :title="t('settings.appearance')" :description="t('settings.appearanceDesc')" @close="phoneSheet = ''">
+      <div class="ps-list" role="radiogroup" :aria-label="t('settings.appearance')">
+        <button
+          v-for="opt in APPEARANCE_OPTIONS"
+          :key="opt.value"
+          type="button"
+          role="radio"
+          class="ps-row"
+          :class="{ on: settings.appearance === opt.value }"
+          :aria-checked="settings.appearance === opt.value"
+          @click="pickSheet(() => (settings.appearance = opt.value))"
+        >
+          <span class="ps-ico" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path :d="opt.icon" /></svg></span>
+          <span class="ps-label">{{ t(opt.labelKey) }}</span><svg class="ps-tick" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" d="m5 12.5 4.5 4.5L19 7.5"/></svg>
+        </button>
+      </div>
+    </AppModal>
+    <AppModal v-if="phoneSheet === 'language'" :title="t('settings.language')" @close="phoneSheet = ''">
+      <div class="ps-list" role="radiogroup" :aria-label="t('settings.language')">
+        <button
+          v-for="opt in [{ value: 'zh', label: '中文' }, { value: 'en', label: 'English' }] as const"
+          :key="opt.value"
+          type="button"
+          role="radio"
+          class="ps-row"
+          :class="{ on: settings.language === opt.value }"
+          :aria-checked="settings.language === opt.value"
+          @click="pickSheet(() => (settings.language = opt.value))"
+        ><span class="ps-label">{{ opt.label }}</span><svg class="ps-tick" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" d="m5 12.5 4.5 4.5L19 7.5"/></svg></button>
+      </div>
+    </AppModal>
+    <AppModal v-if="phoneSheet === 'pdf'" :title="t('settings.pdfRenderer')" :description="t('settings.pdfRendererDesc')" @close="phoneSheet = ''">
+      <div class="ps-list" role="radiogroup" :aria-label="t('settings.pdfRenderer')">
+        <button
+          v-for="opt in (['mupdf', 'pdfium'] as const)"
+          :key="opt"
+          type="button"
+          role="radio"
+          class="ps-row"
+          :class="{ on: settings.pdf.renderer === opt }"
+          :aria-checked="settings.pdf.renderer === opt"
+          @click="pickSheet(() => (settings.pdf.renderer = opt))"
+        ><span class="ps-label">{{ opt === 'mupdf' ? 'MuPDF' : 'PDFium' }}</span><svg class="ps-tick" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" d="m5 12.5 4.5 4.5L19 7.5"/></svg></button>
+      </div>
+    </AppModal>
+    <AppModal v-if="phoneSheet === 'goal'" :title="t('settings.dailyGoal')" :description="t('stats.goalHint')" @close="phoneSheet = ''">
+      <div class="ps-goals" role="radiogroup" :aria-label="t('stats.goalPickerAria')">
+        <button
+          v-for="m in goalOptions"
+          :key="m"
+          type="button"
+          role="radio"
+          :class="{ on: settings.dailyGoalMinutes === m }"
+          :aria-checked="settings.dailyGoalMinutes === m"
+          @click="pickSheet(() => (settings.dailyGoalMinutes = m))"
+        >{{ m === 0 ? t('stats.goalOff') : m }}</button>
+      </div>
+    </AppModal>
+    <AppModal v-if="phoneSheet === 'backup'" :title="t('settings.backupRestore')" :description="t('settings.backupDesc')" @close="phoneSheet = ''">
+      <div class="ps-list">
+        <button type="button" class="ps-row" :disabled="!!busy" @click="sheetThen(doExport)">
+          <span class="ps-ico brand" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 4v11m-5-5 5 5 5-5M5 20h14"/></svg></span>
+          <span class="ps-label">{{ t('settings.exportBackup') }}</span>
+        </button>
+        <button type="button" class="ps-row" :disabled="!!busy" @click="sheetThen(() => backupInput?.click())">
+          <span class="ps-ico" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7.5 12 3l9 4.5v9L12 21l-9-4.5zM3 7.5l9 4.5 9-4.5M12 12v9"/></svg></span>
+          <span class="ps-label">{{ t('settings.importBackup') }}</span>
+        </button>
+      </div>
+    </AppModal>
     <AppModal v-if="showSecretsConfirm" :title="t('sync.secretsConfirmTitle')" initial-focus=".settings-confirm-cancel" @close="showSecretsConfirm = false">
       <div class="settings-confirm-body"><p>{{ t('sync.secretsConfirmBody') }}</p><p>{{ t('sync.secretsConfirmAdvice') }}</p></div>
       <template #footer><div class="modal-actions">
@@ -2812,6 +3076,332 @@ h2:focus {
     display: inline-flex;
     align-items: center;
     min-height: 36px;
+  }
+}
+/* ================= 手机: 分组列表 + 二级页 ================= */
+.phone-settings h1 {
+  margin: 4px 0 12px;
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+.pl-account {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px;
+  border: none;
+  border-radius: var(--radius-xl);
+  background: var(--card);
+  box-shadow: var(--shadow-sm);
+  color: var(--text);
+  text-align: left;
+}
+.pl-account:active {
+  background: var(--surface-2);
+}
+.pl-avatar {
+  flex-shrink: 0;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--brand-soft);
+  color: var(--brand);
+  font-size: 20px;
+  font-weight: 700;
+}
+.pl-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.pl-account-title {
+  font-size: 17px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pl-account-sub {
+  margin-top: 2px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text-3);
+}
+.pl-account-sub.error {
+  color: var(--danger);
+}
+.pl-dot {
+  flex-shrink: 0;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--success);
+}
+.pl-sync {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--brand-soft);
+  color: var(--brand);
+}
+.pl-sync.spinning svg {
+  animation: pl-spin 1s linear infinite;
+}
+@keyframes pl-spin {
+  to { transform: rotate(360deg); }
+}
+.pl-label {
+  padding: 20px 4px 6px;
+  font-size: 13px;
+  color: var(--text-3);
+}
+.pl-foot {
+  margin: 0;
+  padding: 6px 4px 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-3);
+}
+.pl-group {
+  border-radius: var(--radius-xl);
+  background: var(--card);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+.pl-row {
+  position: relative;
+  width: 100%;
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border: none;
+  background: none;
+  color: var(--text);
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+.pl-row + .pl-row::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 58px;
+  right: 0;
+  height: 1px;
+  background: var(--border);
+}
+.pl-row:active {
+  background: var(--surface-2);
+}
+.pl-row:focus-visible,
+.pl-account:focus-visible {
+  outline: none;
+  box-shadow: inset var(--ring);
+}
+.pl-sub {
+  padding-left: 58px;
+}
+.pl-ico {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  display: grid;
+  place-items: center;
+}
+.tone-brand { background: var(--brand-soft); color: var(--brand); }
+.tone-success { background: var(--success-soft); color: var(--success); }
+.tone-warning { background: var(--warning-soft); color: var(--warning); }
+.tone-danger { background: var(--danger-soft); color: var(--danger); }
+.tone-purple { background: color-mix(in srgb, var(--brand) 12%, var(--danger-soft)); color: color-mix(in srgb, var(--brand) 55%, var(--danger)); }
+.tone-gray { background: var(--surface-2); color: var(--text-2); }
+.tone-ink { background: var(--text); color: var(--bg); }
+.pl-app-icon {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+}
+.pl-title {
+  font-size: 15px;
+  line-height: 1.35;
+}
+.pl-desc {
+  margin-top: 2px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--text-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pl-value {
+  flex-shrink: 0;
+  max-width: 40%;
+  font-size: 14px;
+  color: var(--text-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pl-badge {
+  flex-shrink: 0;
+  padding: 0 8px;
+  border-radius: var(--radius-pill);
+  background: var(--danger);
+  color: var(--on-brand);
+  font-size: 12px;
+  line-height: 20px;
+}
+.pl-chev {
+  flex-shrink: 0;
+  color: var(--text-3);
+  opacity: 0.7;
+}
+.pl-busy {
+  margin-top: 8px;
+}
+.pl-end {
+  height: 8px;
+}
+.pl-navbar {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  height: 52px;
+  margin: calc(-1 * var(--page-top)) calc(-1 * var(--page-x)) 12px;
+  padding: 0 4px;
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+  box-shadow: 0 1px 0 var(--border);
+}
+.pl-back {
+  position: relative;
+  z-index: 1;
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 10px 0 4px;
+  border: none;
+  border-radius: var(--radius);
+  background: none;
+  color: var(--brand);
+  font-size: 15px;
+}
+.pl-back:active {
+  background: var(--brand-soft);
+}
+.pl-navtitle {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: 50%;
+  font-size: 16px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* 二级页: 返回栏已经写了分区名, 卡片里的分区标题不再重复 */
+.phone-sub .section > h2 {
+  display: none;
+}
+.phone-sub .section {
+  padding-top: 6px;
+}
+
+/* 手机设置的选择面板 (AppModal 内容) */
+.ps-list {
+  padding: 6px 0 10px;
+}
+.ps-row {
+  width: 100%;
+  min-height: 56px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 20px;
+  border: none;
+  background: none;
+  color: var(--text);
+  text-align: left;
+  font-size: 15px;
+}
+.ps-row:active:not(:disabled),
+.ps-row:focus-visible {
+  background: var(--surface-2);
+  outline: none;
+}
+.ps-row:disabled {
+  opacity: 0.5;
+}
+.ps-ico {
+  flex-shrink: 0;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  background: var(--surface-2);
+  color: var(--text-2);
+}
+.ps-ico.brand {
+  background: var(--brand-soft);
+  color: var(--brand);
+}
+.ps-label {
+  flex: 1;
+  min-width: 0;
+}
+.ps-tick {
+  color: var(--brand);
+  visibility: hidden;
+}
+.ps-row.on .ps-tick {
+  visibility: visible;
+}
+.ps-row.on .ps-label {
+  color: var(--brand);
+  font-weight: 600;
+}
+.ps-goals {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  padding: 8px 20px 16px;
+}
+.ps-goals button {
+  height: 44px;
+  border: none;
+  border-radius: var(--radius-lg);
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+}
+.ps-goals button.on {
+  background: var(--brand);
+  color: var(--on-brand);
+  font-weight: 600;
+}
+@media (prefers-reduced-motion: reduce) {
+  .pl-sync.spinning svg {
+    animation: none;
   }
 }
 </style>

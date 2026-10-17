@@ -29,7 +29,7 @@ try {
  await page.evaluate(()=>history.back())
  await page.locator('[data-app-modal]').waitFor({state:'detached'})
  await page.waitForTimeout(250)
- assert(page.url().endsWith('/settings?section=ai'), 'Back must close the panel without leaving settings')
+ assert(page.url().endsWith('/settings?page=ai'), 'Back must close the panel without leaving the AI settings page')
  await page.locator('#ai-provider').click()
  await page.locator('.app-select-option').first().waitFor()
  const providers=await page.locator('.app-select-option').evaluateAll(els=>els.map(el=>el.dataset.value))
