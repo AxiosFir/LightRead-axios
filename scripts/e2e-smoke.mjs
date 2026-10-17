@@ -638,6 +638,15 @@ await step('PDF 自动阅读按模式滚动或翻页', async () => {
   await page.click('.paper-actions .reader-segment button:has-text("滚动")')
   await page.waitForSelector('.pane-left .p-holder canvas', { timeout: 8000 })
   await page.click('.paper-actions .reader-tool:has-text("自动翻页")')
+  // Slowest setting is < 1px/frame: native scroll quantization must not stall it.
+  await page.locator('.auto-panel input[type=range]').fill('1')
+  await page.locator('.pane-left').evaluate(el => { el.scrollTop = 0 })
+  await page.waitForTimeout(200)
+  await page.click('.auto-panel .auto-toggle')
+  await page.waitForTimeout(1000)
+  const slowTop = await page.locator('.pane-left').evaluate(el => el.scrollTop)
+  if (slowTop <= 0 || slowTop > 15) throw new Error(`最慢自动滚动应缓慢推进: ${slowTop}`)
+  await page.click('.auto-panel .auto-toggle')
   // 速度用档位滑动条 (很慢 … 很快): 点「很快」刻度
   await page.click('.auto-panel .ls-stop:has-text("很快")')
   await page.waitForSelector('.auto-panel .ls-stop.active:has-text("很快")', { timeout: 2000 })

@@ -60,7 +60,10 @@
     "stats": "node scripts/stats.mjs",
     "deploy": "npm run build && wrangler deploy",
     "test:terminology": "node --experimental-strip-types --test scripts/test-terminology.mjs",
-    "audit:keywords": "node --experimental-strip-types scripts/audit-keyword-candidates.mjs"
+    "audit:keywords": "node --experimental-strip-types scripts/audit-keyword-candidates.mjs",
+    "test:concept-recognition": "node --experimental-strip-types --test scripts/test-concept-recognition.mjs",
+    "test:auto-scroll": "node --experimental-strip-types --test scripts/test-auto-scroll.mjs",
+    "e2e:concept-recognition": "node scripts/e2e-concept-recognition.mjs"
   },
   "dependencies": {
     "@embedpdf/pdfium": "^2.14.4",

@@ -9,6 +9,7 @@ import lexiconUrl from '../../data/zh-lexicon.txt?url'
 import { SectionText } from './blocks.ts'
 import { KwBook, MAX_BOOK_CHARS, packPicks, type KwPickRequest } from './keyWordsBook.ts'
 import { loadZhLexicon } from './zhLexicon.ts'
+import { loadConceptLexicon } from './conceptLexicon.ts'
 
 export interface KwBookHost {
   sectionCount(): number
@@ -125,7 +126,7 @@ export class KeyWordService {
     if (!this.#local) {
       const lex = await loadZhLexicon()
       if (!lex) throw new Error('lexicon unavailable')
-      this.#local ??= new KwBook(lex)
+      this.#local ??= new KwBook(lex, await loadConceptLexicon())
     }
     // 让出一帧再算 (一节约 10–50 ms)
     await new Promise(r => setTimeout(r, 0))

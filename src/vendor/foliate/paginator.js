@@ -1025,7 +1025,7 @@ export class Paginator extends HTMLElement {
     }
 
     // ---- LightRead: sub-pixel drift (auto scroll, typewriter follow) ----
-    // scrollTop only takes whole CSS px (Chromium rounds the setter), so a slow auto scroll moved
+    // scrollTop may quantize writes (depending on zoom / WebView), so a slow auto scroll moved
     // the text 1,0,1,1,0… px per frame and it visibly juddered. driftBy keeps the exact position:
     // the whole-px part goes to scrollTop, the remainder (< 1px) to a transform on the container.
     // Any other scroll (the reader, navigation, relayout compensation) drops the remainder.
@@ -1045,7 +1045,9 @@ export class Paginator extends HTMLElement {
             } else ct.scrollTop = whole
         }
         const now = ct.scrollTop
-        const frac = Math.max(0, Math.min(0.99, exact - now))
+        // At fractional zoom the browser may round UP to a physical-pixel boundary.
+        // Keep the signed residual; clamping negatives loses distance every frame.
+        const frac = exact - now
         this.#drift = { whole: now, frac }
         this.#showDrift(frac)
         // the single-section scroll debounce never fires while drifting: report as cont mode does
@@ -1062,19 +1064,18 @@ export class Paginator extends HTMLElement {
         this.#drift = null
         this.#showDrift(0)
         const ct = this.#container
-        if (d.frac >= 0.5 && ct.scrollTop === d.whole) {
-            if (this.#mode === 'cont') this.#setScroll(d.whole + 1)
-            else ct.scrollTop = d.whole + 1
+        if (ct.scrollTop === d.whole) {
+            if (this.#mode === 'cont') this.#setScroll(d.whole + d.frac)
+            else ct.scrollTop = d.whole + d.frac
         }
     }
     #drift = null // { whole, frac }: scrollTop we wrote and the remainder shown by the transform
     #driftShown = 0
     #driftRelocTimer = null
     #showDrift(frac) {
-        const v = frac >= 0.01 ? frac : 0
-        if (v === this.#driftShown) return
-        this.#driftShown = v
-        this.#container.style.transform = v ? `translateY(${-v}px)` : ''
+        this.#driftShown = frac
+        const transform = this.#drift ? `translateY(${-frac}px)` : ''
+        if (this.#container.style.transform !== transform) this.#container.style.transform = transform
     }
     #dropDrift() {
         if (!this.#drift && !this.#driftShown) return

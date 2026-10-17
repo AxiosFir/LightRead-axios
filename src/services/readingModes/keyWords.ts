@@ -374,6 +374,11 @@ function forcedSpans(p: string, fm: ForcedMatcher): Array<[number, number]> {
   for (const w of fm.words) {
     let i = p.indexOf(w)
     while (i >= 0) {
+      if ((/^[A-Za-z0-9]/.test(w) && /[A-Za-z0-9_]/.test(p[i - 1] ?? ''))
+        || (/[A-Za-z0-9]$/.test(w) && /[A-Za-z0-9_]/.test(p[i + w.length] ?? ''))) {
+        i = p.indexOf(w, i + 1)
+        continue
+      }
       taken ??= new Uint8Array(p.length)
       let free = true
       for (let k = i; k < i + w.length; k++) if (taken[k]) { free = false; break }
@@ -452,6 +457,10 @@ export interface KwSection {
 }
 
 export interface KwStats {
+  /** Paragraph-local compound boundaries; never added to the base segmenter. */
+  concepts?: Map<number, ForcedMatcher[]>
+  /** Background estimates for matched concepts; source DF is not salience. */
+  conceptCosts?: Map<string, number>
   /** 叠加了本书新词的词表 */
   lex: ZhLexicon
   /** 本书新词 (原文写法) */
@@ -469,7 +478,7 @@ export interface KwStats {
 }
 
 /** 由若干节 (按节序) 建全书统计: 先发现新词, 再按叠加词表切分并记位置 */
-export function buildStats(sections: KwSection[], base: ZhLexicon, opts: { newWords?: boolean } = {}): KwStats {
+export function buildStats(sections: KwSection[], base: ZhLexicon, opts: { newWords?: boolean; concepts?: Map<number, string[][]> } = {}): KwStats {
   const sorted = [...sections].sort((a, b) => a.section - b.section)
   const found = opts.newWords === false ? new Map<string, number>() : discoverNewWords(sorted.flatMap(s => s.paras), base)
   const lex = overlayLexicon(base, newWordCosts(base, found.keys()))
@@ -479,11 +488,21 @@ export function buildStats(sections: KwSection[], base: ZhLexicon, opts: { newWo
   const ordEnd = new Map<number, number>()
   const texts = new Map<number, string>()
   const chars = new Map<number, number>()
+  const concepts = new Map<number, ForcedMatcher[]>()
+  const conceptCosts = new Map<string, number>()
+  for (const [section, paras] of opts.concepts ?? []) {
+    concepts.set(section, paras.map(words => forcedMatcher(words)))
+    for (const word of new Set(paras.flat())) {
+      // Reuse the existing split-cost estimate (capped at rank 30k). Do not
+      // assign every source term the maximum rarity used for discovered names.
+      if (!conceptCosts.has(word)) conceptCosts.set(word, base.cost.get(word) ?? newWordCosts(base, [encodeMixed(word)]).get(encodeMixed(word))!)
+    }
+  }
   let ord = 0
   for (const s of sorted) {
     ordStart.set(s.section, ord)
-    for (const p of s.paras) {
-      const { toks, n } = tokenizeParaN(p, lex)
+    for (const [pi, p] of s.paras.entries()) {
+      const { toks, n } = tokenizeParaN(p, lex, concepts.get(s.section)?.[pi])
       for (const t of toks) {
         if (!worthTracking(t, lex)) continue
         let a = posArr.get(t.text); if (!a) posArr.set(t.text, a = [])
@@ -498,7 +517,7 @@ export function buildStats(sections: KwSection[], base: ZhLexicon, opts: { newWo
   }
   const pos = new Map<string, Int32Array>()
   for (const [w, a] of posArr) pos.set(w, Int32Array.from(a))
-  return { lex, newWords, N: ord, ordStart, ordEnd, pos, texts, chars }
+  return { lex, newWords, N: ord, ordStart, ordEnd, pos, texts, chars, concepts, conceptCosts }
 }
 
 // ---------------- 打分 ----------------
@@ -550,18 +569,20 @@ export function effectiveMinRank(prm: KwParams): number {
 }
 
 /** 单个词的打分 (I 由词表名次、K 与 B 由出现位置算) */
-export function scoreWord(w: string, p: ArrayLike<number>, f: number, N: number, stats: Pick<KwStats, 'lex' | 'newWords'>, prm: KwParams): KwType {
+export function scoreWord(w: string, p: ArrayLike<number>, f: number, N: number, stats: Pick<KwStats, 'lex' | 'newWords' | 'conceptCosts'>, prm: KwParams): KwType {
   const { lex } = stats
   const lnH = Math.log(zipfH(lex))
   const minI = Math.log(effectiveMinRank(prm) + RANK_K)
   const lexTop = Math.log(lex.size + RANK_K)
-  const isNew = stats.newWords.has(w)
+  const conceptCost = stats.conceptCosts?.get(w)
+  const isNew = conceptCost === undefined && stats.newWords.has(w)
   let I: number
   let eligible = true
   let common = false
   if (isNew || HAN_START_RE.test(w)) {
     const c = lex.cost.get(w)
-    if (isNew) I = lexTop
+    if (conceptCost !== undefined) I = conceptCost
+    else if (isNew) I = lexTop
     else if (c === undefined) { I = lex.unk; eligible = false }
     else I = c
     if (w.length < 2 && !isNew) eligible = eligible && c !== undefined && c >= Math.log(20000) && !STOP_CHARS.has(w)
@@ -725,7 +746,9 @@ export function pickSection(
   let gbase = 0
   let total = 0
   paras.forEach((p, pi) => {
-    const { toks, n } = tokenizeParaN(p, stats.lex, fm)
+    const compounds = stats.concepts?.get(section)?.[pi]
+    const matcher = compounds?.words.length ? forcedMatcher([...compounds.words, ...(fm?.words ?? [])]) : fm
+    const { toks, n } = tokenizeParaN(p, stats.lex, matcher)
     let cur: Sentence | null = null
     let curSent = -1
     for (const t of toks) {
@@ -739,12 +762,18 @@ export function pickSection(
       let rep = seen.get(t.text)
       if (rep === undefined) rep = priorOf(t.text)
       seen.set(t.text, rep + 1)
-      const isAi = !!ai && aiOk(t.text)
+      let a = aiOk(t.text) ? ai!.get(t.text) : undefined
+      // Correct a selected fragment's local boundary, without granting a new
+      // concept votes from other blocks or selecting every dictionary match.
+      if (!a && ai && compounds?.words.includes(t.text)) {
+        for (const [word, v] of ai) if (word.length >= 2 && !STOP.has(word) && v.r >= minR && t.text.includes(word)
+          && (!a || v.r > a.r)) a = { r: v.r, n: 1 }
+      }
+      const isAi = !!a
       let s: number
       if (isAi) {
-        const a = ai!.get(t.text)!
         const ty = typeOf(t.text)
-        const base = 4 * a.r + 2 * Math.log(Math.max(1, a.n)) + (ty ? ty.K + 0.5 * ty.B : 0)
+        const base = 4 * a!.r + 2 * Math.log(Math.max(1, a!.n)) + (ty ? ty.K + 0.5 * ty.B : 0)
         s = (mode === 'aiFill' ? 100 : 0) + base
       } else {
         if (mode === 'ai') continue

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { AutoScrollClock, ScrollAccumulator } from '../services/autoScroll'
 import { AUTO_SPEED_LEVELS, AUTO_SPEED_STEPS, speedPosition, secondsAtPosition } from '../services/autoReadSpeed'
 import LevelSlider from '../components/LevelSlider.vue'
 import { TTS_RATE_MAX, TTS_RATE_MIN, TTS_RATE_STOPS, rateText } from '../services/ttsRate'
@@ -3096,7 +3097,8 @@ const autoReading = ref(false)
 const autoPanel = ref(false)
 let autoPageTimer: ReturnType<typeof setInterval> | undefined
 let autoScrollFrame: number | undefined
-let autoScrollAt = 0
+const autoClock = new AutoScrollClock()
+const autoPosition = new ScrollAccumulator()
 let autoPanelTimer: ReturnType<typeof setTimeout> | undefined
 
 function cancelAutoPanelCollapse() {
@@ -3145,11 +3147,14 @@ function stepAutoScroll(now: number) {
   }
 
   // “秒/页”在连续模式中换算为每秒滚动一个页面高度的速度。
-  const elapsed = Math.min(Math.max(0, now - autoScrollAt), 100)
   const stepHeight = pdfLayout.value === 'reflow' ? el.clientHeight : holderH.value
-  const pixelsPerMs = stepHeight / (settings.autoReadSeconds * 1000)
-  autoScrollAt = now
-  el.scrollTop = Math.min(maxTop, el.scrollTop + elapsed * pixelsPerMs)
+  if (document.hidden) {
+    autoClock.reset()
+    autoPosition.reset()
+  } else {
+    const dy = autoClock.step(now, stepHeight / Math.max(3, settings.autoReadSeconds))
+    if (dy) autoPosition.move(el, dy)
+  }
   autoScrollFrame = requestAnimationFrame(stepAutoScroll)
 }
 
@@ -3165,7 +3170,8 @@ function startAutoRead() {
       nextPage()
     }, settings.autoReadSeconds * 1000)
   } else {
-    autoScrollAt = performance.now()
+    autoClock.reset()
+    autoPosition.reset()
     autoScrollFrame = requestAnimationFrame(stepAutoScroll)
   }
   scheduleAutoPanelCollapse()
@@ -3177,12 +3183,13 @@ function stopAutoRead() {
   autoPageTimer = undefined
   if (autoScrollFrame != null) cancelAnimationFrame(autoScrollFrame)
   autoScrollFrame = undefined
-  autoScrollAt = 0
+  autoClock.reset()
+  autoPosition.reset()
   cancelAutoPanelCollapse()
 }
 
 watch(() => settings.autoReadSeconds, () => {
-  if (autoReading.value) startAutoRead()
+  if (autoReading.value && bookPaged.value) startAutoRead()
 })
 
 /* ---- 听书 (Edge 在线 / 本地离线 / 系统语音) ---- */
@@ -3502,7 +3509,10 @@ function handleKeydown(e: KeyboardEvent) {
   })
 }
 
+function resetAutoScrollClock() { autoClock.reset() }
+
 onMounted(async () => {
+  document.addEventListener('visibilitychange', resetAutoScrollClock)
   // 匿名使用统计: 今天打开过书 (每天一次, 设置 → 隐私 可关闭)
   void pingUsage(true)
   window.addEventListener('keydown', handleKeydown)
@@ -3593,6 +3603,7 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(() => {
+  document.removeEventListener('visibilitychange', resetAutoScrollClock)
   readerAlive = false
   reflowSession++
   invalidateBdContextGeneration()

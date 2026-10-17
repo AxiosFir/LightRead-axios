@@ -9,8 +9,11 @@ import {
   type AiWord, type KwLevel, type KwPick, type KwStats, type KwType,
 } from './keyWords.ts'
 import type { ZhLexicon } from './zhSegment.ts'
+import type { Terminology, TermBook } from '../terminology.ts'
+import { paragraphConcepts } from './conceptRecognition.ts'
 
 export interface KwPickRequest {
+  book?: TermBook
   section: number
   paras: string[]
   level: KwLevel
@@ -43,11 +46,16 @@ export class KwBook {
   /** 统计覆盖了哪些节 */
   #covered = new Set<number>()
   #types = new Map<number, Map<string, KwType>>()
+  #terminology: Terminology | null
+  #metadata: TermBook = {}
+  #metadataKey = ''
+  #concepts = new Map<number, string[][]>()
   /** 全书统计已完成 (之后新加的节会让它变回 false) */
   complete = false
 
-  constructor(lex: ZhLexicon) {
+  constructor(lex: ZhLexicon, terminology: Terminology | null = null) {
     this.lex = lex
+    this.#terminology = terminology
   }
 
   get sectionCount(): number { return this.#sections.size }
@@ -59,18 +67,24 @@ export class KwBook {
   addSection(section: number, paras: string[]): boolean {
     const n = paras.reduce((a, p) => a + p.length, 0)
     const old = this.#sections.get(section)
+    if (old && old.length === paras.length && old.every((p, i) => p === paras[i])) return true
     if (!old && this.#chars + n > MAX_BOOK_CHARS && this.#sections.size > 0) return false
     if (old) this.#chars -= old.reduce((a, p) => a + p.length, 0)
     this.#sections.set(section, paras)
     this.#chars += n
-    if (!this.#covered.has(section)) this.complete = false
+    this.#concepts.delete(section)
+    this.#covered.delete(section)
+    this.complete = false
     return true
   }
 
   /** 用已收到的全部分节重建统计 (新词发现 + 切分 + 记位置) */
   analyze(): KwStats {
     const sections = [...this.#sections].map(([section, paras]) => ({ section, paras }))
-    this.#stats = buildStats(sections, this.lex)
+    if (this.#terminology) for (const { section, paras } of sections) {
+      if (!this.#concepts.has(section)) this.#concepts.set(section, paragraphConcepts(paras, this.#metadata, this.#terminology))
+    }
+    this.#stats = buildStats(sections, this.lex, { concepts: this.#concepts })
     this.#covered = new Set(this.#sections.keys())
     this.#types.clear()
     this.complete = true
@@ -88,6 +102,13 @@ export class KwBook {
   }
 
   pick(req: KwPickRequest): KwPick[] {
+    const metadataKey = JSON.stringify(req.book ?? {})
+    if (metadataKey !== this.#metadataKey) {
+      this.#metadataKey = metadataKey
+      this.#metadata = req.book ?? {}
+      this.#concepts.clear()
+      this.#stats = null
+    }
     this.addSection(req.section, req.paras)
     // 还没有统计, 或统计不含这一节且还没做过全书统计: 先用已有分节算一份
     if (!this.#stats || (!this.#covered.has(req.section) && !this.complete)) this.analyze()

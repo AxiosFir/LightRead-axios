@@ -67,6 +67,12 @@ const data = { version: catalog.version, domains: catalog.domains, packs }
 const unique = new Set(packs.flatMap(p => p.entries.map(([word]) => word)))
 const output = JSON.stringify(data) + '\n'
 await writeFile(new URL('dictionary.json', root), output)
+// Runtime boundary lexicon: keep the archive complete, but do not treat names,
+// idioms, poems or sentence-length legal titles as compound concept boundaries.
+const concepts = { ...data, packs: packs.filter(p => p.role === 'term').map(p => ({ ...p,
+  entries: p.entries.filter(([w]) => w.length >= 4 && w.length <= 12 && /^[\p{Script=Han}A-Za-z0-9-]+$/u.test(w)).map(([w]) => [w, null]),
+})) }
+await writeFile(new URL('concepts.json', root), JSON.stringify(concepts) + '\n')
 await writeFile(new URL('coverage.json', root), JSON.stringify({
   version: data.version, uniqueTerms: unique.size, bytes: Buffer.byteLength(output),
   sha256: createHash('sha256').update(output).digest('hex'), sources: report,

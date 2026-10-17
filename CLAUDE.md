@@ -30,7 +30,9 @@ npm run test:reading-focus   # 阅读焦点: 舒适区 25%–65% / 焦点线 38%
 npm run test:reader-tap-zone # 轻点分区: 横屏左·中·右 / 竖屏上·中·下 / 自动阅读时无翻页区 (纯函数)
 npm run test:zh-segment      # 仿生阅读中文分词: 词表切分 / 歧义不上色 / ICU 回退 / 交替规则 / 速度 (<15ms/万字)
 npm run test:key-words       # 点睛重点词: 本书新词发现 / 自信息 + 关键度 + 聚集度打分 / 密度与间隔 / AI 词定位与回退 (设计见 docs/research/entropy-keyword-highlighting.md、llm-keyword-selection.md)
-npm run test:terminology     # 术语候选实验: 来源完整性 / 22 类路由 / 原文跨度 / 边界与预算 (尚未接入生产排序)
+npm run test:terminology     # 术语来源完整性 / 22 类路由 / 原文跨度 / 边界与预算
+npm run test:concept-recognition # 生产完整概念边界 / 智能碎片扩展 / 失败回退
+npm run test:auto-scroll     # 多刷新率速度 / 卡帧与调速 / 亚像素累计
 npm run audit:keywords       # 离线复现词边界、同形词跨语境和未来新词影响; 不是准确率评测
 node scripts/build-terminology.mjs   # 重建开放候选词库与覆盖报告; 方案见 docs/research/keyword-optimization.md
 node scripts/build-zh-lexicon.mjs   # 重新生成中文词表 src/data/zh-lexicon.txt + 回退合并表 zhMergeWords.ts (下载 jieba / DeepSeek-R1 词表到 ~/.cache, 校验 SHA-256)

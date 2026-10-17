@@ -14,6 +14,7 @@
  */
 import { parseZhLexicon, type ZhLexicon } from './zhSegment.ts'
 import { KwBook, packPicks, type KwPickRequest } from './keyWordsBook.ts'
+import { loadConceptLexicon } from './conceptLexicon.ts'
 
 let lexicon: Promise<ZhLexicon> | null = null
 let book: KwBook | null = null
@@ -27,7 +28,7 @@ async function bookFor(id: string): Promise<KwBook> {
   if (!lexicon) throw new Error('not initialised')
   const lex = await lexicon
   if (!book || bookId !== id) {
-    book = new KwBook(lex)
+    book = new KwBook(lex, await loadConceptLexicon())
     bookId = id
   }
   return book

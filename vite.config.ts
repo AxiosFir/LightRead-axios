@@ -49,6 +49,10 @@ export default defineConfig({
         urlPattern: /\/assets\/zh-lexicon-[\w-]+\.txt$/,
         handler: 'CacheFirst',
         options: { cacheName: 'lightread-zh-lexicon', expiration: { maxEntries: 2 } },
+      }, {
+        urlPattern: /\/assets\/concepts-[\w-]+\.json$/,
+        handler: 'CacheFirst',
+        options: { cacheName: 'lightread-concepts', expiration: { maxEntries: 2 } },
       }],
     },
     manifest: {

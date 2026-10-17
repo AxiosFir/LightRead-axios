@@ -128,6 +128,7 @@ import { normalizeLevel, smartOnFor } from '../services/dianjing/level'
 import { KeyWordLayer, looksChinese, type KwSmartInput } from '../services/readingModes/keyWordsLayer'
 import { disposeKeyWordService, keyWordService, type KwBookHost } from '../services/readingModes/keyWordsClient'
 import type { KwLevel } from '../services/readingModes/keyWords'
+import type { TermBook } from '../services/terminology'
 import { prefersReducedMotion, scrollMotion } from '../services/readingFocus'
 
 /**
@@ -136,6 +137,7 @@ import { prefersReducedMotion, scrollMotion } from '../services/readingFocus'
  */
 export interface KeyWordSource extends KwBookHost {
   bookId: string
+  metadata?(): TermBook
   /** 小说等叙事作品: 关键度只用读到当前章为止的文本 */
   fiction(): boolean
   /** 智能版: 本节的 AI 词与分块; 还没有时返回 null (先全用离线结果) */
@@ -1052,11 +1054,12 @@ export function useReadingModes(opts: UseReadingModesOptions) {
     return layer
   }
 
-  function kwParams(doc: Document, section: number): { level: KwLevel; spoilerSafe: boolean; smart: KwSmartInput | null } {
+  function kwParams(doc: Document, section: number): { book?: TermBook; level: KwLevel; spoilerSafe: boolean; smart: KwSmartInput | null } {
     const src = kwSource.value
     const d = settings.dianjing.density
     const level: KwLevel = d === 'low' || d === 'high' ? d : 'normal'
     return {
+      book: src?.metadata?.(),
       level,
       spoilerSafe: !!src?.fiction(),
       smart: guideKind.value === 'smart' && src ? src.smart(doc, section) : null,

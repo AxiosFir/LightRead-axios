@@ -501,7 +501,8 @@ async function runAutoScroll(browser) {
     await cdp.send('Emulation.setCPUThrottlingRate', { rate: 6 })
     const seconds = Number(process.env.AUTO_SECONDS ?? 60)
     const from = await page.evaluate(() => performance.now())
-    // the app's auto scroll: renderer.scrollBy every frame at 1.5 screens per second
+    // Cross-chapter throughput stress, directly driving scrollBy at 1.5 screens/s.
+    // The actual UI engine and slow subpixel pacing are covered by `smooth`.
     await page.evaluate(seconds => new Promise(resolve => {
       const r = document.querySelector('foliate-view').renderer
       const end = performance.now() + seconds * 1000
@@ -531,7 +532,83 @@ async function runAutoScroll(browser) {
   }
 }
 
-const SCENARIO = process.env.SCENARIO ?? 'all' // all | basic | device | stream | auto (comma separated)
+// Exercise the actual UI auto engine, including slow fractional motion and a main-thread stall.
+async function runSmoothAuto(browser) {
+  for (const viewport of [{ width: 390, height: 844 }, { width: 960, height: 1127 }]) {
+    const { context, page, errors } = await openStream(browser, viewport)
+    try {
+      if (!process.env.BASELINE) {
+        const residuals = await page.evaluate(async () => {
+          const r = document.querySelector('foliate-view').renderer
+          const ct = r.getContents()[0].doc.defaultView.frameElement.getRootNode().querySelector('#container')
+          const out = []
+          for (const zoom of [1, 1.25, 1.5, 2]) {
+            r.driftEnd()
+            ct.style.zoom = String(zoom)
+            await new Promise(resolve => setTimeout(resolve, 100))
+            const start = ct.scrollTop
+            for (let i = 0; i < 400; i++) r.driftBy(0.075)
+            const offset = new DOMMatrix(getComputedStyle(ct).transform).m42
+            out.push({ zoom, distance: ct.scrollTop - offset - start })
+          }
+          r.driftEnd()
+          ct.style.zoom = ''
+          return out
+        })
+        for (const row of residuals) assert.ok(Math.abs(row.distance - 30) < 0.01, JSON.stringify(row))
+        console.log('SUBPIXEL', JSON.stringify(residuals))
+      }
+      await page.evaluate(() => {
+        const r = document.querySelector('foliate-view').renderer
+        const original = r.driftBy.bind(r), end = r.driftEnd.bind(r)
+        window.__smooth = { moves: [], ends: 0 }
+        r.driftBy = dy => {
+          const ok = original(dy)
+          window.__smooth.moves.push({ t: performance.now(), dy })
+          return ok
+        }
+        r.driftEnd = () => { window.__smooth.ends++; return end() }
+      })
+      await page.getByRole('button', { name: '阅读模式', exact: true }).filter({ visible: true }).first().click()
+      await page.getByRole('button', { name: '自动滚动', exact: true }).click()
+      await page.locator('.auto-panel input[type=range]').fill('17') // 90 seconds/screen
+      await page.locator('.auto-panel').getByRole('button', { name: '开始', exact: true }).click()
+      await sleep(1200)
+      await page.evaluate(() => { window.__smooth.moves = []; window.__smooth.ends = 0 })
+      await sleep(1000)
+      await page.evaluate(() => { const until = performance.now() + 180; while (performance.now() < until) {} })
+      await sleep(600)
+      const beforeMoves = await page.evaluate(() => window.__smooth.moves.slice())
+      if (!await page.locator('.auto-panel').isVisible()) await page.keyboard.press('m')
+      const before = await page.evaluate(() => window.__smooth.ends)
+      await page.locator('.auto-panel input[type=range]').fill('20')
+      await sleep(700)
+      const data = await page.evaluate(() => window.__smooth)
+      const steady = data.moves.slice(0, 40).map(x => x.dy).sort((a, b) => a - b)
+      const median = steady[Math.floor(steady.length / 2)]
+      const maxBeforeSpeed = Math.max(...beforeMoves.map(x => x.dy))
+      const report = { viewport, frames: data.moves.length, medianPx: median,
+        maxBeforeSpeedPx: maxBeforeSpeed, restartsOnSpeed: data.ends - before }
+      console.log('SMOOTH', JSON.stringify(report))
+      assert.ok(data.moves.length > 60, 'UI actually drives continuous auto scroll')
+      if (!process.env.BASELINE) {
+        assert.equal(report.restartsOnSpeed, 0, 'speed adjustment must not end subpixel drift')
+        assert.ok(maxBeforeSpeed < median * 3, 'a stall must not produce a catch-up jump')
+        await page.evaluate(() => {
+          const doc = document.querySelector('foliate-view').renderer.getContents()[0].doc
+          doc.dispatchEvent(new doc.defaultView.TouchEvent('touchstart'))
+          doc.dispatchEvent(new doc.defaultView.TouchEvent('touchcancel'))
+          window.__smooth.moves = []
+        })
+        await sleep(1600)
+        assert.ok(await page.evaluate(() => window.__smooth.moves.length > 5), 'cancelled touch releases the automatic scroll hold')
+      }
+      assert.deepEqual(errors, [])
+    } finally { await context.close() }
+  }
+}
+
+const SCENARIO = process.env.SCENARIO ?? 'all' // all | basic | device | stream | auto | smooth (comma separated)
 const runs = name => SCENARIO === 'all' || SCENARIO.split(',').includes(name)
 const browser = await chromium.launch({ headless: true })
 try {
@@ -901,6 +978,7 @@ if (runs('basic')) {
 if (runs('device')) await runDevice(browser)
 if (runs('stream')) await runStreamFlings(browser)
 if (runs('auto')) await runAutoScroll(browser)
+if (runs('smooth')) await runSmoothAuto(browser)
 } finally {
   await browser.close()
 }

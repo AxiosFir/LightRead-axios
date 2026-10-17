@@ -1,5 +1,4 @@
-/** Experimental, dependency-free terminology candidates. Not wired into production ranking.
- * Usable by both browser and relay once the hybrid extraction experiment is evaluated.
+/** Dependency-free terminology candidates and compound boundaries.
  * A single primary subject plus secondary subjects covers cross-disciplinary books.
  * Dictionary membership supplies candidates, not a decision to highlight them.
  */
@@ -107,14 +106,14 @@ export class Terminology {
   /** Return occurrence spans, including nested candidates, without deciding importance.
    * Scans a bounded chunk using lazy per-pack tries; no frequency-based bonus.
    */
-  match(book: TermBook, rawText: string): { primary: string; related: string[]; spans: TermSpan[] } {
+  match(book: TermBook, rawText: string, includeCore = false): { primary: string; related: string[]; spans: TermSpan[] } {
     const text = rawText.slice(0, 12_000)
     const routing = this.route(book, text)
     const active = new Set([routing.primary, ...routing.related])
     const haystack = asciiLower(text)
     const candidates = new Map<string, TermSpan>()
     for (const pack of this.data.packs) {
-      if (!pack.domains.some(d => active.has(d))) continue
+      if (!pack.domains.some(d => active.has(d)) && !(includeCore && pack.source === 'lightread-editorial')) continue
       const index = this.#index(pack)
       for (let start = 0; start < haystack.length; start++) {
         if (/[a-z0-9]/.test(haystack[start]!) && wordChar(haystack[start - 1])) continue

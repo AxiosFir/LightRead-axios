@@ -28,6 +28,7 @@ import { useReadingTimer } from '../composables/useReadingTimer'
 import { usePortraitView } from '../composables/usePortraitView'
 import { effectiveReaderLayout, portraitSpacing } from '../services/portraitLayout'
 import { autoReadMotion, autoSpeedKey, stepAutoSpeed } from '../services/autoReadSpeed'
+import { AutoScrollClock } from '../services/autoScroll'
 import { TTS_RATE_MAX, TTS_RATE_MIN, TTS_RATE_STOPS, rateText } from '../services/ttsRate'
 import { toast } from '../services/toast'
 import { t } from '../i18n'
@@ -840,9 +841,11 @@ function runAutoEngine() {
   clearInterval(autoTimer)
   cancelAnimationFrame(autoRaf)
   view?.renderer?.driftEnd?.()
+  autoPos = -1
+  autoCarry = 0
   if (!autoReading.value || autoPaused.value) return
   if (autoMotion.value === 'scroll') {
-    autoLastTs = 0
+    autoClock.reset()
     autoRaf = requestAnimationFrame(autoScrollFrame)
     return
   }
@@ -883,7 +886,7 @@ function adjustAutoSpeed(dir: 1 | -1) {
 
 // ---- 滚动模式的匀速滚动 ----
 let autoRaf = 0
-let autoLastTs = 0
+const autoClock = new AutoScrollClock()
 /** 浮点滚动位置 (scrollTop 会被取整, 慢速时每帧不足 1px, 需自己累计) */
 let autoPos = -1
 /** 手指按住 / 滚轮拨动正文后暂缓到这个时间, 松手后接着滚 */
@@ -894,7 +897,7 @@ let autoCrossing = false
 
 /** 面板 / 抽屉打开、手指按住正文时暂缓 (不算暂停, 收起后自动继续) */
 function autoHeld() {
-  return Date.now() < autoHoldUntil || panel.value !== 'none' || settingsOpen.value || ttsPanel.value
+  return document.hidden || Date.now() < autoHoldUntil || panel.value !== 'none' || settingsOpen.value || ttsPanel.value
     || jumpOpen.value || ambientPanel.value || !!activeAnnotation.value || !!selection.value
 }
 
@@ -910,10 +913,9 @@ let autoCarry = 0
 function autoScrollFrame(ts: number) {
   if (!autoReading.value || autoPaused.value) return
   autoRaf = requestAnimationFrame(autoScrollFrame)
-  const dt = autoLastTs ? Math.min(100, ts - autoLastTs) : 0
-  autoLastTs = ts
   const r = view?.renderer
-  if (!r || !dt || loading.value || autoCrossing || !r.scrolled || autoHeld()) {
+  if (!r || loading.value || autoCrossing || !r.scrolled || autoHeld()) {
+    autoClock.reset()
     if (autoHeld()) {
       autoPos = -1
       autoCarry = 0
@@ -924,7 +926,8 @@ function autoScrollFrame(ts: number) {
   const size = Number(r.size) || 0
   const viewSize = Number(r.viewSize) || 0
   if (!size) return
-  const px = size / Math.max(3, settings.autoReadSeconds) * dt / 1000
+  const px = autoClock.step(ts, size / Math.max(3, settings.autoReadSeconds))
+  if (!px) return
   // 跨章连续滚动: 在连续容器上按帧匀速推进, 章与章之间不停顿; 进度由渲染器滚动中节流派发的 relocate 更新
   if (r.continuous) {
     if (r.atEnd) {
@@ -954,7 +957,7 @@ function autoScrollFrame(ts: number) {
     r.driftEnd?.()
     Promise.resolve(r.next()).finally(() => {
       autoCrossing = false
-      autoLastTs = 0
+      autoClock.reset()
     })
     return
   }
@@ -963,11 +966,10 @@ function autoScrollFrame(ts: number) {
     pingReadingAuto()
     return
   }
-  const speed = size / Math.max(3, settings.autoReadSeconds) // px/s
   const cur = Number(r.containerPosition) || 0
   // 用户手动滚过 (位置与自己累计的差太多) 就从当前位置接着走
   if (autoPos < 0 || Math.abs(autoPos - cur) > 4) autoPos = cur
-  autoPos += speed * dt / 1000
+  autoPos += px
   const delta = autoPos - cur
   // delta 必须为正: foliate 的 next(0) 会当成「翻一整屏」
   if (ts - autoReportTs > 1000 && delta >= 1) {
@@ -984,7 +986,7 @@ function autoScrollFrame(ts: number) {
 }
 
 watch(() => settings.autoReadSeconds, () => {
-  if (autoReading.value && !autoPaused.value) runAutoEngine()
+  if (autoReading.value && !autoPaused.value && autoMotion.value !== 'scroll') runAutoEngine()
 })
 // 旋转屏幕、歌词临时滚动、开关墨水屏等导致推进方式改变: 换对应的引擎
 watch(autoMotion, () => {
@@ -2130,6 +2132,17 @@ function onSectionLoad(e: CustomEvent) {
     suppressClickUntil = Date.now() + 700
   }, { passive: true, capture: true })
 
+  // OS gestures / interrupted touches may deliver cancel without end. Do not
+  // leave the 60-second finger-down hold active after the reader has let go.
+  doc.addEventListener('touchcancel', () => {
+    touchStart = null
+    if (autoReading.value) {
+      autoHoldUntil = Date.now() + 1200
+      autoPos = -1
+      autoCarry = 0
+    }
+  }, { passive: true })
+
   // 自动滚动中拨滚轮 / 触控板: 暂缓一会儿再接着滚, 不和用户抢
   doc.addEventListener('wheel', () => { if (autoReading.value) holdAutoScroll(1500) }, { passive: true })
   // 听书时读者自己滑动正文: 暂不跟随朗读句 (见 noteReaderSteer)
@@ -2687,6 +2700,11 @@ lateDj.value = dj
 // 「重点词」(点睛阅读): 书的分节 (后台全书统计)、体裁 (小说不剧透)、智能版的 AI 词
 modes.setKeyWordSource({
   bookId,
+  metadata: () => ({
+    title: meta.value?.title,
+    tags: [...(meta.value?.tags ?? [])],
+    subjects: ([] as any[]).concat(view?.book?.metadata?.subject ?? []).map((x: any) => typeof x === 'string' ? x : x?.name ?? ''),
+  }),
   fiction: () => dj.fiction.value,
   smart: (doc, section) => dj.engine.keyWordInput(section, doc),
   sectionCount: () => view?.book?.sections?.length ?? 0,
@@ -2749,7 +2767,10 @@ watch(() => modes.progressActive.value, on => {
   }
 })
 
+function resetAutoScrollClock() { autoClock.reset() }
+
 onMounted(async () => {
+  document.addEventListener('visibilitychange', resetAutoScrollClock)
   // 匿名使用统计: 今天打开过书 (每天一次, 设置 → 隐私 可关闭)
   void pingUsage(true)
   // 手机切后台时背景音暂停, 但听书在播时跟随听书的后台策略
@@ -2855,6 +2876,7 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(() => {
+  document.removeEventListener('visibilitychange', resetAutoScrollClock)
   setPageBarsDark(null)
   window.removeEventListener('keydown', handleKeydown)
   document.removeEventListener('fullscreenchange', syncFullscreenState)
