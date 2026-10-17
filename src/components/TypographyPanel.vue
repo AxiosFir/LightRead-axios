@@ -13,7 +13,7 @@ import AppSelect from './AppSelect.vue'
 import { computed, nextTick, onMounted, ref } from 'vue'
 import { t } from '../i18n'
 import { MQ, useMediaQuery } from '../composables/useMediaQuery'
-import { useSettings } from '../stores/settings'
+import { useSettings, type ReaderPrefs } from '../stores/settings'
 import { READER_THEME_CHOICES, FONT_FAMILIES } from '../services/readerTheme'
 import { listSystemFonts, importFontFile } from '../services/fonts'
 import { isTauri } from '../storage/types'
@@ -44,6 +44,11 @@ const emit = defineEmits<{
 }>()
 
 const settings = useSettings()
+// 读生效值、写显式偏好: 即使选中了当前默认值也记为手动选择。
+const reader = new Proxy({} as ReaderPrefs, {
+  get: (_, key: keyof ReaderPrefs) => settings.readerPrefs[key],
+  set: (_, key: keyof ReaderPrefs, value) => { settings.setReaderPreference(key, value); return true },
+})
 const desktop = isTauri()
 const touch = useMediaQuery(MQ.touch)
 const root = ref<HTMLElement>()
@@ -57,7 +62,7 @@ const themeLabel = (name: string) => (THEME_LABEL_KEYS[name] ? t(THEME_LABEL_KEY
 function setFontSize(raw: string | number) {
   const n = Math.round(Number(raw))
   if (!Number.isFinite(n)) return
-  settings.reader.fontSize = Math.min(64, Math.max(8, n))
+  reader.fontSize = Math.min(64, Math.max(8, n))
 }
 
 // 系统字体只枚举一次 (桌面版)
@@ -77,7 +82,7 @@ async function importFont() {
     const font = await importFontFile()
     if (!font) return
     if (!settings.customFonts.some(f => f.file === font.file)) settings.customFonts.push(font)
-    settings.reader.fontFamily = `custom:${font.name}`
+    reader.fontFamily = `custom:${font.name}`
     toast(t('reader.fontImported', { name: font.name }), 'success')
   } catch (e: any) {
     toast(t('reader.fontImportFailed', { msg: e?.message ?? e }), 'error', 5000)
@@ -86,15 +91,15 @@ async function importFont() {
 
 function onLetterSpacing(e: Event) {
   const n = Number((e.target as HTMLInputElement).value)
-  if (Number.isFinite(n)) settings.reader.letterSpacing = Math.min(0.2, Math.max(0, Math.round(n * 100) / 100))
+  if (Number.isFinite(n)) reader.letterSpacing = Math.min(0.2, Math.max(0, Math.round(n * 100) / 100))
 }
 
 // ---- 页面: 高亮保存的选择, 临时约束只影响说明与可用状态 ----
-const flowChoice = computed(() => settings.reader.flow === 'paginated' ? 'paginated' : settings.reader.continuousScroll ? 'continuous' : 'chapter')
+const flowChoice = computed(() => reader.flow === 'paginated' ? 'paginated' : reader.continuousScroll ? 'continuous' : 'chapter')
 const flows = ['paginated', 'chapter', 'continuous'] as const
 function setFlow(value: typeof flows[number]) {
-  settings.reader.flow = value === 'paginated' ? 'paginated' : 'scrolled'
-  if (value !== 'paginated') settings.reader.continuousScroll = value === 'continuous'
+  reader.flow = value === 'paginated' ? 'paginated' : 'scrolled'
+  if (value !== 'paginated') reader.continuousScroll = value === 'continuous'
 }
 const flowHint = computed(() => props.portraitLocked
   ? t(touch.value ? 'reader.portraitLockedNote' : 'reader.portraitWindowNote')
@@ -155,6 +160,8 @@ let systemFontsLoading = false
       </button>
     </header>
 
+    <p v-if="reader.portraitScroll" class="set-note tp-adaptive" role="note">{{ t(settings.screenPreset.orientation === 'portrait' ? 'reader.portraitPreset' : 'reader.landscapePreset') }} · {{ t('reader.manualFirst') }}</p>
+
     <!-- 开着的场景: 关闭后恢复原来的排版 -->
     <p v-if="sceneNames" class="tp-scenes" role="note">
       <span>{{ t('reader.scenesOn', { names: sceneNames }) }}</span>
@@ -166,9 +173,9 @@ let systemFontsLoading = false
       <h3 class="tp-title">{{ t('reader.groupText') }}</h3>
       <div class="set-row">
         <span class="tp-label">{{ t('reader.fontSize') }}</span>
-        <button type="button" class="step-btn" :title="t('reader.fontSmaller')" :aria-label="t('reader.fontSmaller')" @click="setFontSize(settings.reader.fontSize - 1)">A−</button>
-        <input v-model.number="settings.reader.fontSize" type="range" min="8" max="64" step="1" :aria-label="t('reader.fontSize')" />
-        <button type="button" class="step-btn big" :title="t('reader.fontLarger')" :aria-label="t('reader.fontLarger')" @click="setFontSize(settings.reader.fontSize + 1)">A+</button>
+        <button type="button" class="step-btn" :title="t('reader.fontSmaller')" :aria-label="t('reader.fontSmaller')" @click="setFontSize(reader.fontSize - 1)">A−</button>
+        <input v-model.number="reader.fontSize" type="range" min="8" max="64" step="1" :aria-label="t('reader.fontSize')" />
+        <button type="button" class="step-btn big" :title="t('reader.fontLarger')" :aria-label="t('reader.fontLarger')" @click="setFontSize(reader.fontSize + 1)">A+</button>
         <input
           class="input set-num"
           type="number"
@@ -176,24 +183,24 @@ let systemFontsLoading = false
           max="64"
           step="1"
           inputmode="numeric"
-          :value="settings.reader.fontSize"
+          :value="reader.fontSize"
           :aria-label="t('reader.fontSize')"
           @change="setFontSize(($event.target as HTMLInputElement).value)"
         />
       </div>
       <div class="set-row">
         <span class="tp-label">{{ t('reader.lineHeight') }}</span>
-        <input v-model.number="settings.reader.lineHeight" type="range" min="1.2" max="2.6" step="0.1" :aria-label="t('reader.lineHeight')" />
-        <span class="tp-value">{{ settings.reader.lineHeight.toFixed(1) }}</span>
+        <input v-model.number="reader.lineHeight" type="range" min="1.2" max="2.6" step="0.1" :aria-label="t('reader.lineHeight')" />
+        <span class="tp-value">{{ reader.lineHeight.toFixed(1) }}</span>
       </div>
       <div class="set-row">
         <span class="tp-label">{{ t('reader.margin') }}</span>
-        <input v-model.number="settings.reader.gap" type="range" min="2" max="16" step="1" :aria-label="t('reader.margin')" />
-        <span class="tp-value">{{ settings.reader.gap }}%</span>
+        <input v-model.number="reader.gap" type="range" min="2" max="16" step="1" :aria-label="t('reader.margin')" />
+        <span class="tp-value">{{ reader.gap }}%</span>
       </div>
       <div class="set-row">
         <span class="tp-label">{{ t('reader.font') }}</span>
-        <AppSelect v-model="settings.reader.fontFamily" class="input" :aria-label="t('reader.font')">
+        <AppSelect v-model="reader.fontFamily" class="input" :aria-label="t('reader.font')">
           <option v-for="f in FONT_FAMILIES" :key="f.labelKey" :value="f.value">{{ t(f.labelKey) }}</option>
           <optgroup v-if="settings.customFonts.length" :label="t('reader.customFonts')">
             <option v-for="f in settings.customFonts" :key="f.file" :value="`custom:${f.name}`">{{ f.name }}</option>
@@ -216,18 +223,18 @@ let systemFontsLoading = false
               min="0"
               max="0.2"
               step="0.01"
-              :value="settings.reader.letterSpacing"
+              :value="reader.letterSpacing"
               :aria-label="t('reader.letterSpacing')"
-              :aria-valuetext="`${settings.reader.letterSpacing.toFixed(2)}em`"
+              :aria-valuetext="`${reader.letterSpacing.toFixed(2)}em`"
               @input="onLetterSpacing"
             />
-            <span class="tp-value">{{ settings.reader.letterSpacing.toFixed(2) }}em</span>
+            <span class="tp-value">{{ reader.letterSpacing.toFixed(2) }}em</span>
           </div>
           <div class="set-row">
             <span class="tp-label">{{ t('reader.justify') }}</span>
             <div class="seg" role="group" :aria-label="t('reader.justify')">
-              <button type="button" :class="{ active: settings.reader.justify }" :aria-pressed="settings.reader.justify" @click="settings.reader.justify = true">{{ t('reader.justifyOn') }}</button>
-              <button type="button" :class="{ active: !settings.reader.justify }" :aria-pressed="!settings.reader.justify" @click="settings.reader.justify = false">{{ t('reader.justifyOff') }}</button>
+              <button type="button" :class="{ active: reader.justify }" :aria-pressed="reader.justify" @click="reader.justify = true">{{ t('reader.justifyOn') }}</button>
+              <button type="button" :class="{ active: !reader.justify }" :aria-pressed="!reader.justify" @click="reader.justify = false">{{ t('reader.justifyOff') }}</button>
             </div>
           </div>
           <div v-if="desktop" class="set-row">
@@ -250,12 +257,12 @@ let systemFontsLoading = false
             :key="choice.name"
             type="button"
             class="theme-btn"
-            :class="{ active: settings.reader.theme === choice.name }"
+            :class="{ active: reader.theme === choice.name }"
             :style="{ background: choice.bg, color: choice.fg }"
             :title="themeLabel(choice.name)"
             :aria-label="themeLabel(choice.name)"
-            :aria-pressed="settings.reader.theme === choice.name"
-            @click="settings.reader.theme = choice.name"
+            :aria-pressed="reader.theme === choice.name"
+            @click="reader.theme = choice.name"
           >{{ t('reader.themeSample') }}</button>
         </div>
       </div>
@@ -301,24 +308,24 @@ let systemFontsLoading = false
         <div class="set-row">
           <span class="tp-label">{{ t('reader.columns') }}</span>
           <div class="seg" role="group" :aria-label="t('reader.columns')">
-            <button v-for="col in (['auto', 1, 2] as const)" :key="col" type="button" :disabled="effectiveFlow === 'scrolled'" :class="{ active: settings.reader.maxColumnCount === col }" :aria-pressed="settings.reader.maxColumnCount === col" @click="settings.reader.maxColumnCount = col">
+            <button v-for="col in (['auto', 1, 2] as const)" :key="col" type="button" :disabled="effectiveFlow === 'scrolled'" :class="{ active: reader.maxColumnCount === col }" :aria-pressed="reader.maxColumnCount === col" @click="reader.maxColumnCount = col">
               {{ t(col === 'auto' ? 'reader.autoColumns' : col === 1 ? 'reader.singleColumn' : 'reader.twoColumns') }}
             </button>
           </div>
         </div>
         <p v-if="effectiveFlow === 'scrolled'" class="set-note" role="note">{{ t('reader.scrolledSingleColumn') }}</p>
         <p v-else-if="modes.forceSingleColumn.value" class="set-note" role="note">{{ t('reader.forcedSingleColumn') }}</p>
-        <div v-if="touch" class="tp-portrait">
+        <div class="tp-portrait">
           <span>{{ t('reader.portraitSwitch') }}<small>{{ t('reader.portraitSwitchHint') }}</small></span>
-          <button type="button" class="tp-switch" role="switch" :aria-checked="settings.reader.portraitScroll" :aria-label="t('reader.portraitSwitch')" @click="settings.reader.portraitScroll = !settings.reader.portraitScroll"><span aria-hidden="true" /></button>
+          <button type="button" class="tp-switch" role="switch" :aria-checked="reader.portraitScroll" :aria-label="t('reader.portraitSwitch')" @click="reader.portraitScroll = !reader.portraitScroll"><span aria-hidden="true" /></button>
         </div>
       </template>
       <div class="set-row">
         <span class="tp-label">{{ t('reader.progressDisplay') }}</span>
         <div class="seg" role="group" :aria-label="t('reader.progressDisplay')">
-          <button type="button" :class="{ active: settings.reader.progressDisplay === 'both' }" :aria-pressed="settings.reader.progressDisplay === 'both'" @click="settings.reader.progressDisplay = 'both'">{{ t('reader.progressBoth') }}</button>
-          <button type="button" :class="{ active: settings.reader.progressDisplay === 'page' }" :aria-pressed="settings.reader.progressDisplay === 'page'" @click="settings.reader.progressDisplay = 'page'">{{ t('reader.progressPage') }}</button>
-          <button type="button" :class="{ active: settings.reader.progressDisplay === 'percent' }" :aria-pressed="settings.reader.progressDisplay === 'percent'" @click="settings.reader.progressDisplay = 'percent'">{{ t('reader.progressPercent') }}</button>
+          <button type="button" :class="{ active: reader.progressDisplay === 'both' }" :aria-pressed="reader.progressDisplay === 'both'" @click="reader.progressDisplay = 'both'">{{ t('reader.progressBoth') }}</button>
+          <button type="button" :class="{ active: reader.progressDisplay === 'page' }" :aria-pressed="reader.progressDisplay === 'page'" @click="reader.progressDisplay = 'page'">{{ t('reader.progressPage') }}</button>
+          <button type="button" :class="{ active: reader.progressDisplay === 'percent' }" :aria-pressed="reader.progressDisplay === 'percent'" @click="reader.progressDisplay = 'percent'">{{ t('reader.progressPercent') }}</button>
         </div>
       </div>
     </section>

@@ -27,7 +27,7 @@ import LocalTtsPack from '../components/LocalTtsPack.vue'
 import LevelSlider from '../components/LevelSlider.vue'
 import { useReadingTimer } from '../composables/useReadingTimer'
 import { usePortraitView } from '../composables/usePortraitView'
-import { effectiveReaderLayout, portraitSpacing } from '../services/portraitLayout'
+import { effectiveReaderLayout } from '../services/portraitLayout'
 import { autoReadMotion, autoSpeedKey, stepAutoSpeed } from '../services/autoReadSpeed'
 import { AutoScrollClock } from '../services/autoScroll'
 import { TTS_RATE_MAX, TTS_RATE_MIN, TTS_RATE_STOPS, rateText } from '../services/ttsRate'
@@ -348,8 +348,7 @@ let saveTimer: ReturnType<typeof setTimeout> | undefined
 let pendingProgress: { cfi: string; frac: number } | null = null
 
 const appDark = computed(() => resolvedTheme.value === 'dark')
-// 竖屏 (手机 / iPad / Surface 竖着拿): 「竖屏时单页滚动」开启时改为单栏连续滚动, 横过来恢复用户自己的翻页 / 分栏。
-// 只算生效值, 不改写保存的 settings.reader.flow; 页码、手势等凡按 flow 分支的地方都用 effectiveFlow
+// 自动预设先与手动偏好合并; 页码、手势等统一读取生效版式。
 const portraitView = usePortraitView()
 // 阅读模式与点睛在下方声明, 二者初始化时会互相 / 回头读取这里的值;
 // 先用响应式占位, 声明完再填入, 避免初始化顺序问题 (TDZ), 填入后依赖它们的 computed 自动重算
@@ -357,47 +356,44 @@ const lateModes = shallowRef<ReturnType<typeof useReadingModes>>()
 const lateDj = shallowRef<ReturnType<typeof useDianjing>>()
 // 生效版式的唯一出口: 用户保存的翻页 / 分栏 + 临时约束 (竖屏锁定、歌词要滚动、大字 / 歌词要单栏), 约束不回写设置
 const readerLayout = computed(() => effectiveReaderLayout({
-  flow: settings.reader.flow,
-  maxColumnCount: settings.reader.maxColumnCount,
-  portraitScroll: settings.reader.portraitScroll,
+  flow: settings.readerPrefs.flow,
+  maxColumnCount: settings.readerPrefs.maxColumnCount,
+  portraitScroll: false, // 自动预设已逐项应用, 不再强制覆盖手动版式
   portrait: portraitView.value,
   forceSingleColumn: lateModes.value?.forceSingleColumn.value,
   forceScrolled: lateModes.value?.forceScrolled.value,
 }))
 const effectiveFlow = computed(() => readerLayout.value.flow)
 // 墨水屏等阅读模式会改写正文配色 (纯黑白)
-const themeColors = computed(() => resolveReaderColors(settings.reader.theme, appDark.value, lateModes.value?.readerStyle.value))
+const themeColors = computed(() => resolveReaderColors(settings.readerPrefs.theme, appDark.value, lateModes.value?.readerStyle.value))
 // 正文主题铺满全屏 (含状态栏下方), 安卓系统栏图标按正文深浅切换
 watch(
-  () => resolveReaderTheme(settings.reader.theme, appDark.value) === 'dark',
+  () => resolveReaderTheme(settings.readerPrefs.theme, appDark.value) === 'dark',
   dark => setPageBarsDark(dark),
   { immediate: true },
 )
 
-/** 当前选中的自定义字体 (settings.reader.fontFamily 为 custom:Name 时) */
+/** 当前选中的自定义字体 (settings.readerPrefs.fontFamily 为 custom:Name 时) */
 function selectedCustomFont() {
-  const m = settings.reader.fontFamily.match(/^custom:(.+)$/)
+  const m = settings.readerPrefs.fontFamily.match(/^custom:(.+)$/)
   return m ? settings.customFonts.find(f => f.name === m[1]) : undefined
 }
 
 /**
- * 排版几何 (左右留白 / 行宽上限 / 上下边带)。竖屏时按绝对像素留窄边并放宽行宽让正文铺满,
- * 不改用户保存的页边距百分比 (横屏照旧); 见 services/portraitLayout.ts portraitSpacing
+ * 排版几何。自动边距按窗口换算, 手动边距使用原值; 不回写保存设置。
  */
 function layoutGeometry() {
-  const prefs = settings.reader
-  const width = container.value?.clientWidth || window.innerWidth
+  const prefs = settings.readerPrefs
   const portrait = portraitView.value
-  const spacing = portrait ? portraitSpacing(width, prefs.gap) : null
   const phone = matchesMQ(MQ.phone)
   // 上下边带: 翻页模式放页眉页脚 (章节名 / 进度), 手机屏幕矮收窄些; 滚动模式下正文铺满全高,
   // 它只决定「哪段算在屏上」(进度 / 朗读起点), 竖屏滚动收窄让判定贴近实际可见区
   const margin = portrait && readerLayout.value.flow === 'scrolled'
     ? (phone ? '12px' : '20px')
-    : (phone ? '36px' : '48px')
+    : `${settings.screenPreset.pageMargin}px`
   return {
-    gap: `${spacing ? spacing.gapPercent : prefs.gap}%`,
-    maxInline: spacing ? `${spacing.maxInlineSize}px` : '720px',
+    gap: `${prefs.gap}%`,
+    maxInline: `${settings.screenPreset.maxInlineSize}px`,
     margin,
   }
 }
@@ -417,7 +413,7 @@ function setRendererAttr(r: any, name: string, value: string) {
 
 function applyPrefs() {
   if (!view) return
-  const prefs = settings.reader
+  const prefs = settings.readerPrefs
   try {
     // 墨水屏: 去掉翻页动画 (残影)
     if (modes.einkActive.value) view.renderer.removeAttribute('animated')
@@ -449,7 +445,7 @@ function applyPrefs() {
 }
 
 let prefsTimer: ReturnType<typeof setTimeout> | undefined
-watch([() => settings.reader, appDark, readerLayout, portraitView], () => {
+watch([() => settings.readerPrefs, appDark, readerLayout, portraitView], () => {
   clearTimeout(prefsTimer)
   prefsTimer = setTimeout(applyPrefs, 120)
 }, { deep: true })
@@ -549,8 +545,8 @@ let tocFractions: Array<{ fraction: number; label: string }> = []
 const tocFractionsReady = ref(0)
 let tocFractionTimer: ReturnType<typeof setTimeout> | undefined
 
-const showPage = computed(() => !!pageInfo.value && settings.reader.progressDisplay !== 'percent')
-const showPercent = computed(() => !pageInfo.value || settings.reader.progressDisplay !== 'page')
+const showPage = computed(() => !!pageInfo.value && settings.readerPrefs.progressDisplay !== 'percent')
+const showPercent = computed(() => !pageInfo.value || settings.readerPrefs.progressDisplay !== 'page')
 const percentText = computed(() => `${(fraction.value * 100).toFixed(1)}%`)
 const pageRangeText = computed(() => {
   const p = pageInfo.value
@@ -568,7 +564,7 @@ const chapterLeftText = computed(() => {
   if (!showPage.value || chapterLeft.value == null) return ''
   return chapterLeft.value > 0 ? t('reader.chapterPagesLeft', { n: chapterLeft.value }) : t('reader.chapterLastPage')
 })
-watch(() => settings.reader.progressDisplay, () => updateMarginals())
+watch(() => settings.readerPrefs.progressDisplay, () => updateMarginals())
 
 function loadPageMeasure() {
   try {
@@ -586,7 +582,7 @@ function savePageMeasure() {
 
 /** 排版指纹: 影响分页的设置与版面尺寸; 取整到 8px, 避免亚像素抖动让测量反复作废 */
 function layoutSignature(per: number, scrolled: boolean) {
-  const p = settings.reader
+  const p = settings.readerPrefs
   const rect = container.value?.getBoundingClientRect()
   const q = (n = 0) => Math.round(n / 8)
   return [p.fontSize, p.lineHeight, p.gap, p.fontFamily, p.justify ? 1 : 0, scrolled ? 's' : 'p', per, q(rect?.width), q(rect?.height)].join('|')
@@ -712,8 +708,8 @@ function updatePages(detail: any) {
   const fallback = fallbackBytesPerPage({
     width: (rect?.width ?? 360) / per * 0.85,
     height: (rect?.height ?? 640) - 96,
-    fontSize: settings.reader.fontSize,
-    lineHeight: settings.reader.lineHeight,
+    fontSize: settings.readerPrefs.fontSize,
+    lineHeight: settings.readerPrefs.lineHeight,
     cjk: !!view.language?.isCJK,
   })
   secCounts = sectionPageCounts(secSizes, pageMeasure.pages, fallback)
@@ -740,7 +736,7 @@ function computeChapterLeft(index: number, pos: PagePosition, range: Range | und
     const start = range.cloneRange()
     start.collapse(true)
     const colSize = scrolled ? size : size / per
-    const lineBox = settings.reader.fontSize * settings.reader.lineHeight * 1.5
+    const lineBox = settings.readerPrefs.fontSize * settings.readerPrefs.lineHeight * 1.5
     for (const a of tocAnchors) {
       if (a.index !== index || !a.anchor) continue
       let target: Element | Range | null = null
@@ -1349,7 +1345,7 @@ function listenRange(key = currentListenKey.value): Range | null {
  */
 const TTS_MARK = 'lr-tts-sentence'
 /** 朗读句标记随正文主题取色 (墨水屏为下划线), 句内文字对比度 ≥ 4.5:1, 见 readerTheme.LISTEN_MARKS */
-const listenMark = computed(() => listenMarkStyle(settings.reader.theme, appDark.value, lateModes.value?.readerStyle.value))
+const listenMark = computed(() => listenMarkStyle(settings.readerPrefs.theme, appDark.value, lateModes.value?.readerStyle.value))
 const SVG_NS = 'http://www.w3.org/2000/svg'
 /** overlayer 绘制函数: 色块 (按主题透明度) 或下划线; rects 是 foliate 给出的行框 */
 function drawListenMark(rects: Array<{ left: number; top: number; width: number; height: number }>, opts: { mark: ListenMarkStyle; padding?: number }) {
@@ -2525,8 +2521,8 @@ function onSlideInput(e: Event) {
     }
   }
   const parts: string[] = []
-  if (page && total && settings.reader.progressDisplay !== 'percent') parts.push(`${page} / ${total}`)
-  if (!parts.length || settings.reader.progressDisplay !== 'page') parts.push(`${(value * 100).toFixed(1)}%`)
+  if (page && total && settings.readerPrefs.progressDisplay !== 'percent') parts.push(`${page} / ${total}`)
+  if (!parts.length || settings.readerPrefs.progressDisplay !== 'page') parts.push(`${(value * 100).toFixed(1)}%`)
   slidePreview.value = { fraction: value, label, text: parts.join(' · ') }
 }
 
@@ -2573,7 +2569,7 @@ watch(jumpOpen, open => {
 async function jumpTo(target: { fraction: number } | number) {
   if (!view) return
   const from = currentCfi.value
-  const label = pageInfo.value && settings.reader.progressDisplay !== 'percent'
+  const label = pageInfo.value && settings.readerPrefs.progressDisplay !== 'percent'
     ? t('reader.jumpBack', { page: pageInfo.value.current })
     : `${t('common.back')} ${percentText.value}`
   interruptTTSForReposition()
@@ -2664,7 +2660,7 @@ const dj = useDianjing({
     // EPUB 只有一个 dc:subject 时 foliate 给的是单个值而不是数组
     subjects: ([] as any[]).concat(view?.book?.metadata?.subject ?? []).map((x: any) => (typeof x === 'string' ? x : x?.name ?? '')),
   },
-  getThemeName: () => djThemeName(resolveReaderTheme(settings.reader.theme, appDark.value), !!lateModes.value?.einkActive.value),
+  getThemeName: () => djThemeName(resolveReaderTheme(settings.readerPrefs.theme, appDark.value), !!lateModes.value?.einkActive.value),
   isEink: () => !!lateModes.value?.einkActive.value,
   // 「我也觉得」: 收为自己的划线 (与划词划线同一份存储, 会随同步)
   adoptHighlight: async ({ index, range, text, withNote }) => {

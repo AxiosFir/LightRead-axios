@@ -2,6 +2,9 @@ import { normalizeFocusLines, normalizeLyricAnchor } from '../services/readingMo
 import { defineStore } from 'pinia'
 import { watch } from 'vue'
 import { startSettingsTracking } from '../services/sync/settingsTracker.ts'
+import { readSyncedSettings } from '../services/sync/settingsSync.ts'
+import { emptyLayoutOverrides, restoreLayoutOverrides, resolveReaderPrefs, resolvePdfPrefs, screenLayout, type LayoutOverrides, type ReaderLayoutKey, type PdfLayoutKey } from '../services/adaptiveLayout.ts'
+import { readingViewport } from '../services/readingViewport.ts'
 import { isTauri } from '../storage/types.ts'
 import { BASIC_MARK_DEFAULT, migrateLevel, normalizeLevel, savedBasicMark, type BasicMark, type DjLevel } from '../services/dianjing/level.ts'
 
@@ -15,7 +18,7 @@ export interface ReaderPrefs {
   flow: 'paginated' | 'scrolled'
   /** auto 根据版面判断; 1 / 2 固定栏数 */
   maxColumnCount: 'auto' | 1 | 2
-  /** 平板竖屏 (高于宽) 时改为单栏连续滚动, 横屏恢复上面的 flow / 分栏; PDF 同样适用 */
+  /** 自动采用横/竖屏默认排版 (历史字段名); 手动设置逐项优先, PDF 同样适用 */
   portraitScroll: boolean
   /** 滚动模式下跨章连续滚动: 章与章首尾相接 (docs/continuous-scroll.md); 关掉回到单章滚动 */
   continuousScroll: boolean
@@ -126,7 +129,7 @@ export interface FeaturePrefs {
 }
 
 /** 结构版本: 修正历史默认值时递增 */
-const SETTINGS_VERSION = 16
+const SETTINGS_VERSION = 17
 
 /** v3 时代曾并入用户设置的内置书库 (v4 起社区清单独立远程拉取, 此表仅供迁移清理) */
 const BUILTIN_BOOK_REPOS = [
@@ -196,6 +199,8 @@ interface SettingsState {
   appearance: 'system' | 'light' | 'dark'
   reader: ReaderPrefs
   pdf: PdfPrefs
+  /** 显式选择过的排版项; 旋转/缩放不会修改它们, 与对应偏好一起同步 */
+  layoutOverrides: LayoutOverrides
   /** 导入的自定义字体 (桌面端) */
   customFonts: CustomFontRec[]
   /** 用户自行添加的 GitHub 书库仓库 (owner/repo); 社区清单另行远程拉取 */
@@ -263,6 +268,7 @@ const defaults: SettingsState = {
   language: 'zh',
   appearance: 'system',
   customFonts: [],
+  layoutOverrides: emptyLayoutOverrides(),
   githubBookRepos: [],
   reader: {
     fontSize: 18,
@@ -496,6 +502,9 @@ function load(): SettingsState {
     if ((saved.version ?? 1) < 16 && merged.readingMode.lyric.anchor === 0.4) merged.readingMode.lyric.anchor = 0.382
     merged.readingMode.lyric.lines = normalizeFocusLines(merged.readingMode.lyric.lines)
     merged.readingMode.lyric.anchor = normalizeLyricAnchor(merged.readingMode.lyric.anchor)
+    let stamps = {}
+    try { stamps = JSON.parse(localStorage.getItem('lightread-settings-sync') || 'null')?.stamps ?? {} } catch { /* 无历史记录 */ }
+    merged.layoutOverrides = restoreLayoutOverrides(saved.layoutOverrides, readSyncedSettings(merged), readSyncedSettings(defaults), stamps)
     merged.version = SETTINGS_VERSION
     return merged
   } catch {
@@ -505,7 +514,24 @@ function load(): SettingsState {
 
 export const useSettings = defineStore('settings', {
   state: (): SettingsState => load(),
+  getters: {
+    screenPreset: () => screenLayout(readingViewport.value),
+    readerPrefs(): ReaderPrefs {
+      return resolveReaderPrefs(this.reader, this.layoutOverrides.reader, this.screenPreset, this.readingMode.presets)
+    },
+    pdfPrefs(): PdfPrefs {
+      return resolvePdfPrefs(this.pdf, this.layoutOverrides.pdf, this.screenPreset, this.reader.portraitScroll)
+    },
+  },
   actions: {
+    setReaderPreference<K extends keyof ReaderPrefs>(key: K, value: ReaderPrefs[K]) {
+      this.reader[key] = value
+      if (key in this.layoutOverrides.reader) this.layoutOverrides.reader[key as ReaderLayoutKey] = true
+    },
+    setPdfPreference<K extends keyof PdfPrefs>(key: K, value: PdfPrefs[K]) {
+      this.pdf[key] = value
+      if (key in this.layoutOverrides.pdf) this.layoutOverrides.pdf[key as PdfLayoutKey] = true
+    },
     persistOnChange() {
       // 设置同步: 记录每项可同步设置的修改时间 (services/sync/settingsSync.ts)
       startSettingsTracking(() => this.$state, defaults)
@@ -524,6 +550,7 @@ export const useSettings = defineStore('settings', {
     },
     resetReader() {
       this.reader = structuredClone(defaults.reader)
+      this.layoutOverrides.reader = emptyLayoutOverrides().reader
     },
   },
 })

@@ -8,6 +8,8 @@
 export const PORTRAIT_QUERY = '(orientation: portrait)'
 
 export interface PortraitProbe {
+  /** 已知键盘状态时, 无键盘始终按应用窗口判定 (支持桌面和分屏)。 */
+  keyboardOpen?: boolean
   /** 视口 (CSS px) */
   width: number
   height: number
@@ -28,6 +30,7 @@ export interface PortraitProbe {
  */
 export function isPortraitView(p: PortraitProbe): boolean {
   const viewport = p.height >= p.width
+  if (p.keyboardOpen === false) return viewport
   const sw = p.screenWidth ?? 0
   const sh = p.screenHeight ?? 0
   if (!(sw > 0 && sh > 0)) return viewport

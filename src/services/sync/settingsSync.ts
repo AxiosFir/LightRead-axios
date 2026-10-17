@@ -56,6 +56,10 @@ export const SETTINGS_SYNC_SPEC: SettingsSpec = {
     fit: SYNC,
     spreadMode: SYNC,
   },
+  layoutOverrides: {
+    reader: { fontSize: SYNC, lineHeight: SYNC, gap: SYNC, flow: SYNC, maxColumnCount: SYNC, continuousScroll: SYNC },
+    pdf: { mode: SYNC, fit: SYNC, spreadMode: SYNC },
+  },
   /** 导入的字体文件只在本机 */
   customFonts: LOCAL,
   githubBookRepos: SYNC,
@@ -464,6 +468,17 @@ export function createSettingsSyncPort(opts: SettingsPortOptions): SettingsSyncP
         if (e.changed && !writeSyncedSetting(state, e.path, cloneValue(e.value))) continue
         meta.stamps[e.path] = { t: e.stamp.t, d: e.stamp.d }
         meta.snap[e.path] = stableKey(e.value)
+      }
+      // 旧客户端没有显式选择标记: 推断为手动, 但不能覆盖更新的「恢复自动」。
+      // 先应用整批再比较时间, 使同批的显式标记优先, 并沿用来源时间避免同步回声。
+      for (const e of entries) {
+        const path = `layoutOverrides.${e.path}`
+        if (getPath(state, path) === undefined) continue
+        const saved = meta.stamps[path]
+        if (cmpStamp(e.stamp, { t: saved?.t ?? 0, d: saved?.d ?? '' }) <= 0) continue
+        setPath(state, path, true)
+        meta.stamps[path] = { ...e.stamp }
+        meta.snap[path] = stableKey(true)
       }
       if (entries.length) opts.onMetaChange?.()
     },

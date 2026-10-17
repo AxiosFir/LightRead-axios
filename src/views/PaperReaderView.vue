@@ -153,14 +153,13 @@ const backLabel = computed(() => (isPaper.value ? t('paper.backToPapers') : t('r
 /** 幻灯片放映 (整页翻页 + 全屏); 放映时不受竖屏单页滚动约束 */
 const presentationMode = ref(false)
 /**
- * 竖屏 (手机 / 平板 / Surface 竖着拿) 且开启「竖屏时单页滚动」时, 生效为单页连续滚动; 横过来恢复
- * settings.pdf.mode / spreadMode。只算生效值, 不改写用户保存的设置。
+ * PDF 共用横竖屏默认预设, 手动选择逐项优先。放映临时固定单页翻页。
  */
 const portraitView = usePortraitView()
 const pdfEffective = computed(() => effectivePdfLayout({
-  mode: settings.pdf.mode,
-  spreadMode: settings.pdf.spreadMode,
-  portraitScroll: settings.reader.portraitScroll,
+  mode: presentationMode.value ? 'paged' : settings.pdfPrefs.mode,
+  spreadMode: presentationMode.value ? 'single' : settings.pdfPrefs.spreadMode,
+  portraitScroll: false,
   portrait: portraitView.value,
   presentation: presentationMode.value,
 }))
@@ -194,7 +193,8 @@ type PdfZoom = number | 'fit-page' | 'fit-width'
 const LEGACY_ZOOM_KEY = 'lightread-paper-zoom'
 const ZOOM_KEY = `lightread-pdf-zoom:${bookId}`
 const restoredZoom = restoreZoom()
-const zoom = ref<PdfZoom>(restoredZoom ?? (mode.value === 'scroll' ? 'fit-width' : 'fit-page'))
+const zoomManual = ref(restoredZoom !== null)
+const zoom = ref<PdfZoom>(restoredZoom ?? (settings.pdfPrefs.fit === 'fitW' ? 'fit-width' : 'fit-page'))
 const scrollStartPadding = computed(() => typeof zoom.value === 'number' ? NORMAL_SCROLL_PADDING : 0)
 
 function restoreZoom(): PdfZoom | null {
@@ -502,30 +502,32 @@ function noteLockedChoice() {
 }
 
 async function switchMode(next: 'paged' | 'scroll') {
-  if (settings.pdf.mode === next && mode.value === next) return
+  if (settings.pdf.mode === next && mode.value === next) { settings.setPdfPreference('mode', next); return }
   stopAutoRead()
-  settings.pdf.mode = next
-  if (next === 'paged' && restoredZoom == null && zoom.value === 'fit-width') {
-    zoom.value = settings.pdf.fit === 'fitH' ? 'fit-page' : 'fit-width'
+  settings.setPdfPreference('mode', next)
+  if (next === 'paged' && !zoomManual.value && zoom.value === 'fit-width') {
+    zoom.value = settings.pdfPrefs.fit === 'fitH' ? 'fit-page' : 'fit-width'
   }
   if (mode.value !== next) noteLockedChoice()
   await syncPdfLayout()
 }
 
 async function setSpreadMode(next: 'single' | 'facing' | 'book') {
-  settings.pdf.spreadMode = next
+  settings.setPdfPreference('spreadMode', next)
   if (spreadMode.value !== next) noteLockedChoice()
   await syncPdfLayout()
 }
 
-// 旋转屏幕 / 拖动窗口跨过竖屏阈值、切换「竖屏时单页滚动」: 按新的生效值重排, 停在当前页
-watch(() => pdfEffective.value.portraitLocked, () => {
+// 屏幕旋转 / 窗口缩放 / 自动适配切换: 保留手动缩放, 按生效值重排并停在当前页
+watch(() => `${mode.value}:${spreadMode.value}:${settings.pdfPrefs.fit}`, () => {
+  if (presentationMode.value) return
+  if (!zoomManual.value) zoom.value = settings.pdfPrefs.fit === 'fitW' ? 'fit-width' : 'fit-page'
   stopAutoRead()
   void syncPdfLayout()
 })
 
 async function setPagedFit(fit: 'fitH' | 'fitW') {
-  settings.pdf.fit = fit
+  settings.setPdfPreference('fit', fit)
   await applyZoom(fit === 'fitH' ? 'fit-page' : 'fit-width')
 }
 
@@ -676,9 +678,12 @@ function gotoPage(n: number, smooth = false, yOffsetPx = 0) {
   else scrollGoto(n, smooth, yOffsetPx)
 }
 
-async function applyZoom(next: PdfZoom) {
+async function applyZoom(next: PdfZoom, remember = true) {
   zoom.value = next
-  localStorage.setItem(ZOOM_KEY, String(next))
+  if (remember) {
+    zoomManual.value = true
+    localStorage.setItem(ZOOM_KEY, String(next))
+  }
   // 先让适配模式的无边距样式生效，再读取 clientWidth/clientHeight 计算精确倍率。
   await nextTick()
   if (bookPaged.value) {
@@ -726,7 +731,7 @@ const shortcutRows = computed(() => getPdfShortcutHelpRows({
 function changeReaderZoom(dir: 1 | -1) {
   zoomMenu.value = false
   if (pdfLayout.value === 'reflow') {
-    settings.reader.fontSize = Math.min(36, Math.max(12, settings.reader.fontSize + dir * 2))
+    settings.setReaderPreference('fontSize', Math.min(36, Math.max(12, settings.readerPrefs.fontSize + dir * 2)))
   } else {
     zoomStep(dir)
   }
@@ -734,7 +739,7 @@ function changeReaderZoom(dir: 1 | -1) {
 
 function resetReaderZoom() {
   zoomMenu.value = false
-  if (pdfLayout.value === 'reflow') settings.reader.fontSize = 18
+  if (pdfLayout.value === 'reflow') settings.setReaderPreference('fontSize', 18)
   else void applyZoom('fit-page')
 }
 
@@ -951,7 +956,7 @@ async function enterPresentation() {
   if (pdfLayout.value === 'reflow') await switchPdfLayout('original')
   if (mode.value !== 'paged') await switchMode('paged')
   if (spreadMode.value !== 'single') await setSpreadMode('single')
-  await applyZoom('fit-page')
+  await applyZoom('fit-page', false)
   if (!isFullscreen.value) await setFullscreen(true)
 }
 
@@ -972,7 +977,7 @@ async function exitPresentation(exitFullscreen = true) {
   settings.pdf.spreadMode = restore.spreadMode
   // 竖屏锁定会在这里重新生效
   await syncPdfLayout()
-  await applyZoom(restore.zoom)
+  await applyZoom(restore.zoom, false)
 }
 
 function onFullscreenChange() {
@@ -2461,8 +2466,8 @@ const reflowStyle = computed<Record<string, string>>(() => {
     '--reflow-bg': colors.bg,
     '--reflow-fg': colors.fg,
     '--reflow-link': colors.link,
-    '--reflow-font-size': `${settings.reader.fontSize}px`,
-    '--reflow-line-height': String(settings.reader.lineHeight),
+    '--reflow-font-size': `${settings.readerPrefs.fontSize}px`,
+    '--reflow-line-height': String(settings.readerPrefs.lineHeight),
     '--reflow-font-family': resolveFontFamily(settings.reader.fontFamily) || 'inherit',
     '--reflow-align': settings.reader.justify ? 'justify' : 'start',
     '--reflow-side-pad': `${Math.max(2, settings.reader.gap)}%`,
@@ -3554,8 +3559,6 @@ onMounted(async () => {
     pageCount.value = pdm.pages.length
     pageDims.value = pdm.pages.map(page => ({ w: page.w, h: page.h }))
     baseDims.value = pageDims.value[0] ?? { w: 612, h: 792 }
-    // 连续阅读默认适宽；论文沿用同一阅读模型。
-    if (restoredZoom == null && isPaper.value) zoom.value = 'fit-width'
     const saved = parseInt(meta.value.location ?? '1', 10)
     currentPage.value = Number.isFinite(saved)
       ? Math.min(Math.max(saved, 1), pageCount.value)
@@ -3762,7 +3765,7 @@ onBeforeUnmount(() => {
             <button class="icon-btn" :title="`${t('reader.zoomIn')} (${primaryShortcutLabel} +)`" @click="zoomStep(1)">＋</button>
           </template>
           <button v-else class="dock-zoom" @click="typographyOpen = !typographyOpen">
-            Aa · {{ settings.reader.fontSize }}
+            Aa · {{ settings.readerPrefs.fontSize }}
             <span class="dock-caret">⌄</span>
           </button>
         </div>
@@ -4386,13 +4389,13 @@ onBeforeUnmount(() => {
         <div v-if="typographyOpen && pdfLayout === 'reflow'" class="reflow-settings card">
           <label>
             <span>{{ t('reader.fontSize') }}</span>
-            <input v-model.number="settings.reader.fontSize" type="range" min="12" max="36" step="1" />
-            <strong>{{ settings.reader.fontSize }}</strong>
+            <input :value="settings.readerPrefs.fontSize" @input="settings.setReaderPreference('fontSize', Number(($event.target as HTMLInputElement).value))" type="range" min="12" max="36" step="1" />
+            <strong>{{ settings.readerPrefs.fontSize }}</strong>
           </label>
           <label>
             <span>{{ t('reader.lineHeight') }}</span>
-            <input v-model.number="settings.reader.lineHeight" type="range" min="1.2" max="2.6" step="0.1" />
-            <strong>{{ settings.reader.lineHeight.toFixed(1) }}</strong>
+            <input :value="settings.readerPrefs.lineHeight" @input="settings.setReaderPreference('lineHeight', Number(($event.target as HTMLInputElement).value))" type="range" min="1.2" max="2.6" step="0.1" />
+            <strong>{{ settings.readerPrefs.lineHeight.toFixed(1) }}</strong>
           </label>
           <label>
             <span>{{ t('reader.font') }}</span>

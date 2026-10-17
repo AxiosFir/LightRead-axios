@@ -45,6 +45,8 @@
     "test:dianjing": "node --experimental-strip-types --test scripts/test-dianjing.mjs",
     "test:usage-stats": "node --experimental-strip-types --test scripts/test-usage-stats.mjs",
     "test:ambient": "node --experimental-strip-types --test scripts/test-ambient.mjs",
+    "e2e:adaptive-layout": "node scripts/e2e-adaptive-layout.mjs",
+    "test:adaptive-layout": "node --experimental-strip-types --test scripts/test-adaptive-layout.mjs",
     "test:reader-pages": "node --experimental-strip-types --test scripts/test-reader-pages.mjs",
     "test:tts": "node --experimental-strip-types --test scripts/test-tts.mjs",
     "test:reading-modes": "node --experimental-strip-types --test scripts/test-reading-modes.mjs",

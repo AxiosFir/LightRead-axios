@@ -825,7 +825,7 @@ export function useReadingModes(opts: UseReadingModesOptions) {
     let units = lyricUnitsPerLine.value
     if (!units) {
       const w = host.viewportRect()?.width || window.innerWidth || 375
-      const est = estimateUnitsPerLine(w, settings.reader.fontSize * ly.value.scale, settings.reader.gap, settings.reader.letterSpacing)
+      const est = estimateUnitsPerLine(w, settings.readerPrefs.fontSize * ly.value.scale, settings.readerPrefs.gap, settings.readerPrefs.letterSpacing)
       units = bookScript.value === 'cjk' ? est : Math.max(2, Math.round(est * 2 / 5))
     }
     return secondsPerLine(units, speed.value)
@@ -973,7 +973,7 @@ export function useReadingModes(opts: UseReadingModesOptions) {
   /** 歌词的字号 × 倍数、行距至少 2.0: 同样只是生效值, 不写 settings.reader (不同步、不污染排版面板) */
   const lyricTypography = computed<{ fontSize?: number; lineHeight?: number } | null>(() => {
     if (!lyricActive.value) return null
-    const v = lyricValues(read, ly.value.scale)
+    const v = lyricValues(key => key.startsWith('reader.') ? (settings.readerPrefs as any)[key.slice(7)] : read(key), ly.value.scale)
     const out: { fontSize?: number; lineHeight?: number } = {}
     if (typeof v['reader.fontSize'] === 'number') out.fontSize = v['reader.fontSize']
     if (typeof v['reader.lineHeight'] === 'number') out.lineHeight = v['reader.lineHeight']

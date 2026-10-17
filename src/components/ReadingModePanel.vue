@@ -697,8 +697,8 @@ function onAutoSpeedExact(e: Event) {
 .rm-position-slider { flex: 1; min-width: 0; }
 .rm-position-slider input { width: 100%; min-height: 44px; }
 .rm-position-ends { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-3); }
-.rm-position-input { width: 80px !important; min-height: 44px; }
-.rm-lines-input { width: 64px !important; min-height: 44px; }
+.rm-position-input { width: 84px; flex: 0 0 84px; }
+.rm-lines-input { width: 64px; flex: 0 0 64px; }
 
 .rm-sound {
   display: flex;
@@ -842,29 +842,33 @@ function onAutoSpeedExact(e: Event) {
   justify-content: flex-end;
   gap: 4px;
 }
-:is(.rm-speed-input, .rm-number-input) {
-  width: 64px;
-  height: 30px;
-  padding: 0 6px;
+:is(.rm-speed-input, .rm-number-input, .rm-time) {
+  box-sizing: border-box;
+  width: 72px;
+  min-width: 0;
+  height: 38px;
+  padding: 0 10px;
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--card);
+  border-radius: var(--radius);
+  background: var(--surface-2);
   color: var(--text);
   font: inherit;
-  font-size: 13px;
-  text-align: right;
+  font-size: 14px;
+  font-weight: 500;
+  text-align: center;
   font-variant-numeric: tabular-nums;
   -moz-appearance: textfield;
+  transition: border-color var(--dur-fast) var(--ease), box-shadow var(--dur-fast) var(--ease);
 }
 :is(.rm-speed-input, .rm-number-input)::-webkit-outer-spin-button,
 :is(.rm-speed-input, .rm-number-input)::-webkit-inner-spin-button {
   -webkit-appearance: none;
   margin: 0;
 }
-:is(.rm-speed-input, .rm-number-input):focus {
+:is(.rm-speed-input, .rm-number-input, .rm-time):focus {
   outline: none;
   border-color: var(--brand);
-  box-shadow: 0 0 0 2px var(--brand-soft);
+  box-shadow: var(--ring);
 }
 .rm-value {
   flex-shrink: 0;
@@ -965,7 +969,7 @@ function onAutoSpeedExact(e: Event) {
 }
 @media (max-width: 720px) {
   /* 16px 以下 iOS 聚焦时会放大页面 */
-  :is(.rm-speed-input, .rm-number-input) {
+  :is(.rm-speed-input, .rm-number-input, .rm-time) {
     font-size: 16px;
   }
   .rm-panel {
@@ -1185,16 +1189,11 @@ function onAutoSpeedExact(e: Event) {
   color: var(--text-2);
 }
 .rm-time {
-  height: 32px;
-  padding: 0 8px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--card);
-  color: var(--text);
-  font: inherit;
-  font-size: 13px;
-  font-variant-numeric: tabular-nums;
+  width: 88px;
+  flex: 0 0 88px;
+  letter-spacing: 0.04em;
 }
+
 .rm-indent {
   padding-left: 74px;
 }
@@ -1226,7 +1225,8 @@ function onAutoSpeedExact(e: Event) {
   }
   :is(.rm-speed-input, .rm-number-input),
   .rm-time {
-    height: 40px;
+    height: 44px;
+    font-size: 16px;
   }
   .rm-toggle {
     min-height: 44px;
@@ -1365,15 +1365,29 @@ function onAutoSpeedExact(e: Event) {
 }
 .rm-speed-field {
   flex-shrink: 0;
-  flex-wrap: wrap;
-  max-width: 96px;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  max-width: 88px;
   font-size: 12px;
   color: var(--text-2);
 }
-:is(.rm-speed-input, .rm-number-input) {
-  width: 54px;
-  padding: 0 3px;
-  border-style: dashed;
+/* 所有数值/时间框共用实线边框, 数字和单位分层; 范围控件保持足够的触控高度。 */
+.rm-position-input { width: 84px; }
+.rm-lines-input { width: 64px; }
+.rm-panel input[type=range] { accent-color: var(--brand); cursor: pointer; }
+.rm-panel input[type=range]:focus-visible { outline: none; border-radius: var(--radius); box-shadow: var(--ring); }
+:is(.rm-speed-input, .rm-number-input, .rm-time):disabled { opacity: 0.5; cursor: not-allowed; }
+:is(.rm-speed-input, .rm-number-input, .rm-time)::placeholder { color: var(--text-3); font-weight: 400; }
+@media (hover: hover) {
+  :is(.rm-speed-input, .rm-number-input, .rm-time):hover:not(:disabled):not(:focus) { border-color: var(--border-strong); }
+}
+@media (max-width: 720px), (pointer: coarse) {
+  :is(.rm-speed-input, .rm-number-input, .rm-time) { height: 44px; font-size: 16px; }
+  .rm-panel input[type=range], .rm-panel :deep(.ls-range) { min-height: 44px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  :is(.rm-speed-input, .rm-number-input, .rm-time) { transition: none; }
 }
 .rm-gear:focus-visible, .rm-layout-link:focus-visible, .rm-more summary:focus-visible {
   outline: none;

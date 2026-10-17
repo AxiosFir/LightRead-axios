@@ -294,6 +294,7 @@ test('两台设备经 WebDAV: 主题 / 字号 / WebDAV 地址同步过去, 设�
   tick()
   A.settings.reader.theme = 'dark'
   A.settings.reader.fontSize = 22
+  A.settings.layoutOverrides.reader.fontSize = true
   A.settings.webdavUrl = 'https://dav.jianguoyun.com/dav/'
   A.settings.webdavUser = 'me@x.com'
   A.settings.webdavProvider = 'jianguoyun'
@@ -321,7 +322,8 @@ test('两台设备经 WebDAV: 主题 / 字号 / WebDAV 地址同步过去, 设�
   assert.equal(B.settings.libraryRoot, '/sdcard/books')
   assert.deepEqual(B.settings.dianjing.perBook, {})
   assert.equal(B.settings.dianjing.level, 'smart', '点睛阅读选的版本随同步')
-  assert.equal(r.settingsApplied, 7)
+  assert.equal(r.settingsApplied, 8)
+  assert.equal(B.settings.layoutOverrides.reader.fontSize, true, '字号的手动优先级一起同步')
 
   // 不打架: 双方再同步, 没有新的落地, 文档里的寄存器与来源一致
   assert.equal((await sync(B, dav.remote())).settingsApplied, 0)
@@ -528,7 +530,7 @@ test('歌词高度迁移保留坐标含义，自定义行数和位置参与同�
       const store = useSettings(createPinia())
       assert.equal(store.readingMode.lyric.anchor, expected)
       assert.equal(store.readingMode.lyric.lines, 7)
-      assert.equal(store.version, 16)
+      assert.equal(store.version, settingsDefaults().version)
     }
     const state = settingsDefaults()
     assert.equal(state.readingMode.lyric.anchor, 0.382)

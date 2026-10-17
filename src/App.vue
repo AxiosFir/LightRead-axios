@@ -8,6 +8,7 @@ import ConfirmHost from './components/ConfirmHost.vue'
 import BabeldocTaskStatus from './components/BabeldocTaskStatus.vue'
 import LibraryUploadStatus from './components/LibraryUploadStatus.vue'
 import { useSettings } from './stores/settings'
+import { watchReadingViewport } from './services/readingViewport'
 import { useAppearance } from './services/appearance'
 import { t } from './i18n'
 import { isTauri } from './storage'
@@ -28,6 +29,7 @@ import {
 } from './services/updater'
 
 const settings = useSettings()
+onBeforeUnmount(watchReadingViewport())
 settings.persistOnChange()
 useAppearance()
 const route = useRoute()

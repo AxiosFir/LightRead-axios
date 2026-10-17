@@ -3,6 +3,7 @@ import { chromium, webkit } from 'playwright'
 import { writeFileSync, mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 
+const BASE = process.env.E2E_BASE ?? 'http://localhost:4173'
 const TMP = '/tmp/lightread-e2e'
 mkdirSync(join(TMP, 'shots'), { recursive: true })
 
@@ -102,7 +103,7 @@ const revealBars = async () => {
 }
 
 await step('打开应用', async () => {
-  await page.goto('http://localhost:4173/', { waitUntil: 'networkidle' })
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
   await page.waitForSelector('text=书架还是空的', { timeout: 8000 })
 })
 
@@ -192,12 +193,12 @@ await step('打开 TXT 阅读器并渲染正文', async () => {
 })
 await page.screenshot({ path: join(TMP, 'shots', '03-reader.png') })
 
-await step('分栏默认自动、随宽度切换，手动单栏与双栏固定并持久化', async () => {
+await step('分栏默认随宽度切换，手动单栏与双栏固定并持久化', async () => {
   await revealBars()
   if (page.viewportSize().width <= 720) await page.locator('.dock button').nth(4).click()
   else await page.locator('button[title="排版设置"]').click()
   const columns = page.getByRole('group', { name: '分栏', exact: true })
-  if (await columns.getByRole('button', { name: '自动', exact: true }).getAttribute('aria-pressed') !== 'true') throw new Error('默认未选自动')
+  if (await columns.getByRole('button', { name: '双栏', exact: true }).getAttribute('aria-pressed') !== 'true') throw new Error('横屏预设未选双栏')
   const waitColumns = count => page.waitForFunction(n => document.querySelector('foliate-view')?.renderer?.columnCount === n, count, { timeout: 10000 })
   await waitColumns(2)
   await page.setViewportSize({ width: 700, height: 500 })
@@ -233,7 +234,7 @@ await step('阅读器面板 v2：版式、列表、速度、运行条与跳转',
   await flows.getByRole('button', { name: '翻页', exact: true }).click()
   await page.waitForFunction(() => !document.querySelector('foliate-view')?.renderer?.scrolled)
   await page.waitForFunction(() => JSON.parse(localStorage.getItem('lightread-settings')).reader.continuousScroll === true)
-  if (await typography.locator('.tp-portrait').count()) throw new Error('桌面不应显示触屏开关')
+  if (await typography.locator('.tp-portrait [role=switch]').getAttribute('aria-checked') !== 'true') throw new Error('桌面应默认启用自动适配')
   await typography.locator('.tp-close').click()
   await revealBars()
   await page.locator('button[title="阅读模式"]').click()
@@ -339,12 +340,15 @@ await step('返回书架并打开 PDF', async () => {
   await page.click('button[title="返回藏书"]')
   await page.waitForSelector('.book-card', { timeout: 8000 })
   await page.click('.book-card:has-text("test-doc")')
-  // 藏书 PDF 统一走 PDF 阅读器，默认 MuPDF 渲染 + 连续滚动 + 适宽
+  // 藏书 PDF 统一走 PDF 阅读器; 自动预设另由 e2e:adaptive-layout 验证。
   await page.waitForSelector('.p-holder canvas', { timeout: 15000 })
 })
 await page.screenshot({ path: join(TMP, 'shots', '06-pdf.png') })
 
-await step('PDF 默认连续滚动与适宽', async () => {
+await step('PDF 手动连续滚动与适宽', async () => {
+  await page.getByRole('button', { name: '滚动', exact: true }).click()
+  await page.getByRole('button', { name: '单页', exact: true }).click()
+  await page.getByRole('button', { name: '适宽', exact: true }).click()
   await page.waitForFunction(() => {
     const box = document.querySelector('.pane-left')
     const canvas = document.querySelector('.pane-left canvas')
@@ -534,11 +538,11 @@ await step('翻页 PDF 支持 Ctrl/Cmd+F 搜索与结果导航', async () => {
 })
 
 await step('PDF 渲染引擎可切换为 PDFium', async () => {
-  await page.goto('http://localhost:4173/#/settings', { waitUntil: 'networkidle' })
+  await page.goto(BASE + '/#/settings', { waitUntil: 'networkidle' })
   const reading = page.locator('.section').filter({ hasText: '阅读偏好' })
   await reading.getByRole('button', { name: 'PDFium', exact: true }).click()
   await page.waitForTimeout(400)
-  await page.goto('http://localhost:4173/#/library', { waitUntil: 'networkidle' })
+  await page.goto(BASE + '/#/library', { waitUntil: 'networkidle' })
   await page.click('.book-card:has-text("test-doc")')
   await page.waitForSelector('.p-holder canvas', { timeout: 15000 })
   const renderer = await page.locator('.p-holder canvas').first().getAttribute('data-renderer')
@@ -829,7 +833,7 @@ await step('PDF 自动阅读控制条自动与手动收起', async () => {
 })
 
 await step('双语横版 PDF 适宽后四周和页间均无接缝', async () => {
-  await page.goto('http://localhost:4173/#/library', { waitUntil: 'networkidle' })
+  await page.goto(BASE + '/#/library', { waitUntil: 'networkidle' })
   await page.setInputFiles('input[type=file][multiple]', widePdfPath)
   await page.waitForSelector('.book-card:has-text("bilingual-wide")', { timeout: 15000 })
   await page.click('.book-card:has-text("bilingual-wide")')
@@ -893,7 +897,7 @@ await step('双语横版 PDF 适宽后四周和页间均无接缝', async () => 
 })
 
 await step('刷新后藏书与进度仍在 (持久化)', async () => {
-  await page.goto('http://localhost:4173/#/library', { waitUntil: 'networkidle' })
+  await page.goto(BASE + '/#/library', { waitUntil: 'networkidle' })
   await page.waitForFunction(() => document.querySelectorAll('.book-card').length >= 2, null, { timeout: 8000 })
   const hasProgress = await page.locator('.book-card:has-text("测试小说") .progress').count()
   if (!hasProgress) throw new Error('TXT 书籍没有显示阅读进度')
