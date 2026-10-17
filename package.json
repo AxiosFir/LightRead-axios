@@ -58,7 +58,9 @@
     "test:transfer": "node --experimental-strip-types --test scripts/test-transfer.mjs",
     "test:qr": "node --experimental-strip-types --test scripts/test-qr.mjs",
     "stats": "node scripts/stats.mjs",
-    "deploy": "npm run build && wrangler deploy"
+    "deploy": "npm run build && wrangler deploy",
+    "test:terminology": "node --experimental-strip-types --test scripts/test-terminology.mjs",
+    "audit:keywords": "node --experimental-strip-types scripts/audit-keyword-candidates.mjs"
   },
   "dependencies": {
     "@embedpdf/pdfium": "^2.14.4",

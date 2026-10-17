@@ -30,6 +30,9 @@ npm run test:reading-focus   # 阅读焦点: 舒适区 25%–65% / 焦点线 38%
 npm run test:reader-tap-zone # 轻点分区: 横屏左·中·右 / 竖屏上·中·下 / 自动阅读时无翻页区 (纯函数)
 npm run test:zh-segment      # 仿生阅读中文分词: 词表切分 / 歧义不上色 / ICU 回退 / 交替规则 / 速度 (<15ms/万字)
 npm run test:key-words       # 点睛重点词: 本书新词发现 / 自信息 + 关键度 + 聚集度打分 / 密度与间隔 / AI 词定位与回退 (设计见 docs/research/entropy-keyword-highlighting.md、llm-keyword-selection.md)
+npm run test:terminology     # 术语候选实验: 来源完整性 / 22 类路由 / 原文跨度 / 边界与预算 (尚未接入生产排序)
+npm run audit:keywords       # 离线复现词边界、同形词跨语境和未来新词影响; 不是准确率评测
+node scripts/build-terminology.mjs   # 重建开放候选词库与覆盖报告; 方案见 docs/research/keyword-optimization.md
 node scripts/build-zh-lexicon.mjs   # 重新生成中文词表 src/data/zh-lexicon.txt + 回退合并表 zhMergeWords.ts (下载 jieba / DeepSeek-R1 词表到 ~/.cache, 校验 SHA-256)
 npm run test:book-sources    # 公共书源: 查询归一 / 哲学文库·研辞问典本地索引搜索 / 教材分卷合并与排序 / IA·Open Library·GitHub 相关度
 node scripts/build-philosophy-index.mjs   # 重新生成哲学文库离线索引 src/data/philosophy-index.json (限速抓目录页, 约 5 分钟)
@@ -101,6 +104,8 @@ sync-server/           轻阅账号后端 (Cloudflare Worker + D1 + R2, sync.jia
 - `DEV_EXPOSE_CODE` 只用于本地测试，**生产绝不能设**（否则任何人都能拿到任意邮箱的验证码）。
 
 ## 发版流程
+
+**本地构建优先（2026-10-16 用户要求）**：后续可在本地完成构建、校验后再上传 GitHub Release，以减少 Actions 用量。平台、版本、Android 固定签名、校验清单和公开门禁保持不变；Linux 本机产物不能代替 macOS / Windows 的对应构建。当前 `release.yml` 仍在推送 `v*` tag 时自动构建，采用本地发版前必须先配置明确的自动构建跳过机制，避免同时启动两套发布。v1.18.1 已由 CI 完整成功发布，无需重建或覆盖。
 
 1. 发版前检查工作区、需求清单与变更范围；同步修改 `package.json`、`package-lock.json`（顶层和根包两处）、`src-tauri/Cargo.toml`、`src-tauri/Cargo.lock`（lightread 包）、`src-tauri/tauri.conf.json`。执行 `node scripts/check-release.mjs --self-test` 和 `node scripts/check-release.mjs --tag vX.Y.Z`，版本或 tag 不一致即停止。
 2. 完成相关单测、`npm run build`、阅读器/更新流程冒烟；Rust 变更执行相应原生测试。桌面分别确认 macOS arm64/x64、Windows NSIS、Linux AppImage/deb 的目标平台。CI 的 Rust 最低版本检查也必须通过。资源密集任务使用 `flock /tmp/heavy.lock nice -n 10 ...` 串行执行。

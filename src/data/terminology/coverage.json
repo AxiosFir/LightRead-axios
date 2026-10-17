@@ -1,0 +1,331 @@
+{
+  "version": "1",
+  "uniqueTerms": 156965,
+  "bytes": 3319578,
+  "sha256": "695dd2d90091726643172073f59b02c8ddc1ddaabfa5714416be9a1d612c0a74",
+  "sources": [
+    {
+      "id": "thuocl-IT",
+      "rows": 16000,
+      "unique": 15999,
+      "invalidFrequencies": [],
+      "sha256": "e8cd42c9f5559735fa3bfb91515cbe051f991efd4a803038a1d5c0da85af3526"
+    },
+    {
+      "id": "thuocl-animal",
+      "rows": 17287,
+      "unique": 17287,
+      "invalidFrequencies": [],
+      "sha256": "bcdc95a32fe713d4bc32957ae26174e3b464908e318e821c9abb295e90249145"
+    },
+    {
+      "id": "thuocl-caijing",
+      "rows": 3830,
+      "unique": 3830,
+      "invalidFrequencies": [],
+      "sha256": "68e63d2009e59c6f388eeaa789d19b6a681657de3e8e56cc3479b21cd8548542"
+    },
+    {
+      "id": "thuocl-car",
+      "rows": 1752,
+      "unique": 1752,
+      "invalidFrequencies": [],
+      "sha256": "58ffd756b89e8574852bc72c254276a1d7fa8821342eb3cbf3be73ca33ab921c"
+    },
+    {
+      "id": "thuocl-chengyu",
+      "rows": 8519,
+      "unique": 8519,
+      "invalidFrequencies": [],
+      "sha256": "c339d5d6e37d4f8ecdcb82f2a02b7fdfc66796f0a5215155f2aff8a77e89a7eb"
+    },
+    {
+      "id": "thuocl-diming",
+      "rows": 44804,
+      "unique": 44804,
+      "invalidFrequencies": [
+        {
+          "line": 35690,
+          "word": "柴塔村",
+          "raw": "3?"
+        },
+        {
+          "line": 35724,
+          "word": "高棚子",
+          "raw": "3?"
+        }
+      ],
+      "sha256": "ca5574399da5750a2c36dc373f36e31a66ed1f8a4b21646df6ca44ec0b888d89"
+    },
+    {
+      "id": "thuocl-food",
+      "rows": 8974,
+      "unique": 8974,
+      "invalidFrequencies": [
+        {
+          "line": 39,
+          "word": "丁香",
+          "raw": "125472s"
+        }
+      ],
+      "sha256": "084caa96ad4f976720003e9420097ba7cb5ddbb17f9f8c8f76bc4b8e0cc777fd"
+    },
+    {
+      "id": "thuocl-law",
+      "rows": 9896,
+      "unique": 9896,
+      "invalidFrequencies": [
+        {
+          "line": 7339,
+          "word": "浙江省地质灾害防治管理办法",
+          "raw": ""
+        }
+      ],
+      "sha256": "8ef1a5f41052ac95dedde88b167c5031a43b3e0211bf128b6125736cc76ef7b2"
+    },
+    {
+      "id": "thuocl-lishimingren",
+      "rows": 13658,
+      "unique": 13658,
+      "invalidFrequencies": [],
+      "sha256": "d0e5094016e6db8c55d363dc022f48f7b1753cf6d07e216f63cf522ce8e53605"
+    },
+    {
+      "id": "thuocl-medical",
+      "rows": 18749,
+      "unique": 18749,
+      "invalidFrequencies": [],
+      "sha256": "a01f39f1677af0b6a620bbc68bf293e8e436f06248b74adb625cd61d9ad7bbcd"
+    },
+    {
+      "id": "thuocl-poem",
+      "rows": 13703,
+      "unique": 13703,
+      "invalidFrequencies": [],
+      "sha256": "f7045571f57114a3a70d2eaaeec8f991897d536be808f93161709f1289c8108c"
+    },
+    {
+      "id": "wikidata-philosophy",
+      "rows": 550,
+      "unique": 424,
+      "entities": 330,
+      "sha256": "4aacbf09ff6ecaf19ec6b3985431ce2000801c66b3db82ab2a90de5eb4e5f4ed"
+    }
+  ],
+  "domains": [
+    {
+      "id": "A",
+      "name": "马克思主义与相关理论",
+      "packs": [
+        "core-A"
+      ],
+      "uniqueTerms": 10
+    },
+    {
+      "id": "B",
+      "name": "哲学、心理学与宗教",
+      "packs": [
+        "core-B",
+        "chinese-thought-core",
+        "wikidata-philosophy"
+      ],
+      "uniqueTerms": 486
+    },
+    {
+      "id": "C",
+      "name": "社会科学总论",
+      "packs": [
+        "core-C"
+      ],
+      "uniqueTerms": 12
+    },
+    {
+      "id": "D",
+      "name": "政治与法律",
+      "packs": [
+        "core-D",
+        "thuocl-law"
+      ],
+      "uniqueTerms": 9906
+    },
+    {
+      "id": "E",
+      "name": "军事",
+      "packs": [
+        "core-E"
+      ],
+      "uniqueTerms": 10
+    },
+    {
+      "id": "F",
+      "name": "经济与管理",
+      "packs": [
+        "core-F",
+        "thuocl-caijing"
+      ],
+      "uniqueTerms": 3842
+    },
+    {
+      "id": "G",
+      "name": "文化、教育与体育",
+      "packs": [
+        "core-G"
+      ],
+      "uniqueTerms": 12
+    },
+    {
+      "id": "H",
+      "name": "语言与文字",
+      "packs": [
+        "core-H",
+        "thuocl-chengyu"
+      ],
+      "uniqueTerms": 8531
+    },
+    {
+      "id": "I",
+      "name": "文学",
+      "packs": [
+        "core-I",
+        "chinese-thought-core",
+        "thuocl-chengyu",
+        "thuocl-poem"
+      ],
+      "uniqueTerms": 22148
+    },
+    {
+      "id": "J",
+      "name": "艺术",
+      "packs": [
+        "core-J",
+        "chinese-thought-core"
+      ],
+      "uniqueTerms": 41
+    },
+    {
+      "id": "K",
+      "name": "历史与地理",
+      "packs": [
+        "core-K",
+        "chinese-thought-core",
+        "thuocl-diming",
+        "thuocl-lishimingren"
+      ],
+      "uniqueTerms": 58401
+    },
+    {
+      "id": "N",
+      "name": "自然科学总论",
+      "packs": [
+        "core-N"
+      ],
+      "uniqueTerms": 19
+    },
+    {
+      "id": "O",
+      "name": "数理科学与化学",
+      "packs": [
+        "core-O"
+      ],
+      "uniqueTerms": 12
+    },
+    {
+      "id": "P",
+      "name": "天文学与地球科学",
+      "packs": [
+        "core-P"
+      ],
+      "uniqueTerms": 12
+    },
+    {
+      "id": "Q",
+      "name": "生物科学",
+      "packs": [
+        "core-Q",
+        "thuocl-animal"
+      ],
+      "uniqueTerms": 17299
+    },
+    {
+      "id": "R",
+      "name": "医学与卫生",
+      "packs": [
+        "core-R",
+        "thuocl-food",
+        "thuocl-medical"
+      ],
+      "uniqueTerms": 27611
+    },
+    {
+      "id": "S",
+      "name": "农业科学",
+      "packs": [
+        "core-S",
+        "thuocl-animal",
+        "thuocl-food"
+      ],
+      "uniqueTerms": 26268
+    },
+    {
+      "id": "T",
+      "name": "工业技术与计算机",
+      "packs": [
+        "core-T",
+        "thuocl-IT",
+        "thuocl-car"
+      ],
+      "uniqueTerms": 17756
+    },
+    {
+      "id": "U",
+      "name": "交通运输",
+      "packs": [
+        "core-U",
+        "thuocl-car"
+      ],
+      "uniqueTerms": 1762
+    },
+    {
+      "id": "V",
+      "name": "航空与航天",
+      "packs": [
+        "core-V"
+      ],
+      "uniqueTerms": 10
+    },
+    {
+      "id": "X",
+      "name": "环境科学与安全",
+      "packs": [
+        "core-X"
+      ],
+      "uniqueTerms": 12
+    },
+    {
+      "id": "Z",
+      "name": "综合与参考",
+      "packs": [
+        "core-Z"
+      ],
+      "uniqueTerms": 10
+    }
+  ],
+  "references": [
+    {
+      "id": "chinese-thought",
+      "title": "中华思想文化术语库",
+      "url": "https://shuyuku.chinesethought.cn/",
+      "status": "reference-only",
+      "reportedTerms": 1200,
+      "note": "用于概念与分类核对；未确认整库再分发许可，不复制出版方释义。"
+    },
+    {
+      "id": "dialectics-2024",
+      "title": "自然辩证法名词（第二版、定义版，2024）",
+      "url": "https://www.cnterm.cn/cb/sdgb/202412/t20241224_762343.html",
+      "status": "reference-only",
+      "reportedTerms": 2460,
+      "note": "吸纳其八部分学科结构作为路由参考；未确认整库再分发许可，不复制正式释义。"
+    }
+  ]
+}

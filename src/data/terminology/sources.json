@@ -1,0 +1,147 @@
+{
+  "revision": "a30ce79d895d01ab5132a5c74c29703ff7efb4cc",
+  "sources": [
+    {
+      "id": "thuocl-IT",
+      "domains": [
+        "T"
+      ],
+      "role": "term",
+      "url": "https://raw.githubusercontent.com/thunlp/THUOCL/a30ce79d895d01ab5132a5c74c29703ff7efb4cc/data/THUOCL_IT.txt",
+      "sha256": "e8cd42c9f5559735fa3bfb91515cbe051f991efd4a803038a1d5c0da85af3526",
+      "source": "THUOCL",
+      "license": "MIT"
+    },
+    {
+      "id": "thuocl-animal",
+      "domains": [
+        "Q",
+        "S"
+      ],
+      "role": "name",
+      "url": "https://raw.githubusercontent.com/thunlp/THUOCL/a30ce79d895d01ab5132a5c74c29703ff7efb4cc/data/THUOCL_animal.txt",
+      "sha256": "bcdc95a32fe713d4bc32957ae26174e3b464908e318e821c9abb295e90249145",
+      "source": "THUOCL",
+      "license": "MIT"
+    },
+    {
+      "id": "thuocl-caijing",
+      "domains": [
+        "F"
+      ],
+      "role": "term",
+      "url": "https://raw.githubusercontent.com/thunlp/THUOCL/a30ce79d895d01ab5132a5c74c29703ff7efb4cc/data/THUOCL_caijing.txt",
+      "sha256": "68e63d2009e59c6f388eeaa789d19b6a681657de3e8e56cc3479b21cd8548542",
+      "source": "THUOCL",
+      "license": "MIT"
+    },
+    {
+      "id": "thuocl-car",
+      "domains": [
+        "U",
+        "T"
+      ],
+      "role": "term",
+      "url": "https://raw.githubusercontent.com/thunlp/THUOCL/a30ce79d895d01ab5132a5c74c29703ff7efb4cc/data/THUOCL_car.txt",
+      "sha256": "58ffd756b89e8574852bc72c254276a1d7fa8821342eb3cbf3be73ca33ab921c",
+      "source": "THUOCL",
+      "license": "MIT"
+    },
+    {
+      "id": "thuocl-chengyu",
+      "domains": [
+        "H",
+        "I"
+      ],
+      "role": "idiom",
+      "url": "https://raw.githubusercontent.com/thunlp/THUOCL/a30ce79d895d01ab5132a5c74c29703ff7efb4cc/data/THUOCL_chengyu.txt",
+      "sha256": "c339d5d6e37d4f8ecdcb82f2a02b7fdfc66796f0a5215155f2aff8a77e89a7eb",
+      "source": "THUOCL",
+      "license": "MIT"
+    },
+    {
+      "id": "thuocl-diming",
+      "domains": [
+        "K"
+      ],
+      "role": "name",
+      "url": "https://raw.githubusercontent.com/thunlp/THUOCL/a30ce79d895d01ab5132a5c74c29703ff7efb4cc/data/THUOCL_diming.txt",
+      "sha256": "ca5574399da5750a2c36dc373f36e31a66ed1f8a4b21646df6ca44ec0b888d89",
+      "source": "THUOCL",
+      "license": "MIT"
+    },
+    {
+      "id": "thuocl-food",
+      "domains": [
+        "S",
+        "R"
+      ],
+      "role": "name",
+      "url": "https://raw.githubusercontent.com/thunlp/THUOCL/a30ce79d895d01ab5132a5c74c29703ff7efb4cc/data/THUOCL_food.txt",
+      "sha256": "084caa96ad4f976720003e9420097ba7cb5ddbb17f9f8c8f76bc4b8e0cc777fd",
+      "source": "THUOCL",
+      "license": "MIT"
+    },
+    {
+      "id": "thuocl-law",
+      "domains": [
+        "D"
+      ],
+      "role": "term",
+      "url": "https://raw.githubusercontent.com/thunlp/THUOCL/a30ce79d895d01ab5132a5c74c29703ff7efb4cc/data/THUOCL_law.txt",
+      "sha256": "8ef1a5f41052ac95dedde88b167c5031a43b3e0211bf128b6125736cc76ef7b2",
+      "source": "THUOCL",
+      "license": "MIT"
+    },
+    {
+      "id": "thuocl-lishimingren",
+      "domains": [
+        "K"
+      ],
+      "role": "name",
+      "url": "https://raw.githubusercontent.com/thunlp/THUOCL/a30ce79d895d01ab5132a5c74c29703ff7efb4cc/data/THUOCL_lishimingren.txt",
+      "sha256": "d0e5094016e6db8c55d363dc022f48f7b1753cf6d07e216f63cf522ce8e53605",
+      "source": "THUOCL",
+      "license": "MIT"
+    },
+    {
+      "id": "thuocl-medical",
+      "domains": [
+        "R"
+      ],
+      "role": "term",
+      "url": "https://raw.githubusercontent.com/thunlp/THUOCL/a30ce79d895d01ab5132a5c74c29703ff7efb4cc/data/THUOCL_medical.txt",
+      "sha256": "a01f39f1677af0b6a620bbc68bf293e8e436f06248b74adb625cd61d9ad7bbcd",
+      "source": "THUOCL",
+      "license": "MIT"
+    },
+    {
+      "id": "thuocl-poem",
+      "domains": [
+        "I"
+      ],
+      "role": "phrase",
+      "url": "https://raw.githubusercontent.com/thunlp/THUOCL/a30ce79d895d01ab5132a5c74c29703ff7efb4cc/data/THUOCL_poem.txt",
+      "sha256": "f7045571f57114a3a70d2eaaeec8f991897d536be808f93161709f1289c8108c",
+      "source": "THUOCL",
+      "license": "MIT"
+    }
+  ],
+  "snapshots": [
+    {
+      "id": "wikidata-philosophy",
+      "file": "snapshots/wikidata-philosophy.json",
+      "domains": [
+        "B"
+      ],
+      "role": "term",
+      "source": "Wikidata",
+      "license": "CC0-1.0",
+      "licenseUrl": "https://www.wikidata.org/wiki/Wikidata:Licensing",
+      "endpoint": "https://query.wikidata.org/sparql",
+      "retrievedAt": "2026-10-17",
+      "query": "SELECT DISTINCT ?item ?label WHERE { ?item wdt:P31/wdt:P279* wd:Q33104279. ?item rdfs:label ?label. FILTER(LANG(?label) IN (\"zh\", \"zh-hans\", \"zh-hant\")) } ORDER BY ?item ?label",
+      "sha256": "4aacbf09ff6ecaf19ec6b3985431ce2000801c66b3db82ab2a90de5eb4e5f4ed"
+    }
+  ]
+}
