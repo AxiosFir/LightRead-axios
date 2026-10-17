@@ -58,7 +58,7 @@ export default defineConfig({
     manifest: {
       name: 'LightRead 轻阅',
       short_name: '轻阅',
-      description: '开源本地阅读器 · 支持 EPUB / MOBI / AZW3 / FB2 / CBZ / PDF / TXT 等格式，藏书管理与 OPDS 书源',
+      description: '开源电子书与 PDF 阅读器 · PDF 对照翻译、点睛阅读、本地书库、书单、阅读记录与听书',
       theme_color: '#1664FF',
       background_color: '#F7F8FA',
       display: 'standalone',
