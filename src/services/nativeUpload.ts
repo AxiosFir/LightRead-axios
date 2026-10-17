@@ -88,3 +88,32 @@ export async function nativeUpload(url: string, init: NativeUploadInit): Promise
   }
   return invokeUpload(url, init, proxy, null, await bodyBytes(body))
 }
+
+export interface NativeDownloadResult {
+  status: number
+  /** 2xx 时为文件的 SHA-256 十六进制 */
+  sha256: string
+  size: number
+}
+
+/**
+ * 原生下载到书库文件 (仅 Tauri, 实现见 src-tauri/src/library_files.rs): 流式写盘、边下边算 SHA-256,
+ * 书的内容不经过 WebView. 非 2xx 不建文件, 只返回状态码.
+ */
+export async function nativeDownload(
+  url: string,
+  headers: Record<string, string>,
+  dest: LocalFileRef,
+): Promise<NativeDownloadResult> {
+  const [{ invoke }, { useSettings }] = await Promise.all([
+    import('@tauri-apps/api/core'), import('../stores/settings'),
+  ])
+  const proxy = useSettings().httpProxy.trim()
+  try {
+    return await invoke<NativeDownloadResult>('library_file_download', {
+      url, headers, proxy: proxy || null, root: dest.root, rel: dest.rel,
+    })
+  } catch (err) {
+    throw toError(err)
+  }
+}

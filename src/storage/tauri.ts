@@ -31,6 +31,7 @@ interface BookRow {
   reading_seconds: number | null
   pinned_at: number | null
   kind: string | null
+  no_sync: number | null
 }
 
 const rowToMeta = (r: BookRow): BookMeta => ({
@@ -51,6 +52,7 @@ const rowToMeta = (r: BookRow): BookMeta => ({
   readingSeconds: r.reading_seconds ?? 0,
   pinnedAt: r.pinned_at ?? undefined,
   kind: r.kind === 'paper' ? 'paper' : 'book',
+  ...(r.no_sync ? { noSync: true } : {}),
 })
 
 const META_COLUMNS: Record<string, string> = {
@@ -68,6 +70,7 @@ const META_COLUMNS: Record<string, string> = {
   readingSeconds: 'reading_seconds',
   pinnedAt: 'pinned_at',
   kind: 'kind',
+  noSync: 'no_sync',
 }
 
 export class TauriStorage implements LibraryStorage {
@@ -178,6 +181,7 @@ export class TauriStorage implements LibraryStorage {
       'ALTER TABLE books ADD COLUMN reading_seconds INTEGER NOT NULL DEFAULT 0',
       'ALTER TABLE books ADD COLUMN pinned_at INTEGER',
       "ALTER TABLE books ADD COLUMN kind TEXT NOT NULL DEFAULT 'book'",
+      'ALTER TABLE books ADD COLUMN no_sync INTEGER NOT NULL DEFAULT 0',
     ]) {
       await this.db.execute(ddl).catch(() => { /* 列已存在 */ })
     }
@@ -227,6 +231,12 @@ export class TauriStorage implements LibraryStorage {
       const [path, opts] = this.loc(this.bookPath(id, meta.fileName))
       await this.fs.writeFile(path, new Uint8Array(await file.arrayBuffer()), opts)
     }
+    await this.insertBook(id, meta, cover)
+    return id
+  }
+
+  /** 写封面并插入书目行 (书籍文件已就位) */
+  private async insertBook(id: string, meta: NewBookMeta, cover?: Blob) {
     if (cover) {
       const [path, opts] = this.loc(this.coverPath(id))
       await this.fs.writeFile(path, new Uint8Array(await cover.arrayBuffer()), opts)
@@ -234,15 +244,49 @@ export class TauriStorage implements LibraryStorage {
     await this.db.execute(
       `INSERT INTO books (id, title, author, format, file_name, description, language,
         tags, added_at, last_read_at, location, progress, source, has_cover, kind,
-        reading_seconds, pinned_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)`,
+        reading_seconds, pinned_at, no_sync)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)`,
       [id, meta.title, meta.author, meta.format, meta.fileName,
         meta.description ?? null, meta.language ?? null, JSON.stringify(meta.tags),
         meta.addedAt, meta.lastReadAt ?? null, meta.location ?? null,
         meta.progress ?? null, meta.source ?? null, cover ? 1 : 0,
         meta.kind === 'paper' ? 'paper' : 'book',
-        Math.round(meta.readingSeconds ?? 0), meta.pinnedAt || null])
+        Math.round(meta.readingSeconds ?? 0), meta.pinnedAt || null, meta.noSync ? 1 : 0])
+  }
+
+  // ---- 同步: 书的内容由原生层读写 (src-tauri/src/library_files.rs), 不经过 WebView ----
+
+  private async libraryFile<T>(cmd: string, args: Record<string, unknown>): Promise<T> {
+    const { invoke } = await import('@tauri-apps/api/core')
+    return invoke<T>(cmd, { root: this.root, ...args })
+  }
+
+  async hashBookFile(id: string) {
+    const meta = await this.getBook(id)
+    if (!meta) throw new Error('书籍不存在')
+    return this.libraryFile<string>('library_file_sha256', { rel: this.bookPath(id, meta.fileName) })
+  }
+
+  async stageBookFile(tag: string): Promise<LocalFileRef> {
+    const rel = `books/sync-${tag.replace(/[^0-9a-zA-Z_-]/g, '')}.part`
+    return { kind: 'local-file', root: this.root, rel, blob: () => this.readRel(rel) }
+  }
+
+  async addBookFromStaged(meta: NewBookMeta, staged: LocalFileRef, cover?: Blob) {
+    const id = newId()
+    await this.libraryFile('library_file_rename', { from: staged.rel, to: this.bookPath(id, meta.fileName) })
+    await this.insertBook(id, meta, cover)
     return id
+  }
+
+  async discardStaged(staged: LocalFileRef) {
+    await this.libraryFile('library_file_remove', { rel: staged.rel })
+  }
+
+  private async readRel(rel: string) {
+    const [path, opts] = this.loc(rel)
+    const bytes = await this.fs.readFile(path, opts)
+    return new Blob([bytes.buffer as ArrayBuffer])
   }
 
   async updateBook(id: string, patch: Partial<Omit<BookMeta, 'id'>>) {
@@ -267,6 +311,9 @@ export class TauriStorage implements LibraryStorage {
       if (key === 'tags') {
         sets.push(`tags = $${values.length + 1}`)
         values.push(JSON.stringify(value))
+      } else if (key === 'noSync') {
+        sets.push(`no_sync = $${values.length + 1}`)
+        values.push(value ? 1 : 0)
       } else if (key in META_COLUMNS) {
         sets.push(`${META_COLUMNS[key]} = $${values.length + 1}`)
         values.push(value ?? null)

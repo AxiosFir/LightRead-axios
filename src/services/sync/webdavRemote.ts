@@ -9,7 +9,7 @@
  */
 import { SYNC_FORMAT } from './types.ts'
 import type { SyncDoc, SyncRemote } from './types'
-import { isLocalFileRef, type LocalFileRef } from '../../storage/types.ts'
+import { isLocalFileRef, isTauri, type LocalFileRef } from '../../storage/types.ts'
 
 export interface HttpRequest {
   method: string
@@ -147,6 +147,8 @@ export function createWebdavRemote(
   const http = httpFn ?? defaultHttp(cfg)
   /** 只有默认 HTTP 函数认识本地文件引用 */
   const acceptsFileRefs = !httpFn
+  /** 桌面 / 安卓: 书籍文件由原生层直接下载进书库, 内容不进 JS (几十 MB 的书会撑爆 WebView) */
+  const nativeFiles = acceptsFileRefs && isTauri()
   const base = cfg.url.trim().replace(/\/+$/, '')
   const root = `${base}/LightRead/sync/v1`
   const devicesDir = `${root}/devices/`
@@ -280,5 +282,25 @@ export function createWebdavRemote(
       })
       return res.status === 404 ? null : res.blob
     },
+
+    ...(nativeFiles ? {
+      async downloadFileTo(name: string, dest: LocalFileRef) {
+        const [{ authHeader, REMOTE_USER_AGENT }, { nativeDownload }] = await Promise.all([
+          import('../net.ts'), import('../nativeUpload.ts'),
+        ])
+        let res
+        try {
+          res = await nativeDownload(filesDir + encodeURIComponent(name), {
+            'user-agent': REMOTE_USER_AGENT, ...authHeader({ username: cfg.user, password: cfg.pass }),
+          }, dest)
+        } catch (err) {
+          if ((err as { code?: unknown })?.code === 'timeout') throw new Error(await tr('sync.err.timeout'))
+          throw err
+        }
+        if (res.status === 404) return null
+        if (res.status >= 400) await fail(res.status)
+        return { sha256: res.sha256, size: res.size }
+      },
+    } : {}),
   }
 }

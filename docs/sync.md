@@ -119,6 +119,17 @@ InfiniCLOUD 每个账号的 WebDAV 节点不同（`https://<节点>.teracloud.jp
 - 书整本删了、书单整个删了时，其标注 / 条目不单独生成墓碑，由书或书单的墓碑级联。这样不会把「因书单已删而从未落地」的条目误判为删除；书或书单日后被恢复（重新导入、并发改名胜出）时，里面的内容也一起回来。
 - 书单、书源：基线里有、本地没有 → 墓碑。
 
+### 私密书（不同步）
+
+书目上的 `noSync`（藏书「管理」里的「设为私密 / 取消私密」，书卡格式角标带锁）表示这本书只留在本机：
+
+- 扫描时不进 `LocalState`，也不算 hash（只用缓存里已有的）；同内容的书只要有一本私密，这份内容整体按私密处理。
+- 不算「上次在本地」：基线的 `presentHashes` 去掉私密书再交给 `buildLocalDoc`，所以设为私密、在本机删掉私密书都**不会**生成墓碑，其他设备上的这本书不受影响。
+- 落地前过滤掉涉及私密 hash 的操作（`addBook / deleteBook / updateBook / addAnnotation / addBooklistItem / removeBooklistItem`）：别的设备的进度、标注、删除都不落到私密书上，也不会把它当成缺失的书再下载一份。
+- 不上传文件；本机在私密书上新读的每日阅读时长不发出（文档里只保留基线已有的值），落地时仍按完整的本地记录比较，不会重复补记。
+- 取消私密后按「新落地的书」处理：元数据沿用已同步的寄存器，进度按 `lastReadAt` 比较，期间新加的标注照常同步出去。
+- 已知限制：从未同步、也从未算过 hash 的私密书，若别的设备有同内容的书，会被当成另一本下载下来。
+
 ## 落地到本地（`planApply`）
 
 操作按可执行顺序排列：`addBook → updateBook → addBooklist/renameBooklist → addAnnotation/updateAnnotation → addBooklistItem/putWanted → addSource/updateSource →` 各类删除（`removeBooklistItem, deleteWanted, deleteAnnotation, deleteBooklist, deleteSource, deleteBook`）。待找条目新增或内容变了都产出 `putWanted`（同 id 覆盖），要求所属书单在合并结果里存活；书单删除时由 `deleteBooklist` 级联。
@@ -151,7 +162,7 @@ SyncDoc 增加可选字段 `readingLog: { [device]: { [day]: { [hash]: 秒 } } }
 
 ## 一次同步的流程（engine）
 
-1. 读本地库，得到 `LocalState`（按 hash 键，书的 hash 有缓存，只对新书计算）。
+1. 读本地库，得到 `LocalState`（按 hash 键，书的 hash 有缓存，只对新书计算）。计算不把整本书读进内存：桌面 / 安卓走原生命令 `library_file_sha256` 流式读盘，网页超过 16 MB 的书按 4 MB 分块用增量 SHA-256 计算（`services/sync/hash.ts`）。此前几十 MB 的书会在这一步把安卓 WebView 撑爆（卡死、闪退），且 hash 算不出就不缓存，每次同步都会再崩一次。
 2. 远端：列出并读取所有 `devices/*.json`，合并得到 `remoteMerged`。
 3. `buildLocalDoc(local, base, presentHashes, remoteMerged)`：给本地改动打 stamp、生成墓碑、更新自己的计时贡献；本地每日阅读记录聚合后并入 `readingLog`；本机设置（按修改时间）与基线里的设置并入 `settings`；再与远端文档一起 `mergeDocs`。
 4. `planApply(merged, local)` 得到操作列表并应用到本地库：新书要先下载文件（远端有文件时才加入本地，否则保持「仅元数据」状态，等以后导入同一文件时自动匹配）。随后把 `merged.readingLog` 多出的差额落到本地阅读记录。开启「同步设置」时再落地比本机修改时间新的设置。
@@ -168,7 +179,8 @@ SyncDoc 增加可选字段 `readingLog: { [device]: { [day]: { [hash]: 秒 } } }
   - 书籍文件只传书库里的相对路径（`LibraryStorage.getBookFileRef`，`books/<id>.<扩展名>`，根目录为自定义书库或应用数据目录），由 Rust 直接读盘上传，书的内容不经过 WebView。Rust 侧只允许 `books/`、`covers/` 下的文件，自定义根目录必须含 `lightread.db`。读盘失败时退回读进 JS 再上传。
   - 其他请求体走 Tauri 2 的原始二进制 IPC（Android 上 Tauri 只有 postMessage 通道，仍是数字数组，但封面和同步文档都不大）。
   - 连接超时 30 秒，整体超时同上；代理沿用设置页的「HTTP 代理」（http / https / socks5）。
-  - 其余请求（PROPFIND、GET、MKCOL）要读完整响应，仍走 plugin-http。
+  - 其余请求（PROPFIND、读同步文档、MKCOL）要读完整响应，仍走 plugin-http。
+- 桌面 / 安卓下载书籍文件走原生命令 `library_file_download`（`src-tauri/src/library_files.rs`，`SyncRemote.downloadFileTo`）：流式写到书库里的暂存文件 `books/sync-<hash>.part`，边下边算 SHA-256；与 hash 一致才 `library_file_rename` 成正式文件并插入书目（`addBookFromStaged`），否则删除暂存文件、书保持「仅元数据」。连续 60 秒收不到数据视为卡住。网页版下载后按块校验。
 
 ## 后端接口
 

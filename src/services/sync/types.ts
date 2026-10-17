@@ -190,6 +190,11 @@ export interface SyncRemote {
   putFile(name: string, data: Blob | LocalFileRef): Promise<void>
   /** 不存在返回 null */
   getFile(name: string): Promise<Blob | null>
+  /**
+   * 直接下载到书库里的暂存文件 (内容不进 JS), 返回 SHA-256 与字节数; 不存在返回 null.
+   * 只有能写本地文件的后端 (桌面 / 安卓的 WebDAV) 提供.
+   */
+  downloadFileTo?(name: string, dest: LocalFileRef): Promise<{ sha256: string; size: number } | null>
 }
 
 /** 本机一项设置的修改时间; d 为空表示本机改的 (写文档时换成本机 deviceId), 否则为同步来源设备 */

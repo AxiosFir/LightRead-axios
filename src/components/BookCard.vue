@@ -44,6 +44,7 @@ const progress = computed(() => {
 const tooltip = computed(() => {
   const parts = [props.book.title]
   if (props.book.author) parts.push(props.book.author)
+  if (props.book.noSync) parts.push(t('library.privateBadge'))
   if (props.book.readingSeconds && props.book.readingSeconds >= 60) {
     parts.push(t('book.readTime', { time: formatReadingTime(props.book.readingSeconds) }))
   }
@@ -54,6 +55,7 @@ const ariaLabel = computed(() => {
   const parts = [props.book.title]
   if (props.book.author) parts.push(props.book.author)
   if (progress.value != null) parts.push(`${progress.value}%`)
+  if (props.book.noSync) parts.push(t('library.privateBadge'))
   return parts.join(', ')
 })
 
@@ -145,7 +147,7 @@ function onKeydown(e: KeyboardEvent) {
         <span class="cover-fallback-title"><template v-for="(part, i) in coverTitleParts" :key="i">{{ part }}<wbr /></template></span>
         <span v-if="book.author" class="cover-fallback-author">{{ book.author }}</span>
       </div>
-      <span class="format" aria-hidden="true">{{ formatLabelOf(book) }}</span>
+      <span class="format" aria-hidden="true">{{ formatLabelOf(book) }}<svg v-if="book.noSync" class="private-mark" viewBox="0 0 24 24" width="11" height="11"><path fill="currentColor" d="M12 2a5 5 0 0 1 5 5v3h1a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h1V7a5 5 0 0 1 5-5zm0 2a3 3 0 0 0-3 3v3h6V7a3 3 0 0 0-3-3z"/></svg></span>
       <span v-if="progress != null" class="progress" aria-hidden="true">{{ progress }}%</span>
       <span v-if="progress != null" class="progress-track" aria-hidden="true">
         <span class="progress-fill" :style="{ width: `${progress}%` }" />
@@ -339,6 +341,10 @@ function onKeydown(e: KeyboardEvent) {
 }
 .select-mark.on {
   background: var(--brand);
+}
+.private-mark {
+  margin-left: 4px;
+  vertical-align: -1px;
 }
 .format {
   position: absolute;

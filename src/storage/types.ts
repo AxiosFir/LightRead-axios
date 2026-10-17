@@ -28,6 +28,8 @@ export interface BookMeta {
   pinnedAt?: number
   /** 归属: 藏书 (缺省) / 论文 */
   kind?: 'book' | 'paper'
+  /** 私密: 只留在本机, 不参与多端同步 (书、进度、标注、书单归属、阅读记录都不发出, 别的设备的改动也不落地) */
+  noSync?: boolean
 }
 
 export type NewBookMeta = Omit<BookMeta, 'id' | 'hasCover'>
@@ -122,6 +124,15 @@ export interface LibraryStorage {
   getBookFile(id: string): Promise<Blob>
   /** 书籍文件的本地路径引用 (仅文件系统后端); 不支持时为 undefined */
   getBookFileRef?(id: string): Promise<LocalFileRef | undefined>
+  /** 书籍文件的 SHA-256 (同步指纹). 桌面 / 安卓由原生层读盘计算, 书的内容不进 JS; 缺省时由同步层分块计算 */
+  hashBookFile?(id: string): Promise<string>
+  /**
+   * 同步下载的暂存文件 (书库 books/ 下, 名字由 tag 决定). 与 SyncRemote.downloadFileTo 配合:
+   * 书由原生层直接下载到这里, 校验通过后 addBookFromStaged 收为新书, 否则 discardStaged.
+   */
+  stageBookFile?(tag: string): Promise<LocalFileRef>
+  addBookFromStaged?(meta: NewBookMeta, staged: LocalFileRef, cover?: Blob): Promise<string>
+  discardStaged?(staged: LocalFileRef): Promise<void>
   /** 返回可直接用于 <img src> 的 URL (Object URL), 由调用方缓存, 无封面返回 undefined */
   getCoverUrl(id: string): Promise<string | undefined>
 

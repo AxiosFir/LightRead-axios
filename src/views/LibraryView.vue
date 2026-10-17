@@ -465,6 +465,18 @@ async function batchPin(pin: boolean) {
   toast(pin ? t('library.pinned') : t('library.unpinned'), 'success')
 }
 
+/** 私密: 只留在本机, 不参与多端同步 (见 services/sync/engine.ts) */
+async function batchPrivate(on: boolean) {
+  const storage = await (await import('../storage')).getStorage()
+  for (const id of selectedIds.value) {
+    const book = library.books.find(b => b.id === id)
+    if (!book) continue
+    await storage.updateBook(id, { noSync: on })
+    book.noSync = on || undefined
+  }
+  toast(on ? t('library.privateOn') : t('library.privateOff'), 'success')
+}
+
 // ---- 书单 ----
 function booklistCount(id: string) {
   const ids = new Set(library.booklistBookIds[id] ?? [])
@@ -933,6 +945,8 @@ async function batchClearTags() {
       >{{ t('library.removeFromBooklist') }}</button>
       <button class="btn btn-sm" :disabled="!selectedIds.size" @click="batchPin(true)">{{ t('library.pin') }}</button>
       <button class="btn btn-sm" :disabled="!selectedIds.size" @click="batchPin(false)">{{ t('library.unpin') }}</button>
+      <button class="btn btn-sm" :disabled="!selectedIds.size" @click="batchPrivate(true)">{{ t('library.setPrivate') }}</button>
+      <button class="btn btn-sm" :disabled="!selectedIds.size" @click="batchPrivate(false)">{{ t('library.unsetPrivate') }}</button>
       <button class="btn btn-sm" :disabled="!selectedIds.size" @click="showTagModal = true">{{ t('library.setTags') }}</button>
       <button class="btn btn-sm btn-danger" :disabled="!selectedIds.size" @click="batchDelete">{{ t('common.delete') }}</button>
       <button class="btn btn-sm" @click="toggleManage">{{ t('common.done') }}</button>

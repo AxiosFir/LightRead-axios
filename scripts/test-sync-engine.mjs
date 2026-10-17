@@ -4,6 +4,7 @@ import { test } from 'node:test'
 import { runSync, sha256Hex } from '../src/services/sync/engine.ts'
 import { createWebdavRemote, parsePropfindNames } from '../src/services/sync/webdavRemote.ts'
 import { createMemorySyncStore } from '../src/services/sync/baseline.ts'
+import { rowKey } from '../src/services/readingLog.ts'
 import { createFakeDav, createFakeStorage, enc, tr } from './sync-test-fakes.mjs'
 
 // ---- 场景工具 ----
@@ -26,6 +27,7 @@ const sync = (dev, dav, opts = {}) => runSync({
   app: 'test',
   t: tr,
   onProgress: opts.onProgress,
+  readingLog: opts.readingLog,
 })
 
 const BOOK_BYTES = enc('%EPUB fake book content for sync tests')
@@ -44,6 +46,28 @@ const onlyBook = async dev => {
   assert.equal(list.length, 1)
   return list[0]
 }
+
+test('已知私密内容的未缓存副本: 首次计算指纹后也不上传书目、文件或阅读记录', async () => {
+  const dav = createFakeDav()
+  const A = await device('private-duplicate')
+  const hash = await sha256Hex(BOOK_BYTES)
+  const secret = await importBook(A, { noSync: true })
+  await A.store.setHash(secret, hash)
+  const duplicate = await importBook(A)
+  const day = '2026-10-16'
+  const row = {
+    key: rowKey('dev-private-duplicate', day, `id:${duplicate}`),
+    device: 'dev-private-duplicate', day, bookId: duplicate,
+    title: '三体', kind: 'book', seconds: 120, updatedAt: clock,
+  }
+  const readingLog = { list: async () => [row], addSynced: async () => {} }
+  tick(); const result = await sync(A, dav, { readingLog })
+  assert.equal((await A.store.getHashes()).get(duplicate), hash)
+  assert.equal(result.uploadedFiles, 0)
+  const doc = dav.readJson('devices/dev-private-duplicate.json')
+  assert.equal(doc.books[hash], undefined)
+  assert.deepEqual(doc.readingLog ?? {}, {})
+})
 
 // ---- 场景 ----
 
@@ -453,4 +477,71 @@ test('书单的待找条目: A → B 沿用 id; B 删除后回到 A; 删除书�
   tick(); await sync(B, dav)
   assert.deepEqual(await B.storage.listBooklists(), [])
   assert.deepEqual(await B.storage.listBooklistWanted(), [])
+})
+
+test('私密书: 不上传、不发出改动、不落地别人的改动; 设为私密不会删掉其他设备上的书', async () => {
+  const dav = createFakeDav()
+  const A = await device('A')
+  const B = await device('B')
+  const hash = await sha256Hex(BOOK_BYTES)
+
+  // 从未同步过就设为私密: 不上传, B 看不到
+  const secret = await A.storage.addBook({
+    title: '日记', author: '', format: 'txt', fileName: 'diary.txt', tags: [], addedAt: clock, noSync: true,
+  }, new Blob([enc('dear diary')]))
+  const bookA = await importBook(A)
+  tick(); await sync(A, dav)
+  tick(); await sync(B, dav)
+  assert.deepEqual((await B.storage.listBooks()).map(b => b.title), ['三体'])
+  assert.equal([...dav.files.keys()].filter(k => k.includes('/files/') && !k.endsWith('.cover')).length, 1)
+  assert.ok(await A.storage.getBook(secret))
+
+  // A 把已同步的书设为私密, 之后读书、划线; B 也读了
+  await A.storage.updateBook(bookA, { noSync: true })
+  tick(); await sync(A, dav)
+  tick(60_000)
+  await A.storage.updateBook(bookA, { location: 'cfi-private', progress: 0.9, lastReadAt: clock, readingSeconds: 600 })
+  await A.storage.addAnnotation({ bookId: bookA, kind: 'highlight', cfi: 'epubcfi(/6/8)', text: '私密划线', color: 'yellow', createdAt: clock })
+  const bookB = (await onlyBook(B)).id
+  await B.storage.updateBook(bookB, { location: 'cfi-b', progress: 0.3, lastReadAt: clock + 1 })
+  tick(); await sync(A, dav)
+  tick(); await sync(B, dav)
+  tick(); await sync(A, dav)
+  const b = await onlyBook(B)
+  assert.equal(b.location, 'cfi-b', 'A 的私密进度不外发')
+  assert.deepEqual(await B.storage.listAnnotations(b.id), [])
+  const a = await A.storage.getBook(bookA)
+  assert.equal(a.location, 'cfi-private', 'B 的进度不落到私密书上')
+  assert.equal((await A.storage.listAnnotations(bookA)).length, 1)
+
+  // A 删掉私密书: B 上的不受影响; A 也不会因「本地没有」再把它下载回来
+  await A.storage.deleteBook(bookA)
+  tick(); await sync(A, dav)
+  tick(); await sync(B, dav)
+  assert.equal((await B.storage.listBooks()).length, 1)
+  assert.equal(dav.readJson('devices/dev-A.json').books[hash].alive.value, true)
+})
+
+test('私密书取消私密后: 期间的进度与标注照常同步出去', async () => {
+  const dav = createFakeDav()
+  const A = await device('A')
+  const B = await device('B')
+  const bookA = await importBook(A)
+  tick(); await sync(A, dav)
+  tick(); await sync(B, dav)
+
+  await A.storage.updateBook(bookA, { noSync: true })
+  tick(); await sync(A, dav)
+  tick(60_000)
+  await A.storage.updateBook(bookA, { location: 'cfi-later', progress: 0.7, lastReadAt: clock })
+  const annId = await A.storage.addAnnotation({ bookId: bookA, kind: 'highlight', cfi: 'epubcfi(/6/4)', text: '后来的划线', color: 'blue', createdAt: clock })
+  tick(); await sync(A, dav)
+
+  await A.storage.updateBook(bookA, { noSync: false })
+  tick(); await sync(A, dav)
+  tick(); await sync(B, dav)
+  const b = await onlyBook(B)
+  assert.equal(b.location, 'cfi-later')
+  assert.deepEqual((await B.storage.listAnnotations(b.id)).map(x => x.id), [annId])
+  assert.equal((await A.storage.listBooks()).length, 1, '不会重复下载')
 })

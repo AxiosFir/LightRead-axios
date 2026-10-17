@@ -35,10 +35,10 @@ pub struct UploadResult {
 }
 
 #[derive(Debug, Deserialize)]
-struct FileRef {
+pub(crate) struct FileRef {
   #[serde(default)]
-  root: String,
-  rel: String,
+  pub(crate) root: String,
+  pub(crate) rel: String,
 }
 
 #[derive(Debug, Clone)]
@@ -120,7 +120,7 @@ fn safe_rel(rel: &str) -> Option<PathBuf> {
 
 /// 书库文件的绝对路径. 自定义根目录必须是绝对路径且是轻阅书库 (含 lightread.db),
 /// 避免这个命令被当成任意文件读取 + 外发的通道.
-fn resolve_library_file(app_data: Option<PathBuf>, file: &FileRef) -> Result<PathBuf, String> {
+pub(crate) fn resolve_library_file(app_data: Option<PathBuf>, file: &FileRef) -> Result<PathBuf, String> {
   let rel = safe_rel(&file.rel).ok_or_else(|| format!("file: 不允许的路径 {}", file.rel))?;
   let root = file.root.trim_end_matches(['/', '\\']);
   let base = if root.is_empty() {
@@ -135,7 +135,7 @@ fn resolve_library_file(app_data: Option<PathBuf>, file: &FileRef) -> Result<Pat
   Ok(base.join(rel))
 }
 
-fn build_client(spec: &UploadSpec, timeout: Duration) -> Result<reqwest::Client, String> {
+pub(crate) fn build_client(spec: &UploadSpec, timeout: Duration) -> Result<reqwest::Client, String> {
   let mut builder = reqwest::Client::builder()
     .connect_timeout(CONNECT_TIMEOUT)
     .timeout(timeout);
@@ -169,7 +169,7 @@ pub async fn send(spec: UploadSpec, body: Vec<u8>, timeout: Duration) -> Result<
   Ok(UploadResult { status, body })
 }
 
-fn map_err(e: reqwest::Error) -> String {
+pub(crate) fn map_err(e: reqwest::Error) -> String {
   if e.is_timeout() {
     format!("timeout: {e}")
   } else {

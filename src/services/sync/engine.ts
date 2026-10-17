@@ -9,6 +9,7 @@ import {
   sourceFrom, sourceKey, wantedFrom,
 } from './merge.ts'
 import { buildSettingsRegs, planSettingsApply } from './settingsSync.ts'
+import { sha256Blob } from './hash.ts'
 import {
   aggregateReadingLog, planReadingLogLanding, type ReadingLogRow, type ReadingLogSyncPort,
 } from '../readingLog.ts'
@@ -40,11 +41,7 @@ export interface SyncDeps {
   settings?: SettingsSyncPort
 }
 
-export async function sha256Hex(data: ArrayBuffer | Uint8Array): Promise<string> {
-  const bytes = data instanceof Uint8Array ? data : new Uint8Array(data)
-  const digest = await crypto.subtle.digest('SHA-256', new Uint8Array(bytes))
-  return Array.from(new Uint8Array(digest), b => b.toString(16).padStart(2, '0')).join('')
-}
+export { sha256Hex } from './hash.ts'
 
 /** 本地库快照 + 反查表 */
 interface LocalScan {
@@ -57,6 +54,10 @@ interface LocalScan {
   sourceIdsByKey: Map<string, string[]>
   /** 所有书源的 sourceKey (含内置: 与内置书源同地址的自定义书源不会落地) */
   allSourceKeys: Set<string>
+  /** 私密书 (noSync) 的 hash (已知的): 不在 state 里, 远端针对它们的改动也不落地 */
+  privateHashes: Set<string>
+  /** 私密书的本地 id */
+  privateIds: Set<string>
 }
 
 async function scanLocal(
@@ -65,8 +66,16 @@ async function scanLocal(
   progress: (msg: string) => void,
   tr: TranslateFn,
 ): Promise<LocalScan> {
-  const books = await storage.listBooks()
+  const all = await storage.listBooks()
   const cache = await store.getHashes()
+  // 私密书不参与同步: 不算指纹 (只用缓存里已有的), 同内容的书只要有一本私密, 这份内容整体按私密处理
+  const privateIds = new Set(all.filter(b => b.noSync).map(b => b.id))
+  const privateHashes = new Set<string>()
+  for (const id of privateIds) {
+    const h = cache.get(id)
+    if (h) privateHashes.add(h)
+  }
+  const books = all.filter(b => !privateIds.has(b.id) && !privateHashes.has(cache.get(b.id) ?? ''))
   const hashById = new Map<string, string>()
   const missing = books.filter(b => !cache.has(b.id))
   for (const b of books) {
@@ -77,8 +86,10 @@ async function scanLocal(
   for (const b of missing) {
     progress(tr('sync.phase.hash', { done, total: missing.length }))
     try {
-      const file = await storage.getBookFile(b.id)
-      const hash = await sha256Hex(await file.arrayBuffer())
+      // 不把整本书读进内存: 桌面 / 安卓原生读盘算, 网页按块算 (几十 MB 的书曾在这里卡死、闪退)
+      const hash = storage.hashBookFile
+        ? await storage.hashBookFile(b.id)
+        : await sha256Blob(await storage.getBookFile(b.id))
       hashById.set(b.id, hash)
       await store.setHash(b.id, hash)
     } catch (err) {
@@ -92,7 +103,7 @@ async function scanLocal(
   const byHash = new Map<string, BookMeta[]>()
   for (const b of books) {
     const h = hashById.get(b.id)
-    if (!h) continue
+    if (!h || privateHashes.has(h)) continue
     const list = byHash.get(h) ?? []
     list.push(b)
     byHash.set(h, list)
@@ -165,7 +176,20 @@ async function scanLocal(
     if (Number.isFinite(t)) state.sourceTimes![key] = t
   }
 
-  return { state, idsByHash, booklistIds, sourceIdsByKey, allSourceKeys }
+  return { state, idsByHash, booklistIds, sourceIdsByKey, allSourceKeys, privateHashes, privateIds }
+}
+
+/** 操作涉及的书 (hash); 与书无关的操作返回 undefined */
+function opHash(op: ApplyOp): string | undefined {
+  switch (op.op) {
+    case 'addBook': case 'deleteBook': case 'updateBook':
+    case 'addBooklistItem': case 'removeBooklistItem':
+      return op.hash
+    case 'addAnnotation':
+      return op.value.bookHash
+    default:
+      return undefined
+  }
 }
 
 function newBookMeta(meta: BookMetaVal, progress: ProgressVal, readingSeconds: number): NewBookMeta {
@@ -228,10 +252,12 @@ export async function runSync(deps: SyncDeps): Promise<SyncResult> {
   const stampNow = now()
   const ctx = { deviceId, now: stampNow }
   const remoteMerged = remoteDocs.length ? mergeDocs(remoteDocs, ctx) : null
+  // 私密书不算「上次在本地」: 本地快照里没有它们, 否则会被当成删除, 连带删掉其他设备上的这本书
+  const presentBefore = new Set((baseline?.presentHashes ?? []).filter(h => !scan.privateHashes.has(h)))
   const localDoc = buildLocalDoc(
     local,
     baseline?.doc ?? null,
-    new Set(baseline?.presentHashes ?? []),
+    presentBefore,
     remoteMerged,
     { deviceId, now: stampNow, deviceName: deps.deviceName, app: deps.app },
   )
@@ -239,7 +265,11 @@ export async function runSync(deps: SyncDeps): Promise<SyncResult> {
   const hashById = deps.readingLog ? await store.getHashes() : new Map<string, string>()
   const logRows: ReadingLogRow[] = deps.readingLog ? await deps.readingLog.list() : []
   const localLog = aggregateReadingLog(logRows, hashById)
-  const ownLog = mergeReadingLog(baseline?.doc.readingLog, localLog)
+  // 私密书在本机新读的时长不发出 (文档里只保留基线已有的值); 落地时仍按完整的本地记录比较, 不会重复补记
+  const publicHashById = new Map([...hashById].filter(([id, hash]) =>
+    !scan.privateIds.has(id) && !scan.privateHashes.has(hash)))
+  const ownLog = mergeReadingLog(baseline?.doc.readingLog, aggregateReadingLog(
+    logRows.filter(r => !(r.hash && scan.privateHashes.has(r.hash))), publicHashById))
   if (ownLog) localDoc.readingLog = ownLog
   // 设置: 本机各项 (按修改时间打 stamp) 与基线里已知的设置一起并入本机文档
   const localSettings = deps.settings ? await deps.settings.read() : null
@@ -252,12 +282,53 @@ export async function runSync(deps: SyncDeps): Promise<SyncResult> {
 
   // 4. 落地
   progress(tr('sync.phase.apply'))
-  const ops = planApply(merged, local)
+  // 别的设备对私密书的改动 (含删除、新标注、书单归属) 不落地, 也不把它当成缺失的书去下载
+  const ops = planApply(merged, local).filter(op => !scan.privateHashes.has(opHash(op) ?? ''))
   const present = new Set(scan.idsByHash.keys())
   let applied = 0
   let downloadedBooks = 0
   let pendingBooks = 0
   const idOf = (hash: string) => scan.idsByHash.get(hash)?.[0]
+
+  /**
+   * 下载并校验一本书, 收进本地库, 返回本地 id; 下载 / 校验失败返回 null (保持「仅元数据」, 下次再试),
+   * 写本地库失败则抛错 (整次同步失败). 能直接写盘的后端 + 存储 (桌面 / 安卓) 书的内容不进 JS.
+   */
+  async function downloadBook(op: Extract<ApplyOp, { op: 'addBook' }>): Promise<string | null> {
+    const coverName = `${op.hash}.cover`
+    const getCover = async () => remoteFiles.has(coverName)
+      ? (await remote.getFile(coverName).catch(() => null)) ?? undefined
+      : undefined
+    const meta = newBookMeta(op.meta, op.progress, op.readingSeconds)
+    if (remote.downloadFileTo && storage.stageBookFile && storage.addBookFromStaged) {
+      const staged = await storage.stageBookFile(op.hash)
+      let ok = false
+      let cover: Blob | undefined
+      try {
+        const res = await remote.downloadFileTo(op.hash, staged)
+        ok = res?.sha256 === op.hash
+        if (ok) cover = await getCover()
+      } catch (err) {
+        console.warn('[sync] download failed', op.hash, err)
+      }
+      if (!ok) {
+        await storage.discardStaged?.(staged).catch(() => { /* 残留的暂存文件下次覆盖 */ })
+        return null
+      }
+      return storage.addBookFromStaged(meta, staged, cover)
+    }
+    let file: Blob | null
+    let cover: Blob | undefined
+    try {
+      file = await remote.getFile(op.hash)
+      cover = await getCover()
+    } catch (err) {
+      console.warn('[sync] download failed', op.hash, err)
+      file = null
+    }
+    if (!file || await sha256Blob(file) !== op.hash) return null
+    return storage.addBook(meta, file, cover)
+  }
 
   async function applyOp(op: ApplyOp): Promise<boolean> {
     switch (op.op) {
@@ -268,25 +339,11 @@ export async function runSync(deps: SyncDeps): Promise<SyncResult> {
           return false
         }
         progress(tr('sync.phase.download', { title: op.meta.title }))
-        let file: Blob | null
-        let cover: Blob | undefined
-        try {
-          file = await remote.getFile(op.hash)
-          const coverName = `${op.hash}.cover`
-          if (remoteFiles.has(coverName)) {
-            cover = (await remote.getFile(coverName).catch(() => null)) ?? undefined
-          }
-        } catch (err) {
-          // 下载失败只让这本书保持「仅元数据」, 下次再试; 写本地库失败则整次同步失败
-          console.warn('[sync] download failed', op.hash, err)
-          file = null
-        }
-        if (!file || await sha256Hex(await file.arrayBuffer()) !== op.hash) {
+        const id = await downloadBook(op)
+        if (!id) {
           pendingBooks++
           return false
         }
-        const id = await storage.addBook(
-          newBookMeta(op.meta, op.progress, op.readingSeconds), file, cover)
         await store.setHash(id, op.hash)
         scan.idsByHash.set(op.hash, [id])
         present.add(op.hash)

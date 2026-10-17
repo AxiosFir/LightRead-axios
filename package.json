@@ -1,7 +1,7 @@
 {
   "name": "lightread",
   "private": true,
-  "version": "1.17.0",
+  "version": "1.18.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -25,6 +25,7 @@
     "test:sync-engine": "node --experimental-strip-types --test scripts/test-sync-engine.mjs",
     "test:sync-settings": "node --experimental-strip-types --test scripts/test-sync-settings.mjs",
     "test:sync-account": "node --experimental-strip-types --test scripts/test-sync-account.mjs",
+    "test:sync-large-files": "node --experimental-strip-types --test scripts/test-sync-large-files.mjs",
     "test:reading-log": "node --experimental-strip-types --test scripts/test-reading-log.mjs",
     "test:paper-context": "node --experimental-strip-types --test scripts/test-paper-translation-context.mjs",
     "test:paper-agent": "node --experimental-strip-types --test scripts/test-paper-agent-context.mjs scripts/test-paper-agent-ten-questions.mjs",

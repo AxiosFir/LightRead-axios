@@ -2040,6 +2040,18 @@ function onSectionLoad(e: CustomEvent) {
   }
   doc.addEventListener('mouseup', () => setTimeout(updateSelection, 0))
   doc.addEventListener('touchend', () => setTimeout(updateSelection, 0))
+  // 安卓浏览器 (vivo 自带浏览器、华为平板等) 长按选字会取消这次触摸 (touchcancel, 没有 touchend),
+  // 拖选区两端的把手也不发触摸事件: 只等 touchend 就永远看不到选区, 划线工具条不出来, 只剩浏览器
+  // 自己的复制菜单. 选区稳定一会儿后也读一次; 这里只负责「出现」, 收起仍交给 touchend / mouseup
+  // (点工具条按钮时浏览器可能先把正文选区清掉, 不能因此收起工具条)
+  let selectionTimer: ReturnType<typeof setTimeout> | undefined
+  doc.addEventListener('selectionchange', () => {
+    clearTimeout(selectionTimer)
+    selectionTimer = setTimeout(() => {
+      const sel = doc.getSelection()
+      if (sel && !sel.isCollapsed && sel.toString().trim()) updateSelection()
+    }, 300)
+  })
   // 点击正文时收起目录等侧栏和浮层; 若这一下是为了收面板, 不再触发翻页
   doc.addEventListener('mousedown', () => {
     overlayDismissed = panel.value !== 'none' || settingsOpen.value || !!activeAnnotation.value
