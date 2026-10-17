@@ -9,6 +9,7 @@ import { useSettings } from '../stores/settings'
 import { useLibrary } from '../stores/library'
 import { isTextLike } from '../services/format'
 import { convertToEpub, TEXT_EPUB_LAYOUT } from '../services/textToEpub'
+import { tapZone } from '../services/readerTapZone'
 import { getReaderCSS, resolveReaderColors, resolveReaderTheme, HIGHLIGHT_COLORS, listenMarkStyle, type ListenMarkStyle } from '../services/readerTheme'
 import { resolvedTheme } from '../services/appearance'
 import { setPageBarsDark, setSystemBarsHidden, setKeepScreenOn } from '../services/systemBars'
@@ -2221,7 +2222,7 @@ function onMarginTouchMove(e: TouchEvent) {
   crossSectionBySwipe(marginTouch, dx, dy, null)
 }
 
-// 点正文左/右侧翻页
+// 点正文翻页 (横屏左/右, 竖屏上/下)
 let overlayDismissed = false
 
 function onContentClick(clientX: number, doc: Document, target?: Element | null, clientY = 0) {
@@ -2231,7 +2232,7 @@ function onContentClick(clientX: number, doc: Document, target?: Element | null,
   }
   // 开书未就绪时点击会被 view.init 的落点覆盖, 表现为翻过去又弹回
   if (loading.value) return
-  // 正在选字或点了链接时不翻页 (滚动模式下左右区同样生效: 按一屏平滑滚动)
+  // 正在选字或点了链接时不翻页 (滚动模式下翻页区同样生效: 按一屏平滑滚动)
   if (selection.value) return
   const sel = doc.getSelection()
   if (sel && !sel.isCollapsed) return
@@ -2250,10 +2251,16 @@ function onContentClick(clientX: number, doc: Document, target?: Element | null,
   const frameRect = doc.defaultView?.frameElement?.getBoundingClientRect()
   const contentRect = container.value?.getBoundingClientRect()
   if (!frameRect || !contentRect) return
-  const x = frameRect.left + clientX - contentRect.left
-  // 自动翻页 / 滚动中: 轻点暂停并呼出工具栏, 再点继续 (滚动时整屏都可点; 翻页时左右两侧仍可手动翻)
-  const middle = x >= contentRect.width / 3 && x <= contentRect.width * 2 / 3
-  if (autoReading.value && (middle || effectiveFlow.value === 'scrolled')) {
+  handleTapZone(frameRect.left + clientX - contentRect.left, frameRect.top + clientY - contentRect.top, contentRect)
+}
+
+/**
+ * 轻点分区 (见 services/readerTapZone): 横屏左·中·右, 竖屏上·中·下;
+ * 自动翻页 / 滚动开着时不设翻页区, 整屏轻点只暂停 (并呼出工具栏) / 继续
+ */
+function handleTapZone(x: number, y: number, rect: DOMRect) {
+  const zone = tapZone({ x, y, width: rect.width, height: rect.height, portrait: portraitView.value, autoReading: autoReading.value })
+  if (autoReading.value) {
     if (autoPaused.value) {
       resumeAutoRead()
       hideBars()
@@ -2263,15 +2270,15 @@ function onContentClick(clientX: number, doc: Document, target?: Element | null,
     }
     return
   }
-  if (x < contentRect.width / 3) turnPage('left')
-  else if (x > contentRect.width * 2 / 3) turnPage('right')
-  // 中间 1/3: 呼出 / 隐藏工具栏 (沉浸式)
+  if (zone === 'prev') turnPage('left')
+  else if (zone === 'next') turnPage('right')
+  // 中间: 呼出 / 隐藏工具栏 (沉浸式)
   else barsVisible.value ? hideBars() : showBars()
 }
 
 /**
  * 页眉页脚 (章节名 / 进度那条带) 在正文 iframe 之外, 点这里的事件落在 foliate-view 上,
- * 原本什么也不发生; 手机上拇指常点到页面最下沿, 按同样的左/中/右分区处理
+ * 原本什么也不发生; 手机上拇指常点到页面最下沿, 按与正文相同的分区处理
  */
 function onMarginClick(e: MouseEvent) {
   if (e.target !== view || loading.value) return
@@ -2283,10 +2290,7 @@ function onMarginClick(e: MouseEvent) {
   }
   const rect = container.value?.getBoundingClientRect()
   if (!rect) return
-  const x = e.clientX - rect.left
-  if (x < rect.width / 3) turnPage('left')
-  else if (x > rect.width * 2 / 3) turnPage('right')
-  else barsVisible.value ? hideBars() : showBars()
+  handleTapZone(e.clientX - rect.left, e.clientY - rect.top, rect)
 }
 
 function drawStoredAnnotations() {
@@ -2882,7 +2886,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="reader" :class="[{ 'bars-on': barsVisible, 'portrait-scroll': portraitView && effectiveFlow === 'scrolled' }, modes.shellClass.value]" :style="{ background: themeColors.bg, color: themeColors.fg }">
+  <div class="reader" :class="[{ 'bars-on': barsVisible, 'no-side-nav': portraitView || autoReading }, modes.shellClass.value]" :style="{ background: themeColors.bg, color: themeColors.fg }">
     <!-- 工具栏隐藏时: 鼠标移到上下边缘呼出 -->
     <div v-if="!barsVisible" class="bar-peek top" @mouseenter="showBars()" />
     <div v-if="!barsVisible" class="bar-peek bottom" @mouseenter="showBars()" />
@@ -3675,8 +3679,8 @@ onBeforeUnmount(() => {
 .nav.next {
   right: 6px;
 }
-/* 竖屏滚动: 左右留白很窄, 侧边翻页钮会压住正文边缘、抢走点按; 上下滑 / 滚轮即可, 收起 */
-.reader.portrait-scroll .nav {
+/* 竖屏: 左右留白很窄, 侧边翻页钮会压住正文边缘、抢走点按, 翻页改点上 / 下区; 自动阅读时也不设翻页区, 收起 */
+.reader.no-side-nav .nav {
   display: none;
 }
 .slider {

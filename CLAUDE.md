@@ -27,6 +27,7 @@ npm run test:reader-pages / test:listen-eta   # 重排书页码 (实测+推算/�
 npm run test:read-aloud      # 听书: 句子游标断句 + 播放管线 (分块/预取/无缝拼接/回退, 假时钟) + 音色目录
 npm run test:reading-modes   # 阅读模式: 打字机出字节奏 / 断句 / 按行分组 (纯函数)
 npm run test:reading-focus   # 阅读焦点: 舒适区 25%–65% / 焦点线 38% / 长句 / 手动滚动后暂停跟随 (听书跟随与跳转落点, 纯函数)
+npm run test:reader-tap-zone # 轻点分区: 横屏左·中·右 / 竖屏上·中·下 / 自动阅读时无翻页区 (纯函数)
 npm run test:zh-segment      # 仿生阅读中文分词: 词表切分 / 歧义不上色 / ICU 回退 / 交替规则 / 速度 (<15ms/万字)
 npm run test:key-words       # 点睛重点词: 本书新词发现 / 自信息 + 关键度 + 聚集度打分 / 密度与间隔 / AI 词定位与回退 (设计见 docs/research/entropy-keyword-highlighting.md、llm-keyword-selection.md)
 node scripts/build-zh-lexicon.mjs   # 重新生成中文词表 src/data/zh-lexicon.txt + 回退合并表 zhMergeWords.ts (下载 jieba / DeepSeek-R1 词表到 ~/.cache, 校验 SHA-256)
