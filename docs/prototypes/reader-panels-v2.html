@@ -1,0 +1,339 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>轻阅 · 排版 / 模式 面板原型 v2</title>
+<!-- 交互原型, 不进构建. 规格见 docs/reader-panels.md (v2). 令牌值取自 src/styles/main.css 浅色主题 -->
+<style>
+  :root {
+    --brand: #1664ff; --brand-light: #e8f0ff; --on-brand: #fff;
+    --bg: #f5f6f8; --card: #fff; --surface-2: #f0f2f5; --surface-3: #e6e8ec;
+    --text: #1d2129; --text-2: #4e5969; --text-3: #6b7480;
+    --border: #e5e6eb; --border-strong: #cfd3da; --success: #128a3e;
+    --radius-sm: 6px; --radius: 8px; --radius-lg: 12px; --radius-pill: 999px;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.5 system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; }
+  .page { display: flex; flex-wrap: wrap; gap: 24px; padding: 24px; align-items: flex-start; justify-content: center; }
+  .col { display: flex; flex-direction: column; gap: 8px; }
+  .caption { font-size: 12px; color: var(--text-3); }
+  .controls { width: 100%; display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; font-size: 13px; color: var(--text-2); }
+  .panel { width: 380px; background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 14px 16px; display: flex; flex-direction: column; gap: 12px; box-shadow: 0 8px 24px rgba(0,0,0,.06); }
+  .head { display: flex; justify-content: space-between; align-items: center; }
+  .head strong { font-size: 15px; }
+  .x { border: none; background: none; color: var(--text-2); width: 32px; height: 32px; border-radius: var(--radius); }
+  .group { display: flex; flex-direction: column; gap: 10px; padding-top: 12px; border-top: 1px solid var(--border); }
+  .group-title { display: flex; justify-content: space-between; align-items: baseline; margin: 0; font-size: 12px; font-weight: 600; color: var(--text-3); }
+  .group-title small { font-weight: 400; }
+  .row { display: flex; align-items: center; gap: 10px; }
+  .label { width: 64px; flex-shrink: 0; font-size: 13px; color: var(--text-2); }
+  .hint { margin: 0; font-size: 12px; color: var(--text-3); line-height: 1.6; }
+  .indent { padding-left: 74px; }
+  .seg { display: inline-flex; background: var(--surface-2); border-radius: var(--radius); padding: 3px; gap: 2px; }
+  .seg button { border: none; background: none; padding: 5px 12px; border-radius: 6px; color: var(--text-2); font: inherit; font-size: 13px; cursor: pointer; }
+  .seg button.active { background: var(--card); color: var(--brand); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+  .seg.disabled { opacity: .45; pointer-events: none; }
+  .muted-block { padding: 10px 12px; border-radius: var(--radius); background: var(--surface-2); color: var(--text-3); font-size: 12px; }
+
+  /* 翻页方式: 三张带示意图的卡片 */
+  .flow { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .flow button { border: 1px solid var(--border); background: var(--card); border-radius: var(--radius-lg); padding: 10px 4px 8px; display: flex; flex-direction: column; align-items: center; gap: 6px; cursor: pointer; color: var(--text-2); font: inherit; font-size: 13px; }
+  .flow button.active { border-color: var(--brand); background: var(--brand-light); color: var(--brand); font-weight: 600; }
+  .flow svg { display: block; }
+
+  .switch-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; min-height: 40px; font-size: 13px; }
+  .switch-row .sub { display: block; font-size: 12px; color: var(--text-3); }
+  .sw { width: 38px; height: 22px; border-radius: 999px; background: var(--border-strong); position: relative; border: none; flex-shrink: 0; cursor: pointer; }
+  .sw::after { content: ''; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: transform .15s; }
+  .sw.on { background: var(--brand); }
+  .sw.on::after { transform: translateX(16px); }
+
+  /* 场景 */
+  .cards { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+  .card { border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--card); padding: 10px 2px 8px; text-align: center; font-size: 13px; font-weight: 600; color: var(--text-2); cursor: pointer; }
+  .card small { display: block; font-weight: 400; font-size: 11px; color: var(--text-3); }
+  .card.on { border-color: var(--brand); background: var(--brand-light); color: var(--brand); }
+
+  /* 运行条 */
+  .running { display: none; align-items: center; gap: 8px; padding: 10px 12px; border-radius: var(--radius-lg); background: var(--brand-light); }
+  .running.show { display: flex; }
+  .running .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--brand); flex-shrink: 0; }
+  .running .what { flex: 1; min-width: 0; font-size: 13px; }
+  .running .what small { display: block; color: var(--text-3); font-size: 12px; }
+
+  /* 带读列表 */
+  .guides { display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; }
+  .guide + .guide { border-top: 1px solid var(--border); }
+  .guide-main { display: flex; align-items: center; gap: 10px; padding: 10px 12px; }
+  .guide.is-running .guide-main { background: color-mix(in srgb, var(--brand-light) 60%, transparent); }
+  .guide-text { flex: 1; min-width: 0; }
+  .guide-name { font-size: 14px; font-weight: 600; }
+  .guide-desc { font-size: 12px; color: var(--text-3); }
+  .guide-desc a { color: var(--brand); text-decoration: none; cursor: pointer; }
+  .gear { border: none; background: none; color: var(--text-3); width: 32px; height: 32px; border-radius: var(--radius); cursor: pointer; }
+  .gear[aria-expanded="true"] { color: var(--brand); background: var(--surface-2); }
+  .btn { height: 32px; padding: 0 12px; border-radius: var(--radius); border: 1px solid var(--border); background: var(--card); color: var(--text); font: inherit; font-size: 13px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+  .btn.primary { background: var(--brand); border-color: var(--brand); color: var(--on-brand); }
+  .guide-settings { display: none; flex-direction: column; gap: 10px; padding: 4px 12px 12px; }
+  .guide-settings.open { display: flex; }
+  details { font-size: 13px; color: var(--text-2); }
+  details summary { cursor: pointer; color: var(--text-2); padding: 4px 0; }
+  details > div { display: flex; flex-direction: column; gap: 10px; padding-top: 8px; }
+
+  /* 统一的速度控件: 刻度滑条 + 可点数值 */
+  .speed { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+  .speed input { width: 100%; accent-color: var(--brand); }
+  .speed .stops { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-3); }
+  .speed-val { min-width: 64px; text-align: right; font-size: 12px; color: var(--text-2); border: 1px dashed var(--border-strong); border-radius: var(--radius-sm); padding: 2px 6px; cursor: text; }
+
+  .toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: var(--text); color: #fff; padding: 8px 14px; border-radius: var(--radius-pill); font-size: 13px; opacity: 0; transition: opacity .2s; pointer-events: none; }
+  .toast.show { opacity: .92; }
+  .note-new { color: var(--success); font-size: 11px; font-weight: 600; }
+</style>
+</head>
+<body>
+<div class="controls">
+  <label><input type="checkbox" id="touch" checked /> 触屏设备 (显示「手机竖握」)</label>
+  <label><input type="checkbox" id="largeText" /> 已开「大字」场景 (强制单栏)</label>
+</div>
+<div class="page">
+
+  <!-- ================= 排版面板 (只画「页面」分区) ================= -->
+  <div class="col">
+    <span class="caption">工具栏「A」· 排版设置 —— 文字 / 配色分区不变, 只画改动的「页面」</span>
+    <section class="panel">
+      <div class="head"><strong>排版</strong><button class="x" aria-label="关闭">✕</button></div>
+      <div class="muted-block">文字 · 配色 (不变)</div>
+
+      <div class="group">
+        <h3 class="group-title">页面 <span class="note-new">从「模式」搬回</span></h3>
+
+        <div class="flow" role="group" aria-label="翻页方式">
+          <button data-flow="paginated" class="active">
+            <svg width="44" height="30" viewBox="0 0 44 30" aria-hidden="true"><rect x="1" y="1" width="20" height="28" rx="2" fill="none" stroke="currentColor"/><rect x="23" y="1" width="20" height="28" rx="2" fill="none" stroke="currentColor"/><path d="M5 7h12M5 11h12M5 15h12M27 7h12M27 11h12M27 15h12" stroke="currentColor" opacity=".5"/></svg>
+            翻页
+          </button>
+          <button data-flow="chapter">
+            <svg width="44" height="30" viewBox="0 0 44 30" aria-hidden="true"><rect x="10" y="1" width="24" height="28" rx="2" fill="none" stroke="currentColor"/><path d="M14 6h16M14 10h16M14 14h16M14 18h16" stroke="currentColor" opacity=".5"/><path d="M10 24h24" stroke="currentColor" stroke-dasharray="2 2"/></svg>
+            按章滚动
+          </button>
+          <button data-flow="continuous">
+            <svg width="44" height="30" viewBox="0 0 44 30" aria-hidden="true"><path d="M10 0v30M34 0v30" stroke="currentColor"/><path d="M14 4h16M14 8h16M14 12h16M14 18h16M14 22h16M14 26h16" stroke="currentColor" opacity=".5"/><path d="M14 15h16" stroke="currentColor" stroke-width="1.5"/></svg>
+            连续滚动
+          </button>
+        </div>
+        <p class="hint" id="flowHint">左右翻页，像纸书一样</p>
+
+        <div class="row">
+          <span class="label">分栏</span>
+          <div class="seg" id="cols">
+            <button class="active">自动</button><button>单栏</button><button>双栏</button>
+          </div>
+        </div>
+        <p class="hint indent" id="colsNote" hidden></p>
+
+        <div class="switch-row" id="portraitRow">
+          <span>手机竖握时改为连续滚动<span class="sub">横过来恢复上面的设置</span></span>
+          <button class="sw on" aria-label="手机竖握时改为连续滚动" data-toggle></button>
+        </div>
+
+        <div class="row">
+          <span class="label">进度</span>
+          <div class="seg"><button class="active">页码+百分比</button><button>页码</button><button>百分比</button></div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- ================= 模式面板 ================= -->
+  <div class="col">
+    <span class="caption">工具栏「阅读模式」· 只放开关和动作</span>
+    <section class="panel">
+      <div class="head"><strong>阅读模式</strong><button class="x" aria-label="关闭">✕</button></div>
+
+      <!-- 运行中: 置顶, 任何时候打开面板都能一眼看到并控制 -->
+      <div class="running" id="running">
+        <span class="dot"></span>
+        <span class="what"><span id="runName">打字机</span><small>第三章 · 本章还剩 12 分钟</small></span>
+        <button class="btn" id="runPause">暂停</button>
+        <button class="btn" id="runStop">退出</button>
+      </div>
+
+      <div class="switch-row">
+        <span><strong>点睛阅读</strong><span class="sub">让重点自己浮出来</span></span>
+        <button class="sw" aria-label="点睛阅读" data-toggle></button>
+      </div>
+
+      <div class="group">
+        <h3 class="group-title">场景</h3>
+        <div class="cards">
+          <div class="card">夜读<small>关</small></div>
+          <div class="card">护眼<small>关</small></div>
+          <div class="card">墨水屏<small>关</small></div>
+          <div class="card" id="ltCard">大字<small>关</small></div>
+          <div class="card">沉浸<small>关</small></div>
+        </div>
+      </div>
+
+      <div class="group">
+        <h3 class="group-title">带读 <small>一次运行一个</small></h3>
+        <div class="guides">
+
+          <div class="guide" data-guide="auto">
+            <div class="guide-main">
+              <div class="guide-text">
+                <div class="guide-name" data-name-paged="自动翻页" data-name-scroll="自动滚动">自动翻页</div>
+                <div class="guide-desc" data-desc="auto"></div>
+              </div>
+              <button class="gear" aria-expanded="false" aria-label="自动翻页设置">⚙</button>
+              <button class="btn primary" data-start>▶ 开始</button>
+            </div>
+            <div class="guide-settings">
+              <div class="row"><span class="label">速度</span>
+                <div class="speed"><input type="range" min="1" max="9" value="5" /><div class="stops"><span>慢</span><span>中</span><span>快</span></div></div>
+                <span class="speed-val">8 秒/页</span></div>
+            </div>
+          </div>
+
+          <div class="guide" data-guide="typewriter">
+            <div class="guide-main">
+              <div class="guide-text">
+                <div class="guide-name">打字机</div>
+                <div class="guide-desc" data-desc="typewriter"></div>
+              </div>
+              <button class="gear" aria-expanded="true" aria-label="打字机设置">⚙</button>
+              <button class="btn primary" data-start>▶ 开始</button>
+            </div>
+            <div class="guide-settings open">
+              <div class="row"><span class="label">出字</span><div class="seg"><button class="active">逐字</button><button>逐句</button><button>逐行</button></div></div>
+              <div class="row"><span class="label">速度</span>
+                <div class="speed"><input type="range" min="100" max="900" step="10" value="300" /><div class="stops"><span>慢</span><span>中</span><span>快</span></div></div>
+                <span class="speed-val">300 字/分</span></div>
+              <details><summary>更多</summary><div>
+                <div class="row"><span class="label">后文</span><div class="seg"><button class="active">隐藏</button><button>淡显</button></div></div>
+                <div class="switch-row"><span>标点停顿</span><button class="sw on" data-toggle></button></div>
+                <div class="switch-row"><span>墨迹未干</span><button class="sw on" data-toggle></button></div>
+                <div class="switch-row"><span>打字声</span><button class="sw" data-toggle></button></div>
+              </div></details>
+            </div>
+          </div>
+
+          <div class="guide" data-guide="lyric">
+            <div class="guide-main">
+              <div class="guide-text">
+                <div class="guide-name">歌词</div>
+                <div class="guide-desc" data-desc="lyric"></div>
+              </div>
+              <button class="gear" aria-expanded="false" aria-label="歌词设置">⚙</button>
+              <button class="btn primary" data-start>▶ 开始</button>
+            </div>
+            <div class="guide-settings">
+              <div class="row"><span class="label">换行</span><div class="seg"><button class="active">自动</button><button>跟听书</button><button>手动</button></div></div>
+              <div class="row"><span class="label">速度</span>
+                <div class="speed"><input type="range" min="100" max="900" step="10" value="300" /><div class="stops"><span>慢</span><span>中</span><span>快</span></div></div>
+                <span class="speed-val">300 字/分</span></div>
+              <details><summary>更多</summary><div>
+                <div class="row"><span class="label">聚焦</span><div class="seg"><button class="active">1 行</button><button>3 行</button></div></div>
+                <div class="row"><span class="label">其余行</span><div class="seg"><button class="active">淡显</button><button>隐藏</button></div></div>
+                <div class="row"><span class="label">位置</span><div class="seg"><button class="active">偏上</button><button>居中</button></div></div>
+                <div class="row"><span class="label">字号</span><div class="seg"><button>原字号</button><button class="active">×1.2</button><button>×1.4</button></div></div>
+                <div class="switch-row"><span>标点停顿</span><button class="sw on" data-toggle></button></div>
+              </div></details>
+            </div>
+          </div>
+
+          <div class="guide" data-guide="tts">
+            <div class="guide-main">
+              <div class="guide-text">
+                <div class="guide-name">听书</div>
+                <div class="guide-desc" data-desc="tts"></div>
+              </div>
+              <button class="btn" data-open-tts>打开 ›</button>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </section>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const $ = (s, r = document) => r.querySelector(s)
+const $$ = (s, r = document) => [...r.querySelectorAll(s)]
+const state = { flow: 'paginated', running: null, paused: false }
+const names = { auto: () => state.flow === 'paginated' ? '自动翻页' : '自动滚动', typewriter: () => '打字机', lyric: () => '歌词', tts: () => '听书' }
+const flowHints = { paginated: '左右翻页，像纸书一样', chapter: '上下滚动，读到章末停一下', continuous: '上下滚动，一章接一章读下去' }
+
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toast.h); toast.h = setTimeout(() => t.classList.remove('show'), 1800) }
+
+function render() {
+  const paged = state.flow === 'paginated'
+  $$('.flow button').forEach(b => b.classList.toggle('active', b.dataset.flow === state.flow))
+  $('#flowHint').textContent = flowHints[state.flow]
+  // 分栏: 滚动时变灰并注明, 不隐藏 (面板不跳)
+  const lt = $('#largeText').checked
+  $('#cols').classList.toggle('disabled', !paged)
+  const note = !paged ? '滚动时始终单栏' : lt ? '「大字」开着时按单栏显示，关掉后恢复' : ''
+  $('#colsNote').hidden = !note; $('#colsNote').textContent = note
+  $('#portraitRow').style.display = $('#touch').checked ? '' : 'none'
+  $('#ltCard').classList.toggle('on', lt); $('#ltCard').querySelector('small').textContent = lt ? '已开' : '关'
+
+  // 带读: 每行一句「在当前版式下怎么动」+ 改版式入口
+  const flowName = paged ? '翻页' : '滚动'
+  const desc = {
+    auto: paged ? '每隔几秒翻一页' : '匀速往下滚',
+    typewriter: paged ? '逐字打出，打满一页翻页' : '逐字打出，当前行保持在视线处',
+    lyric: paged ? '一行一行亮起 · 临时改为滚动，结束恢复翻页' : '一行一行亮起',
+    tts: '朗读这本书 · 正在听书时，可在歌词里选「跟听书」',
+  }
+  $$('[data-desc]').forEach(el => {
+    const k = el.dataset.desc
+    el.innerHTML = k === 'tts' ? desc.tts : `${desc[k]} · <a data-jump>当前${flowName}，改 ›</a>`
+  })
+  $$('.guide-name[data-name-paged]').forEach(el => { el.textContent = paged ? el.dataset.namePaged : el.dataset.nameScroll })
+
+  $$('.guide').forEach(g => {
+    const k = g.dataset.guide, on = state.running === k
+    g.classList.toggle('is-running', on)
+    const btn = g.querySelector('[data-start]')
+    if (btn) { btn.textContent = on ? (state.paused ? '▶ 继续' : 'Ⅱ 暂停') : '▶ 开始'; btn.classList.toggle('primary', !on) }
+  })
+  $('#running').classList.toggle('show', !!state.running)
+  if (state.running) { $('#runName').textContent = names[state.running](); $('#runPause').textContent = state.paused ? '继续' : '暂停' }
+}
+
+$$('.flow button').forEach(b => b.onclick = () => { state.flow = b.dataset.flow; render() })
+$$('.seg').forEach(seg => seg.addEventListener('click', e => {
+  if (e.target.tagName !== 'BUTTON') return
+  $$('button', seg).forEach(x => x.classList.toggle('active', x === e.target))
+}))
+document.addEventListener('click', e => {
+  const sw = e.target.closest('[data-toggle]'); if (sw) sw.classList.toggle('on')
+  if (e.target.closest('[data-jump]')) toast('打开「排版」并定位到「页面」')
+})
+$$('.gear').forEach(b => b.onclick = () => {
+  const open = b.getAttribute('aria-expanded') !== 'true'
+  b.setAttribute('aria-expanded', open)
+  b.closest('.guide').querySelector('.guide-settings').classList.toggle('open', open)
+})
+$$('[data-start]').forEach(b => b.onclick = () => {
+  const k = b.closest('.guide').dataset.guide
+  if (state.running === k) { state.paused = !state.paused; return render() }
+  if (state.running) toast(`已停止${names[state.running]()}`)
+  state.running = k; state.paused = false; render()
+})
+$('[data-open-tts]').onclick = () => toast('收起本面板，打开听书面板')
+$('#runPause').onclick = () => { state.paused = !state.paused; render() }
+$('#runStop').onclick = () => { state.running = null; render() }
+$$('.speed input').forEach(r => r.oninput = () => {
+  const v = r.closest('.row').querySelector('.speed-val')
+  v.textContent = r.max === '9' ? `${[30, 20, 15, 12, 8, 6, 5, 4, 3][r.value - 1]} 秒/页` : `${r.value} 字/分`
+})
+$('#touch').onchange = render; $('#largeText').onchange = render
+render()
+</script>
+</body>
+</html>

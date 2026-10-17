@@ -41,6 +41,14 @@ export const AI_PROVIDERS: AiProviderPreset[] = [
     docsUrl: 'https://cloud.siliconflow.cn/i/TxUlXG3u',
   },
   {
+    id: 'deepseek',
+    label: 'DeepSeek',
+    baseUrl: 'https://api.deepseek.com',
+    defaultModel: 'deepseek-flash',
+    needsKey: true,
+    docsUrl: 'https://platform.deepseek.com/api_keys',
+  },
+  {
     id: 'zhipu',
     label: '智谱 GLM',
     baseUrl: 'https://open.bigmodel.cn/api/paas/v4',

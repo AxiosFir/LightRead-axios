@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AppSelect from '../components/AppSelect.vue'
 /**
  * 应用内《轻阅使用手册》: 打包 docs/manual/*.md (离线可看), 用 marked 渲染。
  * 文档之间的相对链接 (02-阅读模式.md#xxx) 在页内切换; 仓库里其他文档链到 GitHub; 外链用系统浏览器打开。
@@ -145,9 +146,9 @@ function onClick(e: MouseEvent) {
         >{{ c.title }}</button>
       </nav>
 
-      <select v-model="current" class="input manual-select" :aria-label="t('manual.toc')">
+      <AppSelect v-model="current" class="input manual-select" :aria-label="t('manual.toc')">
         <option v-for="c in chapters" :key="c.file" :value="c.file">{{ c.title }}</option>
-      </select>
+      </AppSelect>
 
       <!-- 手册内容来自仓库内的 docs/manual, 不含用户输入 -->
       <article ref="article" class="manual-content" :aria-busy="loading" @click="onClick" v-html="html" />

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AppSelect from '../components/AppSelect.vue'
 import { pingUsage } from '../services/usageStats'
 import { noteDjReading } from '../services/usageCounters'
 import type { DjLevelIdx, DjState } from '../services/usageStatsCore'
@@ -142,10 +143,8 @@ function openTypography(section?: TypographySection) {
   settingsOpen.value = true
 }
 
-/** 从「排版」的版式入口跳到「模式 › 阅读方式」(书页怎么动只在那里设置) */
-const modeFocus = ref<'layout' | null>(null)
-function openModes(section?: 'layout') {
-  modeFocus.value = section ?? null
+/** 从排版提示条打开场景管理。 */
+function openModes() {
   modes.openPanel()
 }
 
@@ -435,7 +434,8 @@ function applyPrefs() {
     setRendererAttr(r, 'gap', geo.gap)
     setRendererAttr(r, 'max-inline-size', geo.maxInline)
     // 大字 / 歌词运行时、竖屏单页滚动时强制单栏 (已算进 readerLayout), 不改用户自己的分栏设置
-    setRendererAttr(r, 'max-column-count', String(layout.maxColumnCount))
+    setRendererAttr(r, 'max-column-count', String(layout.maxColumnCount === 'auto' ? 2 : layout.maxColumnCount))
+    setRendererAttr(r, 'column-count', String(layout.maxColumnCount))
     setRendererAttr(r, 'margin', geo.margin)
     // 歌词运行时的字号 / 行距只是生效值 (modes.typographyOverride), 不写回设置
     view.renderer.setStyles?.(getReaderCSS({ ...prefs, ...modes.typographyOverride.value, fontFamily: resolveFontFamily(prefs.fontFamily) }, appDark.value, modes.readerStyle.value))
@@ -827,7 +827,10 @@ const autoMotion = computed(() => autoReadMotion(effectiveFlow.value, { eink: !!
 function startAutoRead() {
   modes.stopForExternal('auto')
   // 带读同一时间只运行一个: 自动翻页开始时暂停听书 (听书会自己跟着翻页, 两者抢位置)
-  if (ttsState.value === 'playing') pauseTTS()
+  if (ttsState.value === 'playing') {
+    pauseTTS()
+    toast(t('readingMode.ttsPaused'))
+  }
   stopAutoRead()
   autoReading.value = true
   autoPaused.value = false
@@ -1596,6 +1599,7 @@ type ListenFrom = 'auto' | 'page' | 'bookmark' | { range: Range }
 async function startTTS(from: ListenFrom = 'auto') {
   if (!view) return
   modes.stopForExternal('tts')
+  if (autoReading.value) toast(t('readingMode.autoStopped'))
   stopAutoRead()
   if (view.isFixedLayout) {
     toast(t('tts.fixedLayoutUnsupported'), 'error')
@@ -2646,8 +2650,6 @@ const modes = useReadingModes({
   onLyricSeek: range => { void startTTS({ range }) },
 })
 lateModes.value = modes
-// 模式面板关上后, 下次从工具栏打开不再定位到版式
-watch(() => modes.panelOpen.value, open => { if (!open) modeFocus.value = null })
 
 // ---- 点睛阅读 (docs/dianjing-reading.md) ----
 const dj = useDianjing({
@@ -3142,17 +3144,16 @@ onBeforeUnmount(() => {
       v-if="modes.panelOpen.value"
       :modes="modes"
       :progress="typewriterProgress"
-      :auto-reading="autoReading && !autoPaused"
+      :auto-reading="autoReading"
+      :auto-paused="autoPaused"
       :auto-motion="autoMotion"
       :effective-flow="effectiveFlow"
       :fixed-layout="fixedLayout"
-      :portrait-locked="readerLayout.portraitLocked"
-      :mode-locked="readerLayout.modeLocked"
-      :focus="modeFocus"
       :tts-active="ttsState === 'playing'"
       v-model:auto-read-seconds="settings.autoReadSeconds"
       @start-auto="startAutoRead"
       @stop-auto="stopAutoRead"
+      @toggle-auto="autoPaused ? resumeAutoRead() : pauseAutoRead()"
       @open-tts="openTTSPanel"
       @open-typography="openTypography"
       @close="modes.closePanel()"
@@ -3377,26 +3378,26 @@ onBeforeUnmount(() => {
       </div>
       <div v-if="edgeAvailable() && settings.ttsEngine === 'edge'" class="tts-row">
         <label>{{ t('tts.voice') }}</label>
-        <select v-model="settings.edgeVoice" class="input" :aria-label="t('tts.voice')">
+        <AppSelect v-model="settings.edgeVoice" class="input" :aria-label="t('tts.voice')">
           <option v-for="v in EDGE_VOICES" :key="v.id" :value="v.id">{{ v.label }}</option>
-        </select>
+        </AppSelect>
       </div>
       <div v-else-if="edgeAvailable() && settings.ttsEngine === 'local'" class="tts-row">
         <label>{{ t('tts.voice') }}</label>
         <template v-if="localInstalled">
-          <select v-model.number="settings.localVoiceId" class="input" :aria-label="t('tts.voice')">
+          <AppSelect v-model="settings.localVoiceId" class="input" :aria-label="t('tts.voice')">
             <option v-for="v in KOKORO_VOICES" :key="v.sid" :value="v.sid">{{ kokoroVoiceLabel(v, settings.language === 'en' ? 'en' : 'zh') }}{{ v.sid === DEFAULT_KOKORO_SID ? t('tts.voiceDefault') : '' }}</option>
-          </select>
+          </AppSelect>
           <button class="btn btn-sm" :disabled="ttsState !== 'stopped'" @click="auditionLocal">{{ t('tts.audition') }}</button>
         </template>
         <LocalTtsPack v-else />
       </div>
       <div v-else class="tts-row">
         <label>{{ t('tts.voice') }}</label>
-        <select v-model="settings.ttsVoice" class="input" :aria-label="t('tts.voice')">
+        <AppSelect v-model="settings.ttsVoice" class="input" :aria-label="t('tts.voice')">
           <option value="">{{ t('tts.autoVoice') }}</option>
           <option v-for="v in ttsVoices" :key="v.name" :value="v.name">{{ v.name }} ({{ v.lang }})</option>
-        </select>
+        </AppSelect>
       </div>
       <p class="tts-hint">
         {{ !edgeAvailable() ? t('tts.hintSystem') : settings.ttsEngine === 'edge' ? t('tts.hintEdge') : settings.ttsEngine === 'local' ? t('tts.hintLocal') : t('tts.hintSystem') }}

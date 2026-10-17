@@ -196,6 +196,48 @@ try {
   await page.getByRole('button', { name: '搜索', exact: true }).click()
   await page.locator('.gh-notice').filter({ hasText: 'Internet Archive' }).waitFor()
   await page.getByText('?&铭.txt', { exact: true }).first().waitFor()
+  // A native HTTP rejection contains the entire encoded query; it must never reach UI copy.
+  await page.evaluate(() => {
+    const originalFetch = window.fetch
+    window.fetch = (input, init) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
+      if (url.includes('archive.org/advancedsearch.php')) {
+        return Promise.reject(`error sending request for url (https://archive.org/advancedsearch.php?q=${'%E6%98%8E'.repeat(400)})`)
+      }
+      return originalFetch(input, init)
+    }
+  })
+  await search.fill('陋室 /?&铭')
+  await page.getByRole('button', { name: '搜索', exact: true }).click()
+  await page.locator('.source-errors').getByText('Internet Archive: 连不上书源，请检查网络或设置书源代理', { exact: true }).waitFor()
+  const notice = await page.locator('.gh-notice').innerText()
+  assert.ok(!/https?:|advancedsearch|%E6|error sending/.test(notice), 'raw transport error must not be shown')
+  await page.getByText('?&铭.txt', { exact: true }).first().waitFor()
+  for (const width of [320, 375, 1280]) {
+    await page.setViewportSize({ width, height: 900 })
+    const overflow = await page.evaluate(() => {
+      const main = document.querySelector('main')
+      const notice = document.querySelector('.gh-notice')
+      return {
+        page: document.documentElement.scrollWidth - innerWidth,
+        main: main ? main.scrollWidth - main.clientWidth : 0,
+        notice: notice.scrollWidth - notice.clientWidth,
+      }
+    })
+    if (Object.values(overflow).some(n => n > 0)) {
+      await page.screenshot({ path: '/tmp/lightread-search-error-overflow.png', fullPage: true })
+      console.log(await page.evaluate(() => [...document.querySelectorAll('main *')].filter(el => el.scrollWidth > el.clientWidth + 1).map(el => ({ tag: el.tagName, cls: el.className, w: el.clientWidth, scroll: el.scrollWidth })).slice(0, 30)))
+    }
+    assert.ok(Object.values(overflow).every(n => n <= 0), `source failure must not overflow at ${width}px: ${JSON.stringify(overflow)}`)
+  }
+  // Exercise layout defence even if a future error path accidentally exposes a long token.
+  await page.setViewportSize({ width: 375, height: 812 })
+  await page.locator('.source-errors li').first().evaluate(el => { el.textContent = 'Internet Archive: ' + 'x'.repeat(2000) })
+  assert.ok(await page.evaluate(() => {
+    const notice = document.querySelector('.gh-notice')
+    return notice.scrollWidth <= notice.clientWidth && document.documentElement.scrollWidth <= innerWidth
+  }), 'long unbroken error text must wrap')
+  await page.setViewportSize({ width: 1280, height: 900 })
   failArchive = false
   // With the existing CORS proxy configured, download/import stays in the app.
   await page.evaluate(() => {

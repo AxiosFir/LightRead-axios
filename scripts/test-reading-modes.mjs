@@ -50,6 +50,7 @@ import {
   einkJumpDelta,
   estimateUnitsPerLine,
   focusWindow,
+  normalizeFocusLines, lyricHeight, anchorAtHeight,
   lineAt,
   lineDwellMs,
   lineForProgress,
@@ -910,4 +911,23 @@ test('自动阅读的推进方式: 翻页 / 固定版式按页, 滚动匀速滚,
   assert.equal(autoReadMotion('scrolled'), 'scroll')
   assert.equal(autoReadMotion('scrolled', { eink: true }), 'screen')
   assert.equal(autoReadMotion('scrolled', { fixedLayout: true }), 'page')
+})
+
+
+test('歌词自定义行数、0–1 高度坐标及边缘完整显示', () => {
+  assert.deepEqual(focusWindow(5, 4, 12), [4, 7])
+  assert.deepEqual(focusWindow(5, 7, 12), [2, 8])
+  assert.deepEqual(focusWindow(0, 99, 5), [0, 4])
+  assert.equal(normalizeFocusLines(0), 1)
+  assert.equal(normalizeFocusLines(2.8), 3)
+  assert.equal(normalizeFocusLines(Infinity), 1)
+  assert.equal(normalizeFocusLines(150), 99)
+  assert.equal(lyricHeight(0.382), 0.618)
+  assert.equal(anchorAtHeight(0.618), 0.382)
+  assert.equal(anchorAtHeight(0), 1)
+  assert.equal(anchorAtHeight(1), 0)
+  assert.equal(anchorAtHeight(-1), 1)
+  assert.equal(anchorAtHeight(2), 0)
+  assert.equal(pinDelta(700, 730, 0, 1000, anchorAtHeight(1)), 700)
+  assert.equal(pinDelta(700, 730, 0, 1000, anchorAtHeight(0)), -270)
 })

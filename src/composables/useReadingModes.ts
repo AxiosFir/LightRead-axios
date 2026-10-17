@@ -32,7 +32,7 @@
  * ```
  *
  * 1. applyPrefs():
- *    - `view.renderer.setAttribute('max-column-count', String(modes.forceSingleColumn.value ? 1 : prefs.maxColumnCount))`
+ *    - `effectiveReaderLayout()` 统一处理分栏 (auto / 1 / 2) 与临时单栏约束
  *      (大字、歌词运行时强制单栏, 不改用户的双栏设置);
  *    - 墨水屏去掉翻页动画: `modes.einkActive.value ? r.removeAttribute('animated') : r.setAttribute('animated', '')`;
  *    - `getReaderCSS(prefsWithFont, appDark.value, modes.readerStyle.value)`;
@@ -74,6 +74,7 @@
 import { computed, onScopeDispose, ref, shallowRef, watch } from 'vue'
 import { useSettings } from '../stores/settings'
 import { t } from '../i18n'
+import { matchesMQ, MQ } from './useMediaQuery'
 import { toast } from '../services/toast'
 import type { ReaderModeStyle, ReaderThemeColors } from '../services/readerTheme'
 import {
@@ -549,7 +550,10 @@ export function useReadingModes(opts: UseReadingModesOptions) {
       toast(t('readingMode.fixedLayoutUnsupported'), 'error')
       return false
     }
-    if (lyricActive.value) stopLyric()
+    if (lyricActive.value) {
+      stopLyric()
+      toast(t('readingMode.lyricStopped'))
+    }
     const hadAuto = !!opts.isAutoReading?.()
     const hadTTS = !!opts.isTTSActive?.()
     opts.onExclusiveStart?.()
@@ -562,7 +566,7 @@ export function useReadingModes(opts: UseReadingModesOptions) {
     const c = ensureController()
     c.setConfig(config())
     ensureDocListeners(host.contents()?.doc)
-    panelOpen.value = false
+    if (matchesMQ(MQ.phone)) panelOpen.value = false
     const ok = c.start()
     if (!ok) toast(t('readingMode.startFailed'), 'error')
     return ok
@@ -712,7 +716,10 @@ export function useReadingModes(opts: UseReadingModesOptions) {
     if (lyricActive.value) return true
     const ttsOn = !!opts.isTTSActive?.()
     const drv: LyricDriver = driver ?? (ttsOn ? 'tts' : ly.value.driver)
-    if (typewriterActive.value) controller.value?.stop()
+    if (typewriterActive.value) {
+      controller.value?.stop()
+      toast(t('readingMode.typewriterStopped'))
+    }
     if (opts.isAutoReading?.()) {
       if (opts.stopAutoRead) opts.stopAutoRead()
       else if (!ttsOn) opts.onExclusiveStart?.()
@@ -723,7 +730,7 @@ export function useReadingModes(opts: UseReadingModesOptions) {
       else opts.onExclusiveStart?.()
       toast(t('readingMode.ttsPaused'))
     } else if (drv === 'tts' && !ttsOn) toast(t('readingMode.lyricWaitTts'))
-    panelOpen.value = false
+    if (matchesMQ(MQ.phone)) panelOpen.value = false
     const token = ++lyricToken
     const vis = host.visibleRange()
     const from = vis ? vis.cloneRange() : null
@@ -829,7 +836,7 @@ export function useReadingModes(opts: UseReadingModesOptions) {
     () => lyric.value?.setConfig(lyricConfig()),
   )
   // 运行中改驱动: 跟设置走; 改为非跟听书且听书在播放时暂停听书
-  watch(() => ly.value.driver, d => {
+  function applyLyricDriver(d: LyricDriver) {
     if (!lyricActive.value) {
       lyricDriver.value = d
       return
@@ -840,7 +847,13 @@ export function useReadingModes(opts: UseReadingModesOptions) {
     } else if (d === 'tts' && !opts.isTTSActive?.()) toast(t('readingMode.lyricWaitTts'))
     lyricDriver.value = d
     lyric.value?.setConfig({ driver: d })
-  })
+  }
+  watch(() => ly.value.driver, applyLyricDriver)
+  function setLyricDriver(d: LyricDriver) {
+    // 听书可以临时接管歌词；即便点的是原来保存的选项，也要切回该驱动。
+    if (ly.value.driver === d) applyLyricDriver(d)
+    else settings.readingMode.lyric.driver = d
+  }
   // 歌词字号变化: typographyOverride 随之变, renderKey 触发 ReaderView 重排
 
   // =====================================================================
@@ -874,13 +887,13 @@ export function useReadingModes(opts: UseReadingModesOptions) {
       const s = typewriterState.value
       if (s === 'running' || s === 'turning') controller.value?.pause()
       else if (s === 'paused') {
-        panelOpen.value = false
+        if (matchesMQ(MQ.phone)) panelOpen.value = false
         controller.value?.resume()
       }
       return
     }
     if (lyricActive.value) {
-      if (lyricState.value === 'paused') panelOpen.value = false
+      if (lyricState.value === 'paused' && matchesMQ(MQ.phone)) panelOpen.value = false
       lyric.value?.togglePause()
     }
   }
@@ -913,9 +926,6 @@ export function useReadingModes(opts: UseReadingModesOptions) {
     opts.beforePanelOpen?.()
     refreshBookInfo()
     if (tab) panelTab.value = tab
-    else if (typewriterActive.value) panelTab.value = 'typewriter'
-    else if (lyricActive.value) panelTab.value = 'lyric'
-    else if (opts.isAutoReading?.()) panelTab.value = 'auto'
     panelOpen.value = true
   }
   function closePanel() { panelOpen.value = false }
@@ -1569,6 +1579,7 @@ export function useReadingModes(opts: UseReadingModesOptions) {
     lyricActive,
     lyricStarting,
     lyricDriver,
+    setLyricDriver,
     lyricFollowing,
     lyricDetached,
     lyricSecondsPerLine,

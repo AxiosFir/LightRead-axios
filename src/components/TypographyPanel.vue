@@ -1,16 +1,18 @@
 <script setup lang="ts">
+import AppSelect from './AppSelect.vue'
 /**
  * 「排版」面板 (docs/reader-panels.md §3.1): 书页长什么样 —— 字和颜色的值只在这里调。
  * 桌面为顶栏下的浮层卡片, 手机为底部抽屉 (遮罩由 ReaderView 的 sheet-scrim 提供)。
  *   文字 (字号 / 行距 / 边距 / 字体; 更多: 字距 / 对齐 / 导入字体)
  *   配色 (主题 / 调暗)
- *   页面 (版式: 只显示当前值, 点了去「模式 › 阅读方式」; 进度显示)
- * 书页怎么动 (翻页 / 滚动 / 跨章 / 分栏 / 竖屏 + 带读) 只在「模式 › 阅读方式」设置, 这里不重复。
+ *   页面 (翻页方式 / 分栏 / 手机竖握 / 进度显示)
+ * 版式在这里设置; 带读的开始、暂停与退出在「模式」中操作。
  * 「模式」里的场景 (夜读、大字…) 只是一键套用这里的值, 本面板顶部提示哪些场景开着, 可跳去管理。
- * e2e 依赖: .theme-btn (5 个, 第 3 个护眼绿)、.tp-jump (版式入口, 见 scripts/e2e-full.mjs)。
+ * e2e 依赖: .theme-btn (5 个, 第 3 个护眼绿)、翻页方式与分栏按钮。
  */
 import { computed, nextTick, onMounted, ref } from 'vue'
 import { t } from '../i18n'
+import { MQ, useMediaQuery } from '../composables/useMediaQuery'
 import { useSettings } from '../stores/settings'
 import { READER_THEME_CHOICES, FONT_FAMILIES } from '../services/readerTheme'
 import { listSystemFonts, importFontFile } from '../services/fonts'
@@ -19,7 +21,7 @@ import { toast } from '../services/toast'
 import { DIM_MAX } from '../services/readingModes/eyeCare'
 import type { ReadingModes } from '../composables/useReadingModes'
 
-export type TypographySection = 'text' | 'color' | 'layout'
+export type TypographySection = 'text' | 'color' | 'page'
 
 const props = defineProps<{
   modes: ReadingModes
@@ -38,12 +40,12 @@ const props = defineProps<{
 const emit = defineEmits<{
   close: []
   /** 打开「模式」面板管理场景 */
-  /** 打开「模式」面板: 管理场景, 或 'layout' 定位到「阅读方式」的版式 */
-  'open-modes': [section?: 'layout']
+  'open-modes': []
 }>()
 
 const settings = useSettings()
 const desktop = isTauri()
+const touch = useMediaQuery(MQ.touch)
 const root = ref<HTMLElement>()
 
 const THEME_LABEL_KEYS: Record<string, string> = {
@@ -87,14 +89,16 @@ function onLetterSpacing(e: Event) {
   if (Number.isFinite(n)) settings.reader.letterSpacing = Math.min(0.2, Math.max(0, Math.round(n * 100) / 100))
 }
 
-// ---- 页面: 当前生效的版式 (竖屏锁定 / 歌词临时滚动时注明原因) ----
-const flowName = computed(() => {
-  if (props.fixedLayout) return t('reader.flowFixed')
-  const name = t(props.effectiveFlow === 'scrolled' ? 'reader.scrolled' : 'reader.paginated')
-  if (props.portraitLocked) return t('reader.flowNamePortrait', { name })
-  if (props.modeLocked) return t('reader.flowNameLyric', { name })
-  return name
-})
+// ---- 页面: 高亮保存的选择, 临时约束只影响说明与可用状态 ----
+const flowChoice = computed(() => settings.reader.flow === 'paginated' ? 'paginated' : settings.reader.continuousScroll ? 'continuous' : 'chapter')
+const flows = ['paginated', 'chapter', 'continuous'] as const
+function setFlow(value: typeof flows[number]) {
+  settings.reader.flow = value === 'paginated' ? 'paginated' : 'scrolled'
+  if (value !== 'paginated') settings.reader.continuousScroll = value === 'continuous'
+}
+const flowHint = computed(() => props.portraitLocked
+  ? t(touch.value ? 'reader.portraitLockedNote' : 'reader.portraitWindowNote')
+  : props.modeLocked ? t('reader.modeLockedNote') : t(`reader.flowHint.${flowChoice.value}`))
 
 // ---- 配色 ----
 function onDim(e: Event) {
@@ -189,7 +193,7 @@ let systemFontsLoading = false
       </div>
       <div class="set-row">
         <span class="tp-label">{{ t('reader.font') }}</span>
-        <select v-model="settings.reader.fontFamily" class="input" :aria-label="t('reader.font')">
+        <AppSelect v-model="settings.reader.fontFamily" class="input" :aria-label="t('reader.font')">
           <option v-for="f in FONT_FAMILIES" :key="f.labelKey" :value="f.value">{{ t(f.labelKey) }}</option>
           <optgroup v-if="settings.customFonts.length" :label="t('reader.customFonts')">
             <option v-for="f in settings.customFonts" :key="f.file" :value="`custom:${f.name}`">{{ f.name }}</option>
@@ -197,7 +201,7 @@ let systemFontsLoading = false
           <optgroup v-if="systemFonts.length" :label="t('reader.systemFonts')">
             <option v-for="name in systemFonts" :key="name" :value="`&quot;${name}&quot;`">{{ name }}</option>
           </optgroup>
-        </select>
+        </AppSelect>
       </div>
       <details class="tp-more" :open="more.text" @toggle="onMoreToggle('text', $event)">
         <summary>
@@ -272,17 +276,43 @@ let systemFontsLoading = false
       <p v-if="modes.einkActive.value" class="set-note" role="note">{{ t('reader.einkColorNote') }}</p>
     </section>
 
-    <!-- 页面: 页眉页脚的进度; 翻页 / 滚动等版式与带读同在「模式 › 阅读方式」, 这里只显示当前值并跳过去 -->
-    <section class="tp-group" data-section="layout" :aria-label="t('reader.groupPage')">
+    <!-- 页面: 版式设置只在这里修改 -->
+    <section class="tp-group" data-section="page" :aria-label="t('reader.groupPage')">
       <h3 class="tp-title">{{ t('reader.groupPage') }}</h3>
-      <div class="set-row">
-        <span class="tp-label">{{ t('reader.groupLayout') }}</span>
-        <button type="button" class="tp-jump" :aria-label="t('reader.flowJump', { name: flowName })" @click="emit('open-modes', 'layout')">
-          <span>{{ flowName }}</span>
-          <span class="tp-jump-hint">{{ t('reader.flowJumpHint') }}</span>
-          <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M9.3 6.3a1 1 0 0 1 1.4 0l5 5a1 1 0 0 1 0 1.4l-5 5a1 1 0 1 1-1.4-1.4L13.58 12 9.3 7.7a1 1 0 0 1 0-1.4z"/></svg>
-        </button>
-      </div>
+      <template v-if="!fixedLayout">
+        <div class="tp-flows" role="group" :aria-label="t('reader.flow')">
+          <button v-for="flow in flows" :key="flow" type="button" :class="{ active: flowChoice === flow }" :aria-pressed="flowChoice === flow" @click="setFlow(flow)">
+            <svg width="44" height="30" viewBox="0 0 44 30" fill="none" stroke="currentColor" aria-hidden="true">
+              <template v-if="flow === 'paginated'">
+                <rect x="1" y="1" width="20" height="28" rx="2"/><rect x="23" y="1" width="20" height="28" rx="2"/>
+                <path d="M5 7h12M5 11h12M5 15h12M27 7h12M27 11h12M27 15h12" opacity=".5"/>
+              </template>
+              <template v-else-if="flow === 'chapter'">
+                <rect x="10" y="1" width="24" height="28" rx="2"/><path d="M14 6h16M14 10h16M14 14h16M14 18h16" opacity=".5"/><path d="M10 24h24" stroke-dasharray="2 2"/>
+              </template>
+              <template v-else>
+                <path d="M10 0v30M34 0v30"/><path d="M14 4h16M14 8h16M14 12h16M14 18h16M14 22h16M14 26h16" opacity=".5"/><path d="M14 15h16" stroke-width="1.5"/>
+              </template>
+            </svg>
+            {{ t(`reader.flowChoice.${flow}`) }}
+          </button>
+        </div>
+        <p class="tp-flow-hint" role="note">{{ flowHint }}</p>
+        <div class="set-row">
+          <span class="tp-label">{{ t('reader.columns') }}</span>
+          <div class="seg" role="group" :aria-label="t('reader.columns')">
+            <button v-for="col in (['auto', 1, 2] as const)" :key="col" type="button" :disabled="effectiveFlow === 'scrolled'" :class="{ active: settings.reader.maxColumnCount === col }" :aria-pressed="settings.reader.maxColumnCount === col" @click="settings.reader.maxColumnCount = col">
+              {{ t(col === 'auto' ? 'reader.autoColumns' : col === 1 ? 'reader.singleColumn' : 'reader.twoColumns') }}
+            </button>
+          </div>
+        </div>
+        <p v-if="effectiveFlow === 'scrolled'" class="set-note" role="note">{{ t('reader.scrolledSingleColumn') }}</p>
+        <p v-else-if="modes.forceSingleColumn.value" class="set-note" role="note">{{ t('reader.forcedSingleColumn') }}</p>
+        <div v-if="touch" class="tp-portrait">
+          <span>{{ t('reader.portraitSwitch') }}<small>{{ t('reader.portraitSwitchHint') }}</small></span>
+          <button type="button" class="tp-switch" role="switch" :aria-checked="settings.reader.portraitScroll" :aria-label="t('reader.portraitSwitch')" @click="settings.reader.portraitScroll = !settings.reader.portraitScroll"><span aria-hidden="true" /></button>
+        </div>
+      </template>
       <div class="set-row">
         <span class="tp-label">{{ t('reader.progressDisplay') }}</span>
         <div class="seg" role="group" :aria-label="t('reader.progressDisplay')">
@@ -424,32 +454,89 @@ let systemFontsLoading = false
   line-height: 1.5;
   color: var(--text-3);
 }
-.tp-jump {
-  display: inline-flex;
+.tp-flows {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+.tp-flows button {
+  display: flex;
+  flex-direction: column;
   align-items: center;
   gap: 6px;
-  min-height: 32px;
-  margin-left: auto;
-  padding: 0 4px 0 10px;
+  padding: 10px 4px 8px;
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--surface-2);
-  color: var(--text);
+  border-radius: var(--radius-lg);
+  background: var(--card);
+  color: var(--text-2);
+  font: inherit;
   font-size: 13px;
 }
-.tp-jump-hint {
-  color: var(--text-3);
-  font-size: 12px;
-}
-.tp-jump svg {
-  color: var(--text-3);
-}
-.tp-jump:hover {
+.tp-flows button.active {
   border-color: var(--brand);
+  background: var(--brand-light);
+  color: var(--brand);
+  font-weight: 600;
 }
-.tp-jump:focus-visible {
-  outline: 2px solid var(--brand);
-  outline-offset: 2px;
+.tp-flow-hint {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text-3);
+}
+.seg button:disabled {
+  opacity: .45;
+  cursor: default;
+}
+.tp-portrait {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+}
+.tp-portrait small {
+  display: block;
+  font-size: 12px;
+  color: var(--text-3);
+}
+.tp-switch {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: none;
+  background: none;
+  border-radius: var(--radius);
+}
+.tp-switch > span {
+  position: relative;
+  width: 38px;
+  height: 22px;
+  border-radius: var(--radius-pill);
+  background: var(--border-strong);
+}
+.tp-switch > span::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--on-brand);
+}
+.tp-switch[aria-checked='true'] > span {
+  background: var(--brand);
+}
+.tp-switch[aria-checked='true'] > span::after {
+  transform: translateX(16px);
+}
+.tp-flows button:focus-visible, .tp-switch:focus-visible {
+  outline: none;
+  box-shadow: var(--ring);
 }
 .font-hint {
   font-size: 12px;
@@ -582,9 +669,6 @@ let systemFontsLoading = false
   .seg button,
   .step-btn {
     height: 44px;
-  }
-  .tp-jump {
-    min-height: 44px;
   }
   .step-btn {
     width: 44px;

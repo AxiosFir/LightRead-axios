@@ -1,6 +1,6 @@
 /**
  * 歌词模式的纯函数 (docs/research/reading-modes-landscape.md §4): 视觉行 → 行区间与停留时间、聚焦窗口、
- * 定位到 40% 处的滚动量、墨水屏整屏跳、点按命中、跟听书的语速估计。DOM 部分见 lyricController.ts。
+ * 定位到指定高度的滚动量、墨水屏整屏跳、点按命中、跟听书的语速估计。DOM 部分见 lyricController.ts。
  *
  * 行不是自己切的: 每个出字单位 (汉字、西文整词) 取浏览器排版后的 rect.top, 用 pacing.groupLines 归并,
  * 所以中文按字断行、西文按词断行、标点禁则都由浏览器决定。
@@ -130,17 +130,36 @@ export function estimateUnitsPerLine(viewportWidth: number, fontSize: number, ga
   return Math.max(4, Math.floor(usable / (Math.max(8, fontSize) * (1 + letterSpacingEm))))
 }
 
-/** 聚焦窗口 [lo, hi] (含): 1 行为当前行; 3 行为上下各一行, 到首末行时不越界 */
-export function focusWindow(index: number, count: 1 | 3, total: number): [number, number] {
-  if (total <= 0) return [0, -1]
-  const i = Math.min(total - 1, Math.max(0, index))
-  if (count === 1) return [i, i]
-  return [Math.max(0, i - 1), Math.min(total - 1, i + 1)]
+/** Custom focus counts stay finite and bounded even after importing settings. */
+export function normalizeFocusLines(value: number): number {
+  return Number.isFinite(value) ? Math.min(99, Math.max(1, Math.round(value))) : 1
 }
 
-/** 让行中心落在视口 anchor 处需要滚动的量 (正数向下滚, 内容上移) */
+/** Stored / renderer coordinate: top=0, bottom=1. UI height uses the inverse. */
+export function normalizeLyricAnchor(value: number): number {
+  return Number.isFinite(value) ? Math.min(1, Math.max(0, value)) : 0.382
+}
+export function lyricHeight(anchor: number): number {
+  return Math.round((1 - normalizeLyricAnchor(anchor)) * 1000) / 1000
+}
+export function anchorAtHeight(height: number): number {
+  return Math.round((1 - normalizeLyricAnchor(height)) * 1000) / 1000
+}
+
+/** Center the window on the current line; for even counts include one extra following line. */
+export function focusWindow(index: number, count: number, total: number): [number, number] {
+  if (total <= 0) return [0, -1]
+  const i = Math.min(total - 1, Math.max(0, index))
+  const n = normalizeFocusLines(count)
+  const before = Math.floor((n - 1) / 2)
+  return [Math.max(0, i - before), Math.min(total - 1, i + n - before - 1)]
+}
+
+/** Keep the whole current line visible even at the top / bottom endpoints. */
 export function pinDelta(lineTop: number, lineBottom: number, viewportTop: number, viewportHeight: number, anchor: number): number {
-  return (lineTop + lineBottom) / 2 - (viewportTop + viewportHeight * anchor)
+  const half = Math.min(viewportHeight / 2, Math.max(0, lineBottom - lineTop) / 2)
+  const target = Math.min(viewportHeight - half, Math.max(half, viewportHeight * normalizeLyricAnchor(anchor)))
+  return (lineTop + lineBottom) / 2 - (viewportTop + target)
 }
 
 /**

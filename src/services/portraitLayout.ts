@@ -45,7 +45,7 @@ export type ReaderFlow = 'paginated' | 'scrolled'
 
 export interface ReaderLayoutInput {
   flow: ReaderFlow
-  maxColumnCount: 1 | 2
+  maxColumnCount: 'auto' | 1 | 2
   /** 设置项「竖屏时单页滚动」 */
   portraitScroll: boolean
   /** 当前是否竖屏 (PORTRAIT_QUERY 命中) */
@@ -58,7 +58,7 @@ export interface ReaderLayoutInput {
 
 export interface ReaderLayout {
   flow: ReaderFlow
-  maxColumnCount: 1 | 2
+  maxColumnCount: 'auto' | 1 | 2
   /** 竖屏锁定生效中 (界面可据此提示「横屏后恢复」) */
   portraitLocked: boolean
   /** 带读临时改成了滚动 (界面提示「结束后恢复」); 竖屏锁定本来就是滚动时为 false */
@@ -76,7 +76,7 @@ export function effectiveReaderLayout(input: ReaderLayoutInput): ReaderLayout {
   return {
     flow,
     // 竖屏 / 歌词的滚动都是单栏; 翻页时大字等场景也要单栏
-    maxColumnCount: locked || input.forceScrolled || input.forceSingleColumn ? 1 : input.maxColumnCount,
+    maxColumnCount: flow === 'scrolled' || input.forceSingleColumn ? 1 : input.maxColumnCount,
     portraitLocked: locked,
     modeLocked,
   }

@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, ref } from 'vue'
 import type { BookMeta } from '../storage'
 import { formatLabelOf } from '../services/plainText'
 import { formatReadingTime } from '../composables/useReadingTimer'
+import { shortAuthor, shortTitle } from '../services/displayTitle'
 import { t } from '../i18n'
 
 const props = defineProps<{
@@ -18,6 +19,8 @@ const props = defineProps<{
   converting?: boolean
   /** 显示「发送到其他设备」(设置里开启了互传) */
   sendable?: boolean
+  /** 手机书格: 封面只留进度条, 操作收进作者行的「⋯」(由父组件弹出操作面板) */
+  compact?: boolean
 }>()
 
 /** 封面占位标题的断行点: 文件名式标题 (package.json / my_notes-v2) 在 . _ - / 之后换行, 不在词中间硬断 */
@@ -33,6 +36,10 @@ const emit = defineEmits<{
   convert: []
   /** 发送到其他设备 (互传) */
   send: []
+  /** compact: 点「⋯」 */
+  menu: []
+  /** compact: 长按封面 */
+  longPress: []
 }>()
 
 const progress = computed(() => {
@@ -59,12 +66,23 @@ const ariaLabel = computed(() => {
   return parts.join(', ')
 })
 
-// 无封面时由书名生成稳定的柔和底色
-const fallbackHue = computed(() => {
+// 无封面时由书名生成稳定的柔和底色; compact 用其中一组纸色令牌
+const titleHash = computed(() => {
   let hash = 0
   for (const ch of props.book.title) hash = (hash * 31 + ch.charCodeAt(0)) | 0
-  return Math.abs(hash) % 360
+  return Math.abs(hash)
 })
+const fallbackHue = computed(() => titleHash.value % 360)
+const fallbackTone = computed(() => titleHash.value % 6)
+
+/* compact 的书名 / 元信息: 短书名; 「12% · 作者」, 读完显示「读完」, 未读不显示进度 */
+const displayTitle = computed(() => (props.compact ? shortTitle(props.book.title) : props.book.title))
+const metaProgress = computed(() => {
+  const p = progress.value
+  if (p == null || p <= 0) return ''
+  return p >= 99 ? t('library.finished') : `${p}%`
+})
+const metaAuthor = computed(() => shortAuthor(props.book.author) || t('common.anonymous'))
 
 function activate() {
   if (props.selectable) emit('toggleSelect')
@@ -104,6 +122,12 @@ function menuAction(event: 'remove' | 'togglePin' | 'addToBooklist' | 'upload' |
 }
 /* 触屏长按封面: 与点「更多」一样展开操作 (系统的长按菜单无意义, 拦掉) */
 function onContextMenu(e: Event) {
+  if (props.compact) {
+    // 手机书格: 长按进入选择并选中这本 (选择模式下由点击切换)
+    e.preventDefault()
+    if (!props.selectable) emit('longPress')
+    return
+  }
   if (props.selectable || !window.matchMedia('(hover: none)').matches) return
   e.preventDefault()
   openMenu()
@@ -121,7 +145,7 @@ function onKeydown(e: KeyboardEvent) {
 <template>
   <div
     class="book-card"
-    :class="{ selected: selectable && selected, selectable, 'menu-open': menuOpen }"
+    :class="{ selected: selectable && selected, selectable, compact, 'menu-open': menuOpen }"
     :title="tooltip"
     :role="selectable ? 'checkbox' : 'button'"
     :aria-checked="selectable ? selected : undefined"
@@ -139,13 +163,14 @@ function onKeydown(e: KeyboardEvent) {
       <div
         v-else
         class="cover-fallback"
+        :class="compact && `tone-${fallbackTone}`"
         :style="{
           '--h': fallbackHue,
         }"
         aria-hidden="true"
       >
-        <span class="cover-fallback-title"><template v-for="(part, i) in coverTitleParts" :key="i">{{ part }}<wbr /></template></span>
-        <span v-if="book.author" class="cover-fallback-author">{{ book.author }}</span>
+        <span class="cover-fallback-title"><template v-if="compact">{{ displayTitle }}</template><template v-else v-for="(part, i) in coverTitleParts" :key="i">{{ part }}<wbr /></template></span>
+        <span v-if="book.author" class="cover-fallback-author">{{ compact ? metaAuthor : book.author }}</span>
       </div>
       <span class="format" aria-hidden="true">{{ formatLabelOf(book) }}<svg v-if="book.noSync" class="private-mark" viewBox="0 0 24 24" width="11" height="11"><path fill="currentColor" d="M12 2a5 5 0 0 1 5 5v3h1a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h1V7a5 5 0 0 1 5-5zm0 2a3 3 0 0 0-3 3v3h6V7a3 3 0 0 0-3-3z"/></svg></span>
       <span v-if="progress != null" class="progress" aria-hidden="true">{{ progress }}%</span>
@@ -153,7 +178,11 @@ function onKeydown(e: KeyboardEvent) {
         <span class="progress-fill" :style="{ width: `${progress}%` }" />
       </span>
 
-      <div v-if="!selectable" ref="actionsEl" class="actions" :class="{ open: menuOpen }">
+      <span v-if="compact && book.noSync" class="compact-private" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="11" height="11"><path fill="currentColor" d="M12 2a5 5 0 0 1 5 5v3h1a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h1V7a5 5 0 0 1 5-5zm0 2a3 3 0 0 0-3 3v3h6V7a3 3 0 0 0-3-3z"/></svg>
+      </span>
+
+      <div v-if="!selectable && !compact" ref="actionsEl" class="actions" :class="{ open: menuOpen }">
         <button
           type="button"
           class="action more hit"
@@ -233,8 +262,24 @@ function onKeydown(e: KeyboardEvent) {
         </button>
       </div>
     </div>
-    <div class="title">{{ book.title }}</div>
-    <div class="author">{{ book.author || t('common.anonymous') }}</div>
+    <div class="title">
+      <svg v-if="compact && book.pinnedAt" class="pinned-mark" viewBox="0 0 24 24" width="12" height="12" :aria-label="t('library.pin')"><path fill="currentColor" d="M14.6 2.6a2 2 0 0 1 2.83 0l4 4a2 2 0 0 1 0 2.82l-3.18 3.18.35 2.47a2 2 0 0 1-.56 1.7l-1.1 1.1a1 1 0 0 1-1.42 0L11.6 13.9l-5.9 5.9a1 1 0 0 1-1.4-1.42l5.88-5.89-3.95-3.95a1 1 0 0 1 0-1.41l1.1-1.1a2 2 0 0 1 1.7-.57l2.47.35 3.1-3.2z"/></svg>{{ displayTitle }}
+    </div>
+    <div v-if="compact" class="meta">
+      <span class="meta-text"><template v-if="metaProgress"><span :class="{ 'meta-done': progress != null && progress >= 99 }">{{ metaProgress }}</span> · </template>{{ metaAuthor }}</span>
+      <button
+        v-if="!selectable"
+        type="button"
+        class="meta-more"
+        :title="t('common.moreActions')"
+        :aria-label="t('common.moreActions')"
+        @click.stop="emit('menu')"
+        @keydown.stop
+      >
+        <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><circle cx="5" cy="12" r="1.7" fill="currentColor"/><circle cx="12" cy="12" r="1.7" fill="currentColor"/><circle cx="19" cy="12" r="1.7" fill="currentColor"/></svg>
+      </button>
+    </div>
+    <div v-else class="author">{{ book.author || t('common.anonymous') }}</div>
   </div>
 </template>
 
@@ -526,6 +571,168 @@ function onKeydown(e: KeyboardEvent) {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* ---- 手机书格 (compact): 封面像书, 只留进度条; 书名 + 「进度 · 作者 ⋯」 ---- */
+.compact,
+.compact:hover {
+  transform: none;
+}
+.compact .cover {
+  aspect-ratio: 2 / 3;
+  border-radius: 3px 5px 5px 3px;
+  box-shadow: var(--cover-shadow);
+}
+.compact:hover .cover {
+  box-shadow: var(--cover-shadow);
+}
+.compact:active:not(.selectable) .cover {
+  transform: scale(0.97);
+  transition: transform var(--dur-fast) var(--ease);
+}
+/* 书脊高光 + 细描边: 白封面也有边界 */
+.compact .cover::after {
+  box-shadow: inset 0 0 0 1px var(--cover-edge);
+  background: linear-gradient(90deg, rgba(0, 0, 0, 0.12) 0, rgba(255, 255, 255, 0.14) 2.5%, transparent 6%);
+}
+.compact .format,
+.compact .progress {
+  display: none;
+}
+.compact .progress-track {
+  background: rgba(255, 255, 255, 0.55);
+}
+:root[data-theme='dark'] .compact .progress-track {
+  background: rgba(0, 0, 0, 0.45);
+}
+.compact.selected .cover {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+.compact .select-mark {
+  left: auto;
+  bottom: auto;
+  right: 6px;
+  top: 6px;
+  width: 24px;
+  height: 24px;
+  background: rgba(17, 20, 26, 0.28);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+.compact .select-mark.on {
+  background: var(--brand);
+  border-color: var(--brand);
+}
+.compact-private {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: rgba(17, 20, 26, 0.5);
+  color: #fff;
+}
+.selectable .compact-private {
+  display: none;
+}
+/* 生成封面: 纸色 + 衬线书名 + 细线, 不再是渐变色块 */
+.compact .cover-fallback {
+  justify-content: flex-start;
+  gap: 0;
+  padding: 14% 12% 10%;
+  border-left: 0;
+  color: var(--ink);
+  background: var(--paper);
+}
+.compact .cover-fallback::before {
+  content: '';
+  height: 1px;
+  margin-bottom: 12%;
+  background: currentColor;
+  opacity: 0.35;
+}
+.compact .cover-fallback-title {
+  font-family: 'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', 'STSong', serif;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.4;
+  letter-spacing: 0.03em;
+  -webkit-line-clamp: 5;
+}
+.compact .cover-fallback-author {
+  margin-top: auto;
+  font-size: 10px;
+  opacity: 0.7;
+}
+.tone-0 { --paper: var(--cover-paper-0); --ink: var(--cover-ink-0); }
+.tone-1 { --paper: var(--cover-paper-1); --ink: var(--cover-ink-1); }
+.tone-2 { --paper: var(--cover-paper-2); --ink: var(--cover-ink-2); }
+.tone-3 { --paper: var(--cover-paper-3); --ink: var(--cover-ink-3); }
+.tone-4 { --paper: var(--cover-paper-4); --ink: var(--cover-ink-4); }
+.tone-5 { --paper: var(--cover-paper-5); --ink: var(--cover-ink-5); }
+:root[data-theme='dark'] .compact .cover-fallback {
+  color: var(--ink);
+  background: var(--paper);
+}
+.compact .title {
+  margin-top: 9px;
+  font-size: 13.5px;
+  line-height: 1.38;
+}
+.pinned-mark {
+  display: inline-block;
+  margin-right: 3px;
+  vertical-align: -1px;
+  color: var(--brand);
+}
+.meta {
+  display: flex;
+  align-items: center;
+  margin-top: 2px;
+  margin-right: -10px;
+}
+.meta-text {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  color: var(--text-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-variant-numeric: tabular-nums;
+}
+.meta-done {
+  color: var(--success);
+}
+/* 36×36 按钮, 上下负边距不撑高作者行; 热区再外扩到 ≥44px */
+.meta-more {
+  position: relative;
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  margin: -6px 0;
+  display: grid;
+  place-items: center;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--text-3);
+}
+/* 热区外扩到 ≥44px 高 */
+.meta-more::before {
+  content: '';
+  position: absolute;
+  inset: -4px;
+}
+.meta-more:active {
+  background: var(--surface-3);
+}
+.meta-more:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 1px;
 }
 
 @media (prefers-reduced-motion: reduce) {

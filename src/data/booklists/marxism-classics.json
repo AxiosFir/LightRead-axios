@@ -1,10 +1,10 @@
 {
   "id": "marxism-classics",
   "title": "马克思主义原典",
-  "description": "马克思、恩格斯、列宁的代表性著作，中文译本均收录在应用内哲学文库（马克思主义文库）中，可直接搜索阅读。",
+  "description": "马克思、恩格斯与列宁代表作，可在哲学文库读中文版。",
   "en": {
     "title": "Marxist Classics",
-    "description": "Key works by Marx, Engels and Lenin. Chinese translations of every title are in the in-app philosophy library (Marxists Internet Archive) and can be searched and read directly."
+    "description": "Marx, Engels and Lenin, with Chinese editions in the philosophy library."
   },
   "curator": "轻阅编辑部",
   "tags": [

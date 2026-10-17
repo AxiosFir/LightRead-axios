@@ -4,6 +4,7 @@ import { localPack, localTtsAvailable, refreshLocalPack } from './services/local
 import { useRoute, useRouter } from 'vue-router'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import ToastHost from './components/ToastHost.vue'
+import ConfirmHost from './components/ConfirmHost.vue'
 import BabeldocTaskStatus from './components/BabeldocTaskStatus.vue'
 import LibraryUploadStatus from './components/LibraryUploadStatus.vue'
 import { useSettings } from './stores/settings'
@@ -249,6 +250,7 @@ const settingsNav = { path: '/settings', labelKey: 'nav.settings', icon: 'M10.83
     <BabeldocTaskStatus />
     <LibraryUploadStatus />
     <ToastHost />
+    <ConfirmHost />
   </div>
 </template>
 

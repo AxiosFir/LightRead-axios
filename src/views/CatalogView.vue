@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { askConfirm } from '../services/confirm'
 import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import { getStorage, type CatalogSourceRec, isTauri } from '../storage'
 import {
@@ -31,6 +32,7 @@ import { importFile } from '../services/importer'
 import { searchOpenLibrary, type OpenLibraryBook } from '../services/openLibrary'
 import { searchInternetArchive, loadArchivePublication, type ArchiveBook } from '../services/internetArchive'
 import { WEB_BOOK_SOURCES, webBookSourceUrl } from '../services/webBookSources'
+import { catalogErrorKey } from '../services/catalogErrors'
 import { normalizeBookQuery, titleRelevance } from '../services/bookQuery'
 import { arxivSearchUrl as arxivSearchUrlOf, loadArxivPage as loadArxivPageOf } from '../services/arxiv'
 import { importFromUrl } from '../services/urlImport'
@@ -144,7 +146,7 @@ async function showArchiveDownloads(book: ArchiveBook) {
   try {
     archivePublications[book.identifier] = await loadArchivePublication(book)
   } catch (e: any) {
-    toast(t('catalog.loadFailed') + ': ' + (e?.message ?? e), 'error', 6000)
+    toast(t('catalog.loadFailed') + ': ' + sourceErrorText(e), 'error', 6000)
   } finally {
     archiveLoading.delete(book.identifier)
   }
@@ -236,13 +238,14 @@ const uniNoResults = computed(() => !uniSearching.value &&
   (UNI_SOURCES.some(key => uniStatus[key] === 'done') || myResults.value.some(r => r.status === 'done')) &&
   !myResults.value.some(r => r.publications.length) && UNI_SOURCES.every(key => !uniTitles(key).length))
 
-/** 「Failed to fetch」对用户没有意义: 说明是连不上, 网页版提示书源代理 */
-function sourceErrorText(e: any): string {
-  const message = String(e?.message ?? e)
-  if (e instanceof TypeError || /failed to fetch|networkerror|load failed|network request failed/i.test(message)) {
-    return t(isTauri() || settings.corsProxy.trim() ? 'catalog.sourceUnreachable' : 'catalog.sourceUnreachableWeb')
+/** 公开书源与私人书库共用: 原生 / 浏览器错误都转成短提示, 不展示底层网址。 */
+function sourceErrorText(e: unknown): string {
+  const message = e && typeof e === 'object' && 'message' in e ? String(e.message) : String(e ?? '')
+  // 这些是应用主动抛出的已翻译提示, 保留具体操作指引。
+  for (const key of ['catalog.searchTimeout', 'catalog.noSearchTemplate', 'catalog.githubRateLimited']) {
+    if (message === t(key)) return message
   }
-  return message
+  return t(catalogErrorKey(e, !isTauri() && !settings.corsProxy.trim()))
 }
 
 /** 十几个书库各报一遍同样的错 (多为 GitHub 匿名接口限流) 没有意义: 合并成一句 */
@@ -593,7 +596,7 @@ async function searchMyLibrary(session: number, entry: MyLibraryResult, query: s
   } catch (e: any) {
     if (session !== uniSession) return
     entry.status = 'error'
-    entry.error = e?.message ?? String(e)
+    entry.error = sourceErrorText(e)
   }
 }
 
@@ -605,7 +608,7 @@ async function loadMoreMine(entry: MyLibraryResult) {
     entry.publications = [...entry.publications, ...more.publications]
     entry.next = more.next
   } catch (e: any) {
-    toast(`${t('catalog.loadMoreFailed')}: ${e?.message ?? e}`, 'error', 5000)
+    toast(`${t('catalog.loadMoreFailed')}: ${sourceErrorText(e)}`, 'error', 5000)
   } finally {
     entry.loadingMore = false
   }
@@ -836,7 +839,7 @@ async function calibreImportAllNew() {
     toast(t('catalog.noNewBooks'))
     return
   }
-  if (!confirm(t('catalog.importNewConfirm', { count: fresh.length }))) return
+  if (!(await askConfirm(t('catalog.importNewConfirm', { count: fresh.length })))) return
   calibreBatchBusy.value = true
   let ok = 0
   for (const book of fresh) {
@@ -863,11 +866,7 @@ async function openUrl(url: string, title: string, pushCrumb = true) {
     page.value = result
     if (pushCrumb) breadcrumbs.value.push({ title: title || result.title, url })
   } catch (e: any) {
-    const network = e instanceof TypeError || /failed to fetch|networkerror|load failed/i.test(String(e?.message))
-    loadError.value = network ? sourceErrorText(e) : (e?.message ?? t('catalog.loadFailed'))
-    if (!network && !isTauri()) {
-      loadError.value += t('catalog.corsHint')
-    }
+    loadError.value = sourceErrorText(e)
   } finally {
     loading.value = false
   }
@@ -924,7 +923,7 @@ async function runSearch() {
     const resolved = await discoverSearchTemplate(template, sourceAuth())
     openUrl(fillSearchTemplate(resolved, query), t('catalog.searchCrumb', { query }))
   } catch (e: any) {
-    toast(t('catalog.searchFailed', { msg: e?.message ?? t('common.unknownError') }), 'error')
+    toast(t('catalog.searchFailed', { msg: sourceErrorText(e) }), 'error')
   }
 }
 
@@ -941,7 +940,7 @@ async function loadMore() {
       searchUrl: page.value.searchUrl ?? nextPage.searchUrl,
     }
   } catch (e: any) {
-    toast(e?.message ?? t('catalog.loadMoreFailed'), 'error')
+    toast(sourceErrorText(e), 'error')
   } finally {
     appendLoading.value = false
   }
@@ -1012,7 +1011,7 @@ async function saveSource() {
 }
 
 async function removeSource(s: CatalogSourceRec) {
-  if (!confirm(t('catalog.deleteSourceConfirm', { title: s.title }))) return
+  if (!(await askConfirm(t('catalog.deleteSourceConfirm', { title: s.title })))) return
   const storage = await getStorage()
   await storage.deleteSource(s.id)
   forgetSearchTemplate(s.id)
@@ -1091,7 +1090,9 @@ async function removeSource(s: CatalogSourceRec) {
         <Teleport :to="findSlot" :disabled="!findSlot">
         <div v-if="uniErrors.length" class="gh-notice" role="alert">
           <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path fill="currentColor" d="M10.3 3.9a2 2 0 0 1 3.4 0l8 13.6A2 2 0 0 1 20 20.5H4a2 2 0 0 1-1.7-3l8-13.6zM12 9a1 1 0 0 0-1 1v4a1 1 0 1 0 2 0v-4a1 1 0 0 0-1-1zm0 9.2a1.2 1.2 0 1 0 0-2.4 1.2 1.2 0 0 0 0 2.4z"/></svg>
-          <span>{{ uniErrors.join('; ') }}</span>
+          <ul class="source-errors">
+            <li v-for="(error, index) in uniErrors" :key="index">{{ error }}</li>
+          </ul>
         </div>
         <div v-if="ghProgress || fetchingNotice" class="uni-progress" role="status">
           <svg class="spin" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 3a9 9 0 1 0 9 9"/></svg>
@@ -1742,6 +1743,8 @@ async function removeSource(s: CatalogSourceRec) {
 
 <style scoped>
 .catalog {
+  min-width: 0;
+  overflow-wrap: anywhere;
   padding: var(--page-top) var(--page-x) calc(var(--page-bottom) + var(--lr-safe-bottom));
   min-height: 100%;
   max-width: 1160px;
@@ -1931,6 +1934,9 @@ async function removeSource(s: CatalogSourceRec) {
   color: var(--warning);
 }
 .gh-notice {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
   margin-top: 12px;
   padding: 8px 12px;
   border-radius: var(--radius);
@@ -1941,6 +1947,16 @@ async function removeSource(s: CatalogSourceRec) {
   display: flex;
   align-items: flex-start;
   gap: 8px;
+}
+.source-errors {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.source-errors li + li {
+  margin-top: 4px;
 }
 .gh-notice svg {
   flex-shrink: 0;
@@ -1978,6 +1994,8 @@ async function removeSource(s: CatalogSourceRec) {
   font-size: 13px;
 }
 .uni-group-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
   font-weight: 600;
   color: var(--text);
 }
@@ -1990,6 +2008,7 @@ async function removeSource(s: CatalogSourceRec) {
   font-size: 11px;
 }
 .uni-group-msg {
+  overflow-wrap: anywhere;
   font-size: 12px;
   line-height: 1.6;
   color: var(--text-3);
@@ -2154,6 +2173,7 @@ async function removeSource(s: CatalogSourceRec) {
   gap: 12px;
 }
 .source-card {
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -3069,7 +3089,7 @@ async function removeSource(s: CatalogSourceRec) {
   .source-grid,
   .web-grid,
   .curated-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
   .curated-hero {
     padding: 14px;

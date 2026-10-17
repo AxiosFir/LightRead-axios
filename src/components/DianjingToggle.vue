@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AppSelect from './AppSelect.vue'
 /**
  * 点睛阅读, 放在「阅读模式」面板顶部 (docs/reader-panels.md §3.2, docs/manual/05-点睛阅读.md)。
  * 关: 标题 + 副标题 + 总开关。开: 「基础 / 智能」两个版本, 下面只显示所选版本的选项——
@@ -235,11 +236,11 @@ function openOutline() {
 
         <div class="dj-row">
           <span class="dj-label">{{ t('dianjing.genre') }}</span>
-          <select v-model="genre" class="input dj-select" :aria-label="t('dianjing.genre')">
+          <AppSelect v-model="genre" class="input dj-select" :aria-label="t('dianjing.genre')">
             <option value="">{{ autoGenreLabel }}</option>
             <option value="fiction">{{ t('dianjing.genreFiction') }}</option>
             <option value="nonfiction">{{ t('dianjing.genreNonfiction') }}</option>
-          </select>
+          </AppSelect>
         </div>
         <p v-if="dj.fiction.value" class="dj-hint">{{ t('dianjing.fictionHint') }}</p>
 

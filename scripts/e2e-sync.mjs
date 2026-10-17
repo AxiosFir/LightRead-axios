@@ -260,8 +260,8 @@ try {
   assert(srcA.length === 1 && srcA[0].password === 's3cret', `A 的书源应只改名: ${srcA.length}`)
   ok('B 编辑书源名称 → A 收到 (原地改写, 不重复)')
 
-  A.once('dialog', d => d.accept())
-  await A.locator('.source-card', { hasText: '书房书库' }).locator('.btn-danger').click()
+    await A.locator('.source-card', { hasText: '书房书库' }).locator('.btn-danger').click()
+  await A.locator('.confirm-accept').click()
   await A.locator('.source-card', { hasText: '书房书库' }).waitFor({ state: 'detached', timeout: 5000 })
   await syncVia(A)
   await syncVia(B)

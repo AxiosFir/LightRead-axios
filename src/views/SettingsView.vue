@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import { askConfirm } from '../services/confirm'
+import AppSelect from '../components/AppSelect.vue'
+import AppModal from '../components/AppModal.vue'
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { getStorage, isTauri } from '../storage'
@@ -24,7 +27,8 @@ import {
   type UpdateInfo, type DownloadOption,
 } from '../services/updater'
 import { t } from '../i18n'
-import { AI_PROVIDERS, providerById, chatStream } from '../services/ai'
+import { providerById, chatStream } from '../services/ai'
+import AiProviderPicker from '../components/settings/AiProviderPicker.vue'
 import {
   paperAgentRuntimeAvailable,
   paperAgentEngineStatus,
@@ -234,7 +238,7 @@ async function davBackup() {
 }
 
 async function davRestore() {
-  if (!confirm(t('webdav.restoreConfirm'))) return
+  if (!(await askConfirm(t('webdav.restoreConfirm')))) return
   busyScope.value = 'dav'
   busy.value = t('webdav.connectingCloud')
   davInfo.value = null
@@ -524,6 +528,8 @@ const aiShowBaseUrl = computed(() => {
   return aiBaseUrlOpen.value || preset.id === 'custom' || !settings.aiBaseUrl || settings.aiBaseUrl !== preset.baseUrl
 })
 
+const aiPreset = computed(() => providerById(settings.aiProvider))
+const aiNeedsKey = computed(() => aiPreset.value.needsKey || aiPreset.value.id === 'custom')
 const aiDocsUrl = computed(() => providerById(settings.aiProvider).docsUrl ?? '')
 
 const paperAgentEngines: Array<{ id: PaperAgentEngine; label: string }> = [
@@ -732,9 +738,9 @@ async function changeLibraryRoot() {
 
   try {
     if (await hasLibraryAt(picked)) {
-      if (!confirm(t('settings.useExistingLibrary', { path: picked }))) return
+      if (!(await askConfirm(t('settings.useExistingLibrary', { path: picked })))) return
     } else {
-      if (!confirm(t('settings.migrateConfirm', { path: picked }))) return
+      if (!(await askConfirm(t('settings.migrateConfirm', { path: picked })))) return
       migrating.value = t('settings.preparingMigration')
       await migrateLibraryTo(picked, msg => (migrating.value = msg))
     }
@@ -749,8 +755,8 @@ async function changeLibraryRoot() {
   }
 }
 
-function resetLibraryRoot() {
-  if (!confirm(t('settings.resetLocationConfirm'))) return
+async function resetLibraryRoot() {
+  if (!(await askConfirm(t('settings.resetLocationConfirm')))) return
   settings.libraryRoot = ''
   localStorage.setItem('lightread-settings', JSON.stringify(settings.$state))
   setTimeout(() => location.reload(), 300)
@@ -1118,14 +1124,11 @@ const APPEARANCE_OPTIONS = [
     <section id="settings-ai" class="card section" aria-labelledby="settings-ai-heading">
       <h2 id="settings-ai-heading" tabindex="-1">{{ t('settings.aiTitle') }}</h2>
       <p class="section-desc">{{ t('settings.aiDesc') }}</p>
-      <div class="field-grid">
-        <div class="field">
+      <div class="field-grid ai-fields">
+        <div class="field field-wide">
           <label class="field-label" for="ai-provider">{{ t('settings.aiProvider') }}</label>
-          <select id="ai-provider" v-model="settings.aiProvider" class="input" @change="onAiProviderChange">
-            <option v-for="p in AI_PROVIDERS" :key="p.id" :value="p.id">
-              {{ p.label }}{{ p.id === 'trial' ? t('settings.aiTrialTag') : p.id === 'siliconflow' || p.id === 'zhipu' ? t('settings.aiFreeTag') : '' }}
-            </option>
-          </select>
+          <AiProviderPicker v-model="settings.aiProvider" @change="onAiProviderChange" />
+          <p class="ai-provider-hint">{{ t(`aiProvider.${aiPreset.id}Desc`) }}</p>
         </div>
         <div class="field">
           <label class="field-label" for="ai-model">{{ t('settings.aiModelLabel') }}</label>
@@ -1135,13 +1138,13 @@ const APPEARANCE_OPTIONS = [
           <label class="field-label" for="ai-base-url">{{ t('settings.aiBaseUrlLabel') }}</label>
           <input id="ai-base-url" v-model="settings.aiBaseUrl" class="input" type="url" inputmode="url" autocapitalize="off" spellcheck="false" placeholder="https://api.siliconflow.cn/v1" />
         </div>
-        <div class="field field-wide">
+        <div v-if="aiNeedsKey" class="field field-wide">
           <label class="field-label" for="ai-key">API Key</label>
           <input id="ai-key" v-model="settings.aiApiKey" class="input" type="password" :placeholder="t('settings.aiKeyPh')" autocomplete="new-password" />
         </div>
       </div>
       <div class="ai-actions">
-        <button class="btn btn-primary" :disabled="aiTesting || !settings.aiBaseUrl || !settings.aiModel" @click="testAi">
+        <button class="btn btn-primary" :disabled="aiTesting || !settings.aiBaseUrl.trim() || !settings.aiModel.trim() || (aiPreset.needsKey && !settings.aiApiKey.trim())" @click="testAi">
           {{ aiTesting ? t('settings.testing') : t('settings.aiTest') }}
         </button>
         <button v-if="!aiShowBaseUrl" type="button" class="link-btn" @click="aiBaseUrlOpen = true">{{ t('settings.aiEditBaseUrl') }}</button>
@@ -1303,9 +1306,9 @@ const APPEARANCE_OPTIONS = [
           </div>
         </div>
         <div class="proxy-grid">
-          <select v-model="proxy.scheme" class="input" :aria-label="t('settings.proxyTitle')">
+          <AppSelect v-model="proxy.scheme" class="input" :aria-label="t('settings.proxyTitle')">
             <option v-for="s in PROXY_SCHEMES" :key="s.value" :value="s.value">{{ s.labelKey ? t(s.labelKey) : s.label }}</option>
-          </select>
+          </AppSelect>
           <input v-model="proxy.host" class="input" :placeholder="t('settings.proxyHostPlaceholder')" :aria-label="t('settings.proxyHostPlaceholder')" :disabled="!proxy.scheme" />
           <input v-model="proxy.port" class="input port" inputmode="numeric" :placeholder="t('settings.proxyPort')" :aria-label="t('settings.proxyPort')" :disabled="!proxy.scheme" />
         </div>
@@ -1439,9 +1442,10 @@ const APPEARANCE_OPTIONS = [
       </div>
 
       <div class="about">
-        <p>
-          {{ t('settings.aboutFormats') }}
-        </p>
+        <details class="about-formats">
+          <summary>{{ t('settings.aboutFormatsShort') }}</summary>
+          <p>{{ t('settings.aboutFormats') }}</p>
+        </details>
         <p class="about-links">
           <a href="javascript:void 0" @click="download(REPO_URL)">{{ t('settings.repoLink') }}</a>
           <a href="javascript:void 0" @click="download(ISSUES_URL)">{{ t('settings.issuesLink') }}</a>
@@ -1453,32 +1457,37 @@ const APPEARANCE_OPTIONS = [
       </div>
     </section>
 
-    <div v-if="showSecretsConfirm" class="modal-mask" @click.self="showSecretsConfirm = false" @keydown.esc="showSecretsConfirm = false">
-      <div class="modal confirm-modal" role="alertdialog" aria-modal="true" aria-labelledby="secrets-title" aria-describedby="secrets-desc">
-        <h3 id="secrets-title">{{ t('sync.secretsConfirmTitle') }}</h3>
-        <p id="secrets-desc" class="modal-text">{{ t('sync.secretsConfirmBody') }}</p>
-        <p class="modal-text">{{ t('sync.secretsConfirmAdvice') }}</p>
-        <div class="modal-actions">
-          <button ref="secretsCancelBtn" class="btn" @click="showSecretsConfirm = false">{{ t('common.cancel') }}</button>
-          <button class="btn btn-primary" @click="confirmSecrets">{{ t('sync.secretsConfirmAction') }}</button>
-        </div>
-      </div>
-    </div>
-
-    <div v-if="showDavDisconnect" class="modal-mask" @click.self="showDavDisconnect = false" @keydown.esc="showDavDisconnect = false">
-      <div class="modal confirm-modal" role="alertdialog" aria-modal="true" aria-labelledby="dav-disconnect-title" aria-describedby="dav-disconnect-desc">
-        <h3 id="dav-disconnect-title">{{ t('webdav.disconnectTitle', { name: t(`webdav.provider.${davProviderId}`) }) }}</h3>
-        <p id="dav-disconnect-desc" class="modal-text">{{ t('webdav.disconnectConfirm') }}</p>
-        <div class="modal-actions">
-          <button ref="davDisconnectCancel" class="btn" @click="showDavDisconnect = false">{{ t('common.cancel') }}</button>
-          <button class="btn btn-danger" @click="confirmDavDisconnect">{{ t('webdav.disconnect') }}</button>
-        </div>
-      </div>
-    </div>
+    <AppModal v-if="showSecretsConfirm" :title="t('sync.secretsConfirmTitle')" initial-focus=".settings-confirm-cancel" @close="showSecretsConfirm = false">
+      <div class="settings-confirm-body"><p>{{ t('sync.secretsConfirmBody') }}</p><p>{{ t('sync.secretsConfirmAdvice') }}</p></div>
+      <template #footer><div class="modal-actions">
+        <button ref="secretsCancelBtn" class="btn settings-confirm-cancel" @click="showSecretsConfirm = false">{{ t('common.cancel') }}</button>
+        <button class="btn btn-primary" @click="confirmSecrets">{{ t('sync.secretsConfirmAction') }}</button>
+      </div></template>
+    </AppModal>
+    <AppModal v-if="showDavDisconnect" :title="t('webdav.disconnectTitle', { name: t(`webdav.provider.${davProviderId}`) })" initial-focus=".settings-confirm-cancel" @close="showDavDisconnect = false">
+      <div class="settings-confirm-body"><p>{{ t('webdav.disconnectConfirm') }}</p></div>
+      <template #footer><div class="modal-actions">
+        <button ref="davDisconnectCancel" class="btn settings-confirm-cancel" @click="showDavDisconnect = false">{{ t('common.cancel') }}</button>
+        <button class="btn btn-danger" @click="confirmDavDisconnect">{{ t('webdav.disconnect') }}</button>
+      </div></template>
+    </AppModal>
   </div>
 </template>
 
 <style scoped>
+.about-formats summary { min-height: 44px; display: flex; align-items: center; gap: 8px; cursor: pointer; color: var(--text-2); }
+.about-formats summary::before { content: '＋'; }
+.about-formats[open] summary::before { content: '−'; }
+.about-formats p { margin: 0 0 12px; }
+
+.settings-confirm-body { padding: 20px; line-height: 1.7; color: var(--text-2); }
+.settings-confirm-body p + p { margin-top: 12px; }
+.modal-actions .btn { min-height: 44px; }
+
+.ai-provider-hint { margin: 2px 0 0; color: var(--text-3); font-size: 12px; line-height: 1.5; }
+.ai-fields .field:has(#ai-model) { grid-column: 1 / -1; }
+.ai-actions .btn, .ai-actions .link-btn { min-height: 44px; }
+
 /* ================= 页面骨架 ================= */
 .settings {
   --nav-h: 52px;
@@ -2380,7 +2389,7 @@ h2:focus {
   margin-top: 8px;
 }
 .proxy-grid .input:first-child,
-.proxy-grid select {
+.proxy-grid .app-select-trigger {
   width: 200px;
   flex-shrink: 0;
 }
@@ -2770,7 +2779,7 @@ h2:focus {
   .proxy-grid .input,
   .proxy-grid .btn,
   .proxy-grid .input:first-child,
-  .proxy-grid select,
+  .proxy-grid .app-select-trigger,
   .proxy-grid .port {
     flex: none;
     width: 100%;

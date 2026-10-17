@@ -28,6 +28,7 @@ npm run test:read-aloud      # 听书: 句子游标断句 + 播放管线 (分块
 npm run test:reading-modes   # 阅读模式: 打字机出字节奏 / 断句 / 按行分组 (纯函数)
 npm run test:reading-focus   # 阅读焦点: 舒适区 25%–65% / 焦点线 38% / 长句 / 手动滚动后暂停跟随 (听书跟随与跳转落点, 纯函数)
 npm run test:reader-tap-zone # 轻点分区: 横屏左·中·右 / 竖屏上·中·下 / 自动阅读时无翻页区 (纯函数)
+npm run test:display-title   # 手机书架短书名 / 短作者: 只去末尾长营销括注, 作者取分号前第一段 (src/services/displayTitle.ts)
 npm run test:zh-segment      # 仿生阅读中文分词: 词表切分 / 歧义不上色 / ICU 回退 / 交替规则 / 速度 (<15ms/万字)
 npm run test:key-words       # 点睛重点词: 本书新词发现 / 自信息 + 关键度 + 聚集度打分 / 密度与间隔 / AI 词定位与回退 (设计见 docs/research/entropy-keyword-highlighting.md、llm-keyword-selection.md)
 npm run test:terminology     # 术语来源完整性 / 22 类路由 / 原文跨度 / 边界与预算
@@ -88,6 +89,9 @@ sync-server/           轻阅账号后端 (Cloudflare Worker + D1 + R2, sync.jia
 - 图标一律内联 SVG（`aria-hidden="true"`），不用 emoji 当图标；图标按钮必须有 `aria-label`/`title`。
 - 触屏设备不依赖 hover：`@media (hover: none)` 下提供可点的替代（如 BookCard 的「更多」按钮）。
 - 所有用户可见文案走 `t()`，中英两个字典同时加 key，放在对应分区（`// ---- 藏书 ----` 等）。
+- UI / UX 需求先从全局检索同类入口，优先统一控件与交互；不只修反馈截图里的单点。应用内选择和确认使用 `AppSelect` / `AppModal` / `askConfirm`，不新增原生 `<select>` 或 `alert` / `confirm` / `prompt`。文件选择、权限和安装器属于系统能力。
+- 全局排查不等于扩大改版范围。替换弹窗时保留所在页面原有布局与触发控件尺寸；未明确要求改版的页面不得顺带重排。藏书页手机端 (≤720px) 已按 2026-10-17 用户确认的原型改版：标题 + 今日 + 圆形「＋」/ 吸顶搜索 / 继续阅读卡 / 列表标题 (范围·排序·选择) / `BookCard compact` (封面只留进度条, 「⋯」在作者行, 长按进入选择) / 选择模式底部 4 项操作栏；添加、书卡操作、批量更多都走 `AppModal` 底部面板。桌面布局保持原样，不要把手机改版带到桌面。
+- 手机文案按实际宽度检查换行；超过两行的界面说明逐项审阅，优先精简或按需展开。保留关键风险信息，不截断书籍正文、用户内容和必要错误详情。
 - 新增设置项：在 `SettingsState` + `defaults` 里加字段即可（load 时自动 merge）；改历史默认值才需递增 `SETTINGS_VERSION` 并写迁移。
 - Vue 模板里 `v-for` 变量不要用 `t`（会遮蔽 i18n 函数）。
 - 组件样式用 `<style scoped>`；需要覆盖主题的选择器写成 `:root[data-theme='dark'] .x`。

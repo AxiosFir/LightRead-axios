@@ -1,3 +1,4 @@
+import { chooseOption } from './e2e-controls.mjs'
 /** Targeted browser coverage. Start Vite on 4175; run with:
  * flock /tmp/heavy.lock nice -n 10 node scripts/e2e-library-upload.mjs
  * Required real Kindle fixtures (never downloaded or silently skipped by this test):
@@ -132,7 +133,7 @@ try {
   await noOverflow('desktop-library')
 
   await openUpload()
-  await dialog.locator('.upload-field select').selectOption(seeded.writableId)
+  await chooseOption(page, dialog.locator('.upload-field .app-select-trigger'), seeded.writableId)
   await dialog.locator('.upload-device input').waitFor({ state: 'attached' })
   // 这一轮校验原文件字节: 关掉默认开启的「上传前转换为 EPUB」
   const convertBox = dialog.getByRole('checkbox', { name: /上传前转换为 EPUB/ })
@@ -158,7 +159,7 @@ try {
   await closeUpload()
   const card = page.locator('.up-task')
   await card.getByText('正在上传到私人书库').waitFor()
-  await page.evaluate(async () => { await (await import('/src/router/index.ts')).router.push('/settings') })
+  await page.locator('.nav-item[href="#/settings"]').click()
   await page.waitForFunction(() => location.hash.includes('/settings'))
   assert.equal(await card.isVisible(), true, 'Progress card must stay visible on other pages')
   await card.getByRole('button', { name: '查看明细', exact: true }).click()
@@ -168,7 +169,7 @@ try {
   await page.locator('.toast').filter({ hasText: '私人书库上传完成：已添加 2 本，1 本书库已有，1 本失败' }).waitFor()
   await card.getByRole('button', { name: '重试失败（1）', exact: true }).waitFor()
   console.log('PASS upload keeps running in the background after closing the dialog and leaving the page')
-  await page.evaluate(async () => { await (await import('/src/router/index.ts')).router.push('/library') })
+  await page.locator('.nav-item[href="#/library"]').click()
   await page.locator('.booklist-chip').filter({ hasText: '上传实测书单' }).click()
   await openUpload()
   assert.equal(await card.count(), 0, 'Progress card hides while the dialog shows the same task')
@@ -184,9 +185,9 @@ try {
   await closeUpload()
 
   await openUpload()
-  await dialog.locator('.upload-field select').selectOption(seeded.writableId)
+  await chooseOption(page, dialog.locator('.upload-field .app-select-trigger'), seeded.writableId)
   await dialog.getByRole('button', { name: '从我的藏书选择', exact: true }).click()
-  await dialog.getByRole('combobox', { name: '全部藏书', exact: true }).selectOption(seeded.listId)
+  await chooseOption(page, dialog.getByRole('button', { name: '全部藏书', exact: true }), seeded.listId)
   assert.equal(await dialog.locator('.upload-book').count(), 4)
   await dialog.getByRole('checkbox', { name: '只看置顶', exact: true }).check()
   assert.equal(await dialog.locator('.upload-book').count(), 1)
@@ -212,7 +213,7 @@ try {
   console.log('PASS existing-book booklist/pinned filters, stored original bytes, metadata headers and responsive layout')
 
   await openUpload()
-  await dialog.locator('.upload-field select').selectOption(seeded.readonlyId)
+  await chooseOption(page, dialog.locator('.upload-field .app-select-trigger'), seeded.readonlyId)
   await dialog.getByRole('alert').filter({ hasText: '这个书库暂不支持从轻阅上传' }).waitFor()
   assert.equal(await dialog.locator('input[type=file]').count(), 0)
   assert.equal(await dialog.getByRole('button', { name: '开始上传（0）', exact: true }).isDisabled(), true)
@@ -226,19 +227,19 @@ try {
   await dialog.locator('.upload-pending li').waitFor()
   assert.equal(await dialog.locator('.upload-pending li').count(), 1)
   assert.match(await dialog.locator('.upload-pending li').innerText(), new RegExp(title))
-  await dialog.locator('.upload-field select').selectOption(seeded.writableId)
+  await chooseOption(page, dialog.locator('.upload-field .app-select-trigger'), seeded.writableId)
   assert.equal(await dialog.locator('.upload-tabs button.active').innerText(), '从我的藏书选择')
   await closeUpload()
   console.log('PASS BookCard cloud action preselects exactly the selected book')
 
   await page.setViewportSize({ width: 390, height: 844 })
-  await page.evaluate(async () => { await (await import('/src/router/index.ts')).router.push('/catalogs') })
+  await page.locator('.nav-item[href="#/catalogs"]').click()
   const sourceCard = page.locator('.source-card').filter({ hasText: '实测私人书库' })
-  await sourceCard.waitFor()
+  await sourceCard.waitFor().catch(async error => { console.log('Catalog state', await page.evaluate(() => ({ route: location.hash, sources: document.querySelectorAll('.source-card').length, dialogs: document.querySelectorAll('[data-app-modal]').length }))); throw error })
   await sourceCard.getByRole('button', { name: '添加书籍', exact: true }).click()
   await dialog.locator('.upload-device input').waitFor({ state: 'attached' })
   assert.equal(await dialog.locator('.upload-field strong').innerText(), '实测私人书库')
-  assert.equal(await dialog.locator('.upload-field select').count(), 0)
+  assert.equal(await dialog.locator('.upload-field .app-select-trigger').count(), 0)
   assert.equal(await dialog.locator('.upload-url').innerText(), `${base}/__upload_e2e/opds`)
   await noOverflow('mobile-catalog-card-upload')
   await closeUpload()
@@ -250,7 +251,7 @@ try {
   await page.locator('header.toolbar').getByRole('button', { name: '添加书籍', exact: true }).click()
   await dialog.locator('.upload-device input').waitFor({ state: 'attached' })
   assert.equal(await dialog.locator('.upload-field strong').innerText(), '实测私人书库')
-  assert.equal(await dialog.locator('.upload-field select').count(), 0)
+  assert.equal(await dialog.locator('.upload-field .app-select-trigger').count(), 0)
   assert.equal(await dialog.locator('.upload-url').innerText(), `${base}/__upload_e2e/opds`)
   await noOverflow('mobile-catalog-directory-upload')
   console.log('PASS Catalog card and OPDS directory upload entries preset the correct destination')
@@ -258,9 +259,9 @@ try {
 
   // 默认开启「上传前转换为 EPUB」: AZW3 先在本机转成 EPUB 再上传
   await page.setViewportSize({ width: 1280, height: 900 })
-  await page.evaluate(async () => { await (await import('/src/router/index.ts')).router.push('/library') })
+  await page.locator('.nav-item[href="#/library"]').click()
   await openUpload()
-  await dialog.locator('.upload-field select').selectOption(seeded.writableId)
+  await chooseOption(page, dialog.locator('.upload-field .app-select-trigger'), seeded.writableId)
   await dialog.locator('.upload-device input').waitFor({ state: 'attached' })
   assert.equal(await dialog.getByRole('checkbox', { name: /上传前转换为 EPUB/ }).isChecked(), true)
   assert.match(await dialog.locator('.upload-device input').getAttribute('accept'), /\.fb2/, 'Convertible formats become selectable')

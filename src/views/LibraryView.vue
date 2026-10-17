@@ -1,5 +1,9 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { askConfirm } from '../services/confirm'
+import AppSelect from '../components/AppSelect.vue'
+import AppModal from '../components/AppModal.vue'
+import { shortAuthor, shortTitle } from '../services/displayTitle'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useLibrary } from '../stores/library'
 import { importFiles, type LazyImportFile } from '../services/importer'
@@ -179,6 +183,7 @@ function onGlobalKeydown(e: KeyboardEvent) {
     e.preventDefault()
     return
   }
+  if (addSheet.value || menuBookId.value || batchMoreSheet.value || booklistSheet.value) return // AppModal 自己处理 Esc
   if (showTagManage.value) showTagManage.value = false
   else if (showUrlModal.value) { if (!urlImporting.value) showUrlModal.value = false }
   else if (showTagModal.value) showTagModal.value = false
@@ -328,7 +333,7 @@ async function removeBook(book: BookMeta) {
     : book.format === 'pdf'
       ? 'library.deletePdfConfirm'
       : 'library.deleteConfirm'
-  if (!confirm(t(confirmation, { title: book.title }))) return
+  if (!(await askConfirm(t(confirmation, { title: book.title })))) return
   try {
     await library.removeBook(book.id)
     toast(t('library.deleted'), 'success')
@@ -401,7 +406,7 @@ async function batchDelete() {
     : includesPdf
       ? 'library.batchDeleteWithAgentConfirm'
       : 'library.batchDeleteConfirm'
-  if (!count || !confirm(t(confirmation, { count }))) return
+  if (!count || !(await askConfirm(t(confirmation, { count })))) return
   let deleted = 0
   try {
     for (const id of selectedIds.value) {
@@ -467,8 +472,11 @@ async function batchPin(pin: boolean) {
 
 /** 私密: 只留在本机, 不参与多端同步 (见 services/sync/engine.ts) */
 async function batchPrivate(on: boolean) {
+  await setPrivate([...selectedIds.value], on)
+}
+async function setPrivate(ids: string[], on: boolean) {
   const storage = await (await import('../storage')).getStorage()
-  for (const id of selectedIds.value) {
+  for (const id of ids) {
     const book = library.books.find(b => b.id === id)
     if (!book) continue
     await storage.updateBook(id, { noSync: on })
@@ -530,7 +538,7 @@ async function renameBooklist(id: string) {
 
 async function deleteBooklist(id: string) {
   const item = library.booklists.find(booklist => booklist.id === id)
-  if (!item || !confirm(t('library.deleteBooklistConfirm', { name: item.name }))) return
+  if (!item || !(await askConfirm(t('library.deleteBooklistConfirm', { name: item.name })))) return
   await library.deleteBooklist(id)
   if (activeBooklistId.value === id) activeBooklistId.value = ''
   delete booklistRenames.value[id]
@@ -614,7 +622,7 @@ async function renameTag(oldName: string) {
 }
 
 async function deleteTag(tag: string) {
-  if (!confirm(t('library.deleteTagConfirm', { tag }))) return
+  if (!(await askConfirm(t('library.deleteTagConfirm', { tag })))) return
   const storage = await (await import('../storage')).getStorage()
   for (const book of library.books) {
     if (!book.tags.includes(tag)) continue
@@ -625,6 +633,70 @@ async function deleteTag(tag: string) {
   if (tagFilter.value === tag) tagFilter.value = ''
   delete tagRenames.value[tag]
   toast(t('library.tagDeleted'), 'success')
+}
+
+// ---- 手机藏书页 (≤720px): 继续阅读 / 列表标题 / 底部面板 / 选择栏; 桌面布局不变 ----
+const phone = useMediaQuery(MQ.phone)
+const addSheet = ref(false)
+const menuBookId = ref('')
+const batchMoreSheet = ref(false)
+const booklistSheet = ref(false)
+const menuBook = computed(() => library.books.find(book => book.id === menuBookId.value))
+
+/** 最近打开的书; 搜索 / 筛选 / 书单 / 选择时不显示 */
+const resumeBook = computed(() => {
+  if (!phone.value || paperMode.value || manageMode.value) return undefined
+  if (keyword.value.trim() || tagFilter.value || activeBooklistId.value) return undefined
+  let last: BookMeta | undefined
+  for (const book of kindBooks.value) if (book.lastReadAt && (!last || book.lastReadAt > (last.lastReadAt ?? 0))) last = book
+  return last
+})
+const resumePercent = computed(() => Math.min(100, Math.max(0, Math.round((resumeBook.value?.progress ?? 0) * 100))))
+function agoText(at: number) {
+  const minutes = Math.floor((Date.now() - at) / 60000)
+  if (minutes < 1) return t('library.agoJustNow')
+  if (minutes < 60) return t('library.agoMinutes', { n: minutes })
+  if (minutes < 1440) return t('library.agoHours', { n: Math.floor(minutes / 60) })
+  return t('library.agoDays', { n: Math.floor(minutes / 1440) })
+}
+
+const listScope = computed(() => {
+  const count = t(paperMode.value ? 'library.paperCount' : 'library.bookCount', { count: filtered.value.length })
+  const scope = keyword.value.trim() ? t('library.searchResults') : activeBooklist.value?.name ?? tagFilter.value ?? ''
+  return t('library.listScope', { scope: scope || t('library.filterAll'), count })
+})
+
+/** 长按封面: 进入选择并选中这本 */
+function onLongPress(book: BookMeta) {
+  navigator.vibrate?.(12)
+  manageMode.value = true
+  selectedIds.value = new Set([book.id])
+}
+const selectedBooks = computed(() => library.books.filter(book => selectedIds.value.has(book.id)))
+const allSelectedPinned = computed(() => !!selectedBooks.value.length && selectedBooks.value.every(book => book.pinnedAt))
+const allSelectedPrivate = computed(() => !!selectedBooks.value.length && selectedBooks.value.every(book => book.noSync))
+
+/* 先关面板再执行: AppModal 卸载前会拦下路由跳转, 也会让其它弹窗处于 inert */
+async function bookMenuAction(run: (book: BookMeta) => unknown) {
+  const book = menuBook.value
+  menuBookId.value = ''
+  await nextTick()
+  if (book) await run(book)
+}
+async function batchMoreAction(run: () => unknown) {
+  batchMoreSheet.value = false
+  await nextTick()
+  await run()
+}
+async function addAction(run: () => unknown) {
+  addSheet.value = false
+  await nextTick()
+  await run()
+}
+async function booklistAction(run: () => unknown) {
+  booklistSheet.value = false
+  await nextTick()
+  await run()
 }
 
 async function batchClearTags() {
@@ -649,11 +721,11 @@ async function batchClearTags() {
     @drop.prevent="onDrop"
     @click="importMenu = false"
   >
-    <header class="toolbar">
+    <header v-show="!(phone && manageMode)" class="toolbar">
       <div class="heading">
         <h1>{{ paperMode ? t('nav.papers') : t('library.title') }}</h1>
         <span v-if="library.loaded" class="count">
-          {{ t(paperMode ? 'library.paperCount' : 'library.bookCount', { count: kindBooks.length }) }}<template v-if="totalReadingTime"> · {{ t('library.totalReading', { time: totalReadingTime }) }}</template>
+          {{ t(paperMode ? 'library.paperCount' : 'library.bookCount', { count: kindBooks.length }) }}<template v-if="totalReadingTime && !phone"> · {{ t('library.totalReading', { time: totalReadingTime }) }}</template>
         </span>
         <router-link
           v-if="!paperMode"
@@ -695,16 +767,28 @@ async function batchClearTags() {
           <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M6.7 5.3a1 1 0 0 0-1.4 1.4L10.6 12l-5.3 5.3a1 1 0 1 0 1.4 1.4l5.3-5.3 5.3 5.3a1 1 0 0 0 1.4-1.4L13.4 12l5.3-5.3a1 1 0 0 0-1.4-1.4L12 10.6 6.7 5.3z"/></svg>
         </button>
       </div>
-      <select v-model="sortBy" class="input sort" :aria-label="t('common.sortBy')">
+      <AppSelect v-if="!phone" v-model="sortBy" class="input sort" :aria-label="t('common.sortBy')">
         <option value="recent">{{ t('library.sortRecent') }}</option>
         <option value="added">{{ t('library.sortAdded') }}</option>
         <option value="title">{{ t(paperMode ? 'library.sortPaperTitle' : 'library.sortTitle') }}</option>
         <option value="author">{{ t('library.sortAuthor') }}</option>
-      </select>
-      <button v-if="kindBooks.length" class="btn" :class="{ 'btn-primary': manageMode }" :aria-pressed="manageMode" @click="toggleManage">
+      </AppSelect>
+      <button v-if="kindBooks.length && !phone" class="btn" :class="{ 'btn-primary': manageMode }" :aria-pressed="manageMode" @click="toggleManage">
         {{ manageMode ? t('common.done') : t('library.manage') }}
       </button>
-      <div class="import-group">
+      <!-- 手机: 圆形「＋」, 添加方式在底部面板里 -->
+      <button
+        v-if="phone"
+        class="add-fab"
+        :disabled="importing"
+        :title="t(paperMode ? 'library.importPapers' : 'library.import')"
+        :aria-label="t(paperMode ? 'library.importPapers' : 'library.import')"
+        aria-haspopup="dialog"
+        @click.stop="addSheet = true"
+      >
+        <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M11 13H5a1 1 0 1 1 0-2h6V5a1 1 0 1 1 2 0v6h6a1 1 0 1 1 0 2h-6v6a1 1 0 1 1-2 0v-6z"/></svg>
+      </button>
+      <div v-else class="import-group">
         <button
           class="btn btn-primary import-main"
           :disabled="importing"
@@ -749,17 +833,36 @@ async function batchClearTags() {
           </button>
         </div>
       </div>
-      <!-- 手机端换行点: 标题+导入 一行, 搜索+排序+管理 一行 -->
+      <!-- 手机端换行点: 标题+今日+添加 一行, 搜索一行 (排序 / 选择在书格上方的列表标题里) -->
       <span class="row-break" aria-hidden="true" />
       <input ref="fileInput" type="file" multiple :accept="ACCEPT_READABLE" hidden @change="onPick" />
       <!-- 选文件夹: 不带 multiple, e2e 的 input[type=file][multiple] 仍只指向上面的文件输入框 -->
       <input v-if="folderSupported" ref="folderInput" type="file" webkitdirectory hidden data-folder-input @change="onFolderPick" />
     </header>
-    <p class="add-books-hint">{{ t(touchPrimary ? 'library.addFormatsHintTouch' : 'library.addFormatsHint') }}<span v-if="activeBooklist"> · {{ t('library.addIntoBooklist', { name: activeBooklist.name }) }}</span></p>
+    <!-- 手机端的格式说明在添加面板里 -->
+    <p v-if="!phone" class="add-books-hint">{{ t(touchPrimary ? 'library.addFormatsHintTouch' : 'library.addFormatsHint') }}<span v-if="activeBooklist"> · {{ t('library.addIntoBooklist', { name: activeBooklist.name }) }}</span></p>
 
-    <!-- 书单: 一级内容分组，可与标签和搜索组合筛选 -->
-    <section v-if="!paperMode" class="booklist-section">
-      <div class="booklist-heading">
+    <!-- 手机: 继续阅读 (最近打开的书) -->
+    <section v-if="resumeBook" class="resume card" role="button" tabindex="0" :aria-label="`${t('library.continueReading')}: ${resumeBook.title}`" @click="openBook(resumeBook)" @keydown.enter.prevent="openBook(resumeBook)">
+      <div class="resume-cover" aria-hidden="true">
+        <img v-if="library.coverUrls[resumeBook.id]" :src="library.coverUrls[resumeBook.id]" alt="" decoding="async" />
+        <span v-else class="resume-cover-title">{{ shortTitle(resumeBook.title) }}</span>
+      </div>
+      <div class="resume-info">
+        <span class="resume-eyebrow">{{ t('library.continueReadingAgo', { time: agoText(resumeBook.lastReadAt!) }) }}</span>
+        <span class="resume-title">{{ shortTitle(resumeBook.title) }}</span>
+        <span class="resume-author">{{ shortAuthor(resumeBook.author) || t('common.anonymous') }}</span>
+        <span class="resume-foot">
+          <span class="resume-track" aria-hidden="true"><span class="resume-fill" :style="{ width: `${Math.max(resumePercent, 2)}%` }" /></span>
+          <span class="resume-pct">{{ resumePercent }}%</span>
+          <span class="resume-go" aria-hidden="true">{{ t('library.continue') }}</span>
+        </span>
+      </div>
+    </section>
+
+    <!-- 书单: 一级内容分组，可与标签和搜索组合筛选; 手机上只有建过书单才出现, 操作在添加面板 / 列表标题里 -->
+    <section v-if="!paperMode && (!phone || library.booklists.length)" class="booklist-section">
+      <div v-if="!phone" class="booklist-heading">
         <span>{{ t('library.booklists') }}</span>
         <button class="booklist-text-action hit" @click="openCreateBooklist">
           <svg viewBox="0 0 24 24" width="13" height="13"><path fill="currentColor" d="M11 13H5a1 1 0 1 1 0-2h6V5a1 1 0 1 1 2 0v6h6a1 1 0 1 1 0 2h-6v6a1 1 0 1 1-2 0v-6z"/></svg>
@@ -794,6 +897,9 @@ async function batchClearTags() {
           <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M5 4a2 2 0 0 1 2-2h9a3 3 0 0 1 3 3v15a1 1 0 0 1-1.45.9L12 18.12 6.45 20.9A1 1 0 0 1 5 20V4zm2 0v14.38l4.55-2.28a1 1 0 0 1 .9 0L17 18.38V5a1 1 0 0 0-1-1H7z"/></svg>
           <span>{{ item.name }}</span>
           <span class="booklist-count">{{ booklistCount(item.id) }}</span>
+        </button>
+        <button v-if="phone" class="booklist-add-chip" :title="t('library.newBooklist')" :aria-label="t('library.newBooklist')" @click="openCreateBooklist">
+          <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M11 13H5a1 1 0 1 1 0-2h6V5a1 1 0 1 1 2 0v6h6a1 1 0 1 1 0 2h-6v6a1 1 0 1 1-2 0v-6z"/></svg>
         </button>
       </div>
     </section>
@@ -833,6 +939,30 @@ async function batchClearTags() {
       <div class="import-track">
         <div class="import-fill" :style="{ width: `${(importState.done / Math.max(importState.total, 1)) * 100}%` }" />
       </div>
+    </div>
+
+    <!-- 手机: 列表标题 (范围 · 数量 / 排序 / 选择) -->
+    <div v-if="phone && library.loaded && kindBooks.length && !manageMode" class="list-head">
+      <span class="list-scope">{{ listScope }}</span>
+      <AppSelect v-model="sortBy" class="list-sort" :aria-label="t('common.sortBy')">
+        <option value="recent">{{ t('library.sortRecent') }}</option>
+        <option value="added">{{ t('library.sortAdded') }}</option>
+        <option value="title">{{ t(paperMode ? 'library.sortPaperTitle' : 'library.sortTitle') }}</option>
+        <option value="author">{{ t('library.sortAuthor') }}</option>
+      </AppSelect>
+      <button v-if="activeBooklist" class="list-icon-btn" :title="t('library.booklistActions')" :aria-label="t('library.booklistActions')" @click="booklistSheet = true">
+        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><circle cx="5" cy="12" r="1.7" fill="currentColor"/><circle cx="12" cy="12" r="1.7" fill="currentColor"/><circle cx="19" cy="12" r="1.7" fill="currentColor"/></svg>
+      </button>
+      <button class="list-text-btn" @click="toggleManage">{{ t('library.select') }}</button>
+    </div>
+
+    <!-- 手机选择模式: 顶部「取消 · 已选 N 本 · 全选」 -->
+    <div v-if="phone && manageMode" class="phone-selectbar">
+      <button class="list-text-btn" @click="toggleManage">{{ t('common.cancel') }}</button>
+      <span class="phone-selectbar-label">{{ selectedIds.size ? t('library.selectedCount', { count: selectedIds.size }) : t('library.selectBooks') }}</span>
+      <button class="list-text-btn" @click="selectAll">
+        {{ selectedIds.size === filtered.length && filtered.length ? t('library.deselectAll') : t('library.selectAll') }}
+      </button>
     </div>
 
     <div v-if="!library.loaded" class="grid" aria-busy="true" :aria-label="t('library.loading')">
@@ -901,7 +1031,10 @@ async function batchClearTags() {
         :convertible="canConvertToEpub(book.format)"
         :converting="!!converting"
         :sendable="settings.features.transfer"
+        :compact="phone"
         @open="openBook(book)"
+        @menu="menuBookId = book.id"
+        @long-press="onLongPress(book)"
         @remove="removeBook(book)"
         @toggle-select="toggleSelect(book.id)"
         @toggle-pin="togglePin(book)"
@@ -921,7 +1054,7 @@ async function batchClearTags() {
     />
 
     <!-- 批量操作栏 -->
-    <div v-if="manageMode" class="batch-bar card" role="toolbar" :aria-label="t('library.manage')">
+    <div v-if="manageMode && !phone" class="batch-bar card" role="toolbar" :aria-label="t('library.manage')">
       <span class="batch-count">{{ t('library.selectedCount', { count: selectedIds.size }) }}</span>
       <button class="btn btn-sm" @click="selectAll">
         {{ selectedIds.size === filtered.length && filtered.length ? t('library.deselectAll') : t('library.selectAll') }}
@@ -951,6 +1084,149 @@ async function batchClearTags() {
       <button class="btn btn-sm btn-danger" :disabled="!selectedIds.size" @click="batchDelete">{{ t('common.delete') }}</button>
       <button class="btn btn-sm" @click="toggleManage">{{ t('common.done') }}</button>
     </div>
+
+    <!-- 手机批量操作: 盖住底部标签栏, 常用 4 项, 其余在「更多」 -->
+    <nav v-if="manageMode && phone" class="phone-actionbar" :aria-label="t('library.manage')">
+      <button v-if="!paperMode" :disabled="!selectedIds.size" @click="openBooklistPicker([...selectedIds])">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h12a1 1 0 0 1 1 1v17l-7-3.5L5 21V4a1 1 0 0 1 1-1z"/></svg>
+        {{ t('library.addToBooklist') }}
+      </button>
+      <button :disabled="!selectedIds.size" @click="batchPin(!allSelectedPinned)">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M5 4h14M12 20V9m-5 5 5-5 5 5"/></svg>
+        {{ allSelectedPinned ? t('library.unpin') : t('library.pin') }}
+      </button>
+      <button class="danger" :disabled="!selectedIds.size" @click="batchDelete">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>
+        {{ t('common.delete') }}
+      </button>
+      <button :disabled="!selectedIds.size" @click="batchMoreSheet = true">
+        <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><circle cx="5" cy="12" r="1.8" fill="currentColor"/><circle cx="12" cy="12" r="1.8" fill="currentColor"/><circle cx="19" cy="12" r="1.8" fill="currentColor"/></svg>
+        {{ t('library.batchMore') }}
+      </button>
+    </nav>
+
+    <!-- 手机: 添加面板 -->
+    <AppModal v-if="addSheet" :title="t(paperMode ? 'library.importPapers' : 'library.import')" @close="addSheet = false">
+      <div class="sheet-list">
+        <button class="sheet-row" @click="addAction(() => fileInput?.click())">
+          <span class="sheet-ico brand"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8zM14 3v5h5"/></svg></span>
+          <span class="sheet-text"><span class="sheet-label">{{ t('library.importLocal') }}</span><span class="sheet-desc">{{ t('library.addLocalDesc') }}</span></span>
+        </button>
+        <button v-if="folderSupported" class="sheet-row" @click="addAction(chooseFolder)">
+          <span class="sheet-ico"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></span>
+          <span class="sheet-text"><span class="sheet-label">{{ t('folder.choose') }}</span><span class="sheet-desc">{{ t('library.addFolderDesc') }}</span></span>
+        </button>
+        <button class="sheet-row" @click="addAction(() => (showUrlModal = true))">
+          <span class="sheet-ico"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.66 0l3-3a4 4 0 0 0-5.66-5.66l-1 1M14 10a4 4 0 0 0-5.66 0l-3 3a4 4 0 0 0 5.66 5.66l1-1"/></svg></span>
+          <span class="sheet-text"><span class="sheet-label">{{ t('library.urlImportTitle') }}</span><span class="sheet-desc">{{ t('library.addUrlDesc') }}</span></span>
+        </button>
+        <button class="sheet-row" @click="addAction(() => uploadBooks())">
+          <span class="sheet-ico"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M7 18H5a4 4 0 0 1-.6-8 7 7 0 0 1 13.4-2 5 5 0 0 1 1.2 10h-2M12 20V10m-4 4 4-4 4 4"/></svg></span>
+          <span class="sheet-text"><span class="sheet-label">{{ t('library.uploadToCloud') }}</span><span class="sheet-desc">{{ t('library.addCloudDesc') }}</span></span>
+        </button>
+        <button v-if="settings.features.transfer" class="sheet-row" @click="addAction(() => router.push('/transfer'))">
+          <span class="sheet-ico"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 3l3 3-3 3M20 6H5M7 21l-3-3 3-3M4 18h15"/></svg></span>
+          <span class="sheet-text"><span class="sheet-label">{{ t('library.addTransfer') }}</span><span class="sheet-desc">{{ t('library.addTransferDesc') }}</span></span>
+        </button>
+        <template v-if="!paperMode">
+          <div class="sheet-sep" />
+          <button class="sheet-row" @click="addAction(openCreateBooklist)">
+            <span class="sheet-ico"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h12a1 1 0 0 1 1 1v17l-7-3.5L5 21V4a1 1 0 0 1 1-1z"/></svg></span>
+            <span class="sheet-text"><span class="sheet-label">{{ t('library.newBooklist') }}</span></span>
+          </button>
+          <button class="sheet-row" @click="addAction(() => (showBooklistImport = true))">
+            <span class="sheet-ico"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M12 4v11m-5-5 5 5 5-5M5 20h14"/></svg></span>
+            <span class="sheet-text"><span class="sheet-label">{{ t('booklist.import') }}</span></span>
+          </button>
+          <button v-if="library.booklists.length" class="sheet-row" @click="addAction(openBooklistManage)">
+            <span class="sheet-ico"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10"/></svg></span>
+            <span class="sheet-text"><span class="sheet-label">{{ t('library.manageBooklists') }}</span></span>
+          </button>
+        </template>
+      </div>
+    </AppModal>
+
+    <!-- 手机: 单本书操作面板 (书卡「⋯」) -->
+    <AppModal v-if="menuBook" :title="shortTitle(menuBook.title)" :description="[menuBook.format.toUpperCase(), menuBook.progress ? t('library.readPercent', { pct: Math.round(menuBook.progress * 100) }) : t('library.unread'), shortAuthor(menuBook.author) || t('common.anonymous')].join(' · ')" @close="menuBookId = ''">
+      <div class="sheet-list">
+        <button v-if="!paperMode" class="sheet-row" @click="bookMenuAction(book => openBooklistPicker([book.id]))">
+          <span class="sheet-ico"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h12a1 1 0 0 1 1 1v17l-7-3.5L5 21V4a1 1 0 0 1 1-1z"/></svg></span>
+          <span class="sheet-text"><span class="sheet-label">{{ t('library.addToBooklist') }}</span></span>
+        </button>
+        <button class="sheet-row" @click="bookMenuAction(togglePin)">
+          <span class="sheet-ico"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M5 4h14M12 20V9m-5 5 5-5 5 5"/></svg></span>
+          <span class="sheet-text"><span class="sheet-label">{{ menuBook.pinnedAt ? t('library.unpin') : t('library.pin') }}</span></span>
+        </button>
+        <button v-if="settings.features.transfer" class="sheet-row" @click="bookMenuAction(book => sendBookToDevices(book.id))">
+          <span class="sheet-ico"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 3 10 14M21 3l-7 18-4-7-7-4z"/></svg></span>
+          <span class="sheet-text"><span class="sheet-label">{{ t('transfer.sendToDevices') }}</span></span>
+        </button>
+        <button class="sheet-row" @click="bookMenuAction(book => uploadBooks([book.id]))">
+          <span class="sheet-ico"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M7 18H5a4 4 0 0 1-.6-8 7 7 0 0 1 13.4-2 5 5 0 0 1 1.2 10h-2M12 20V10m-4 4 4-4 4 4"/></svg></span>
+          <span class="sheet-text"><span class="sheet-label">{{ t('library.uploadToCloud') }}</span></span>
+        </button>
+        <button v-if="canConvertToEpub(menuBook.format)" class="sheet-row" :disabled="!!converting" @click="bookMenuAction(book => convertBooks([book.id]))">
+          <span class="sheet-ico"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9h13l-3.5-3.5M20 15H7l3.5 3.5"/></svg></span>
+          <span class="sheet-text"><span class="sheet-label">{{ t('book.convertToEpub') }}</span></span>
+        </button>
+        <button class="sheet-row" @click="bookMenuAction(book => setPrivate([book.id], !book.noSync))">
+          <span class="sheet-ico"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M6 11h12v9H6zM8.5 11V8a3.5 3.5 0 0 1 7 0v3"/></svg></span>
+          <span class="sheet-text"><span class="sheet-label">{{ menuBook.noSync ? t('library.unsetPrivate') : t('library.setPrivate') }}</span><span class="sheet-desc">{{ t('library.privateDesc') }}</span></span>
+        </button>
+        <button class="sheet-row danger" @click="bookMenuAction(removeBook)">
+          <span class="sheet-ico"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg></span>
+          <span class="sheet-text"><span class="sheet-label">{{ t('book.removeFromLibrary') }}</span></span>
+        </button>
+      </div>
+    </AppModal>
+
+    <!-- 手机: 批量「更多」 -->
+    <AppModal v-if="batchMoreSheet" :title="t('library.selectedCount', { count: selectedIds.size })" @close="batchMoreSheet = false">
+      <div class="sheet-list">
+        <button class="sheet-row" @click="batchMoreAction(() => uploadBooks([...selectedIds]))">
+          <span class="sheet-ico"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M7 18H5a4 4 0 0 1-.6-8 7 7 0 0 1 13.4-2 5 5 0 0 1 1.2 10h-2M12 20V10m-4 4 4-4 4 4"/></svg></span>
+          <span class="sheet-text"><span class="sheet-label">{{ t('library.uploadToCloud') }}</span></span>
+        </button>
+        <button v-if="anyConvertible" class="sheet-row" :disabled="!!converting" @click="batchMoreAction(() => convertBooks([...selectedIds]))">
+          <span class="sheet-ico"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9h13l-3.5-3.5M20 15H7l3.5 3.5"/></svg></span>
+          <span class="sheet-text"><span class="sheet-label">{{ t('book.convertToEpub') }}</span></span>
+        </button>
+        <button v-if="activeBooklist" class="sheet-row" @click="batchMoreAction(removeSelectedFromBooklist)">
+          <span class="sheet-ico"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h12a1 1 0 0 1 1 1v17l-7-3.5L5 21V4a1 1 0 0 1 1-1zM9 10h6"/></svg></span>
+          <span class="sheet-text"><span class="sheet-label">{{ t('library.removeFromBooklist') }}</span></span>
+        </button>
+        <button class="sheet-row" @click="batchMoreAction(batchMoveKind)">
+          <span class="sheet-ico"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8zM14 3v5h5M9 13h6M9 17h6"/></svg></span>
+          <span class="sheet-text"><span class="sheet-label">{{ paperMode ? t('library.moveToBooks') : t('library.moveToPapers') }}</span></span>
+        </button>
+        <button class="sheet-row" @click="batchMoreAction(() => batchPrivate(!allSelectedPrivate))">
+          <span class="sheet-ico"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M6 11h12v9H6zM8.5 11V8a3.5 3.5 0 0 1 7 0v3"/></svg></span>
+          <span class="sheet-text"><span class="sheet-label">{{ allSelectedPrivate ? t('library.unsetPrivate') : t('library.setPrivate') }}</span><span class="sheet-desc">{{ t('library.privateDesc') }}</span></span>
+        </button>
+        <button class="sheet-row" @click="batchMoreAction(() => (showTagModal = true))">
+          <span class="sheet-ico"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M3 12V4h8l10 10-8 8z"/><circle cx="7.5" cy="8.5" r="1.4" fill="currentColor" stroke="none"/></svg></span>
+          <span class="sheet-text"><span class="sheet-label">{{ t('library.setTags') }}</span></span>
+        </button>
+      </div>
+    </AppModal>
+
+    <!-- 手机: 当前书单的操作 -->
+    <AppModal v-if="booklistSheet && activeBooklist" :title="activeBooklist.name" @close="booklistSheet = false">
+      <div class="sheet-list">
+        <button class="sheet-row" @click="booklistAction(() => (showBooklistShare = true))">
+          <span class="sheet-ico"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15V3m-4 4 4-4 4 4M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/></svg></span>
+          <span class="sheet-text"><span class="sheet-label">{{ t('booklist.share') }}</span></span>
+        </button>
+        <button v-if="booklistCount(activeBooklist.id)" class="sheet-row" @click="booklistAction(() => uploadBooks(library.booklistBookIds[activeBooklist!.id] ?? []))">
+          <span class="sheet-ico"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M7 18H5a4 4 0 0 1-.6-8 7 7 0 0 1 13.4-2 5 5 0 0 1 1.2 10h-2M12 20V10m-4 4 4-4 4 4"/></svg></span>
+          <span class="sheet-text"><span class="sheet-label">{{ t('library.uploadBooklist') }}</span></span>
+        </button>
+        <button class="sheet-row" @click="booklistAction(openBooklistManage)">
+          <span class="sheet-ico"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10"/></svg></span>
+          <span class="sheet-text"><span class="sheet-label">{{ t('library.manageBooklists') }}</span></span>
+        </button>
+      </div>
+    </AppModal>
 
     <BooklistShareDialog v-if="showBooklistShare && activeBooklist" :booklist-id="activeBooklist.id" @close="showBooklistShare = false" />
     <BooklistImportDialog v-if="showBooklistImport" @close="showBooklistImport = false" @imported="id => (activeBooklistId = id)" />
@@ -1275,6 +1551,13 @@ async function batchClearTags() {
 }
 .sort {
   width: auto;
+  min-height: var(--control-h);
+  gap: 6px;
+  padding: 0 10px 0 12px;
+}
+.sort :deep(svg) {
+  width: 14px;
+  height: 14px;
 }
 .import-bar {
   padding: 12px 16px;
@@ -1734,26 +2017,94 @@ async function batchClearTags() {
 }
 
 @media (max-width: 720px) {
+  /* 手机两行: 标题 + 今日 + ＋ / 搜索。负 top 吸顶: 标题行滚走, 只留搜索条 */
   .toolbar {
-    margin-bottom: 14px;
+    top: -56px;
+    margin-bottom: 8px;
     padding-top: 12px;
     padding-bottom: 10px;
-    gap: 8px;
+    gap: 8px 6px;
   }
-  /* 手机端两行: 标题+导入 / 搜索+排序+管理 */
   .heading {
     flex: 1;
     min-width: 0;
     order: 1;
+    height: 44px;
+    align-items: center;
+    gap: 8px;
   }
-  /* 手机上标题行较挤: 计数行过长时省略, 今日入口保持完整 */
+  .toolbar h1 {
+    font-size: 26px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+  }
   .count {
+    align-self: flex-end;
+    padding-bottom: 7px;
+    font-size: 14px;
     overflow: hidden;
     text-overflow: ellipsis;
     min-width: 0;
   }
-  .import-group {
+  /* 今日阅读: 不再是彩色胶囊, 只留进度环 + 分钟数 */
+  .today-link,
+  .today-link.done {
+    margin-left: auto;
+    height: 36px;
+    padding: 0 8px;
+    gap: 6px;
+    background: none;
+    color: var(--text-2);
+    font-size: 13px;
+    font-weight: 500;
+  }
+  .today-link:hover,
+  .today-link.done:hover {
+    background: none;
+  }
+  .today-link:active {
+    background: var(--surface-3);
+  }
+  .today-link svg {
+    width: 18px;
+    height: 18px;
+  }
+  .today-ring-track {
+    stroke: var(--surface-3);
+    opacity: 1;
+  }
+  .today-ring-fill {
+    stroke: var(--brand);
+  }
+  .today-link.done .today-ring-fill {
+    stroke: var(--success);
+  }
+  .add-fab {
     order: 2;
+    flex-shrink: 0;
+    width: 36px;
+    height: 36px;
+    margin-left: 2px;
+    border: none;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    background: var(--brand);
+    color: var(--on-brand);
+    box-shadow: 0 2px 8px -2px color-mix(in srgb, var(--brand) 60%, transparent);
+    position: relative;
+  }
+  /* 热区补到 44px */
+  .add-fab::before {
+    content: '';
+    position: absolute;
+    inset: -4px;
+  }
+  .add-fab:active {
+    background: var(--brand-active);
+  }
+  .add-fab:disabled {
+    opacity: 0.6;
   }
   .spacer {
     display: none;
@@ -1770,22 +2121,264 @@ async function batchClearTags() {
     min-width: 0;
     order: 4;
   }
-  .sort {
-    order: 5;
-    flex: none;
-    width: 104px;
+  .search-field .search {
+    height: 40px;
+    border-color: transparent;
+    border-radius: var(--radius-lg);
+    background: var(--card);
+    box-shadow: var(--shadow-sm);
+    font-size: 15px;
+  }
+  :root[data-theme='dark'] .search-field .search {
+    background: var(--surface-2);
+    box-shadow: none;
+  }
+  .search-field .search:focus {
+    border-color: var(--brand);
+    box-shadow: var(--ring);
+  }
+
+  /* 继续阅读 */
+  .resume {
+    display: flex;
+    gap: 14px;
+    margin: 4px 0 18px;
+    padding: 14px;
+    border: none;
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-sm);
+    cursor: pointer;
+  }
+  .resume:active {
+    background: var(--surface-2);
+  }
+  .resume:focus-visible {
+    outline: none;
+    box-shadow: var(--ring);
+  }
+  .resume-cover {
+    position: relative;
+    flex-shrink: 0;
+    width: 64px;
+    aspect-ratio: 2 / 3;
+    border-radius: 3px 5px 5px 3px;
+    overflow: hidden;
+    background: var(--cover-paper-0);
+    color: var(--cover-ink-0);
+    box-shadow: var(--cover-shadow);
+  }
+  .resume-cover::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    box-shadow: inset 0 0 0 1px var(--cover-edge);
+    background: linear-gradient(90deg, rgba(0, 0, 0, 0.12) 0, rgba(255, 255, 255, 0.14) 2.5%, transparent 6%);
+  }
+  .resume-cover img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+  .resume-cover-title {
+    display: -webkit-box;
+    -webkit-line-clamp: 5;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    padding: 10px 8px;
+    font-family: 'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', 'STSong', serif;
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1.4;
+  }
+  .resume-info {
+    flex: 1;
     min-width: 0;
+    display: flex;
+    flex-direction: column;
   }
-  .toolbar > .btn {
-    order: 6;
-    padding-inline: 12px;
+  .resume-eyebrow {
+    font-size: 12px;
+    color: var(--text-3);
   }
-  .import-main {
-    padding-inline: 12px;
+  .resume-title {
+    margin-top: 4px;
+    font-size: 16px;
+    font-weight: 700;
+    line-height: 1.35;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .resume-author {
+    margin-top: 2px;
+    font-size: 13px;
+    color: var(--text-3);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .resume-foot {
+    margin-top: auto;
+    padding-top: 10px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .resume-track {
+    flex: 1;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--surface-3);
+    overflow: hidden;
+  }
+  .resume-fill {
+    display: block;
+    height: 100%;
+    border-radius: 2px;
+    background: var(--brand);
+  }
+  .resume-pct {
+    font-size: 12px;
+    color: var(--text-3);
+    font-variant-numeric: tabular-nums;
+  }
+  .resume-go {
+    flex-shrink: 0;
+    height: 32px;
+    padding: 0 14px;
+    border-radius: var(--radius-pill);
+    display: inline-flex;
+    align-items: center;
+    background: var(--brand);
+    color: var(--on-brand);
+    font-size: 13px;
+    font-weight: 600;
+  }
+
+  /* 列表标题: 范围 · 数量 / 排序 / 选择 */
+  .list-head {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    margin: 0 -8px 6px 0;
+  }
+  .list-scope {
+    flex: 1;
+    min-width: 0;
+    font-size: 13px;
+    color: var(--text-3);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-variant-numeric: tabular-nums;
+  }
+  .list-head .list-sort {
+    flex: none;
+    width: auto;
+    height: 36px;
+    min-height: 0;
+    padding: 0 6px 0 8px;
+    gap: 2px;
+    border: none;
+    background: none;
+    box-shadow: none;
+    color: var(--text-2);
+    font-size: 13px;
+  }
+  .list-head .list-sort:active {
+    background: var(--surface-3);
+  }
+  .list-head .list-sort svg {
+    width: 16px;
+    height: 16px;
+  }
+  .list-icon-btn,
+  .list-text-btn {
+    flex-shrink: 0;
+    height: 40px;
+    border: none;
+    border-radius: var(--radius);
+    background: none;
+  }
+  .list-icon-btn {
+    width: 40px;
+    display: grid;
+    place-items: center;
+    color: var(--text-2);
+  }
+  .list-text-btn {
+    padding: 0 8px;
+    color: var(--brand);
+    font-size: 15px;
+  }
+  .list-icon-btn:active,
+  .list-text-btn:active {
+    background: var(--brand-soft);
+  }
+
+  /* 选择模式: 顶部选择栏 + 底部操作栏 (盖住标签栏) */
+  .phone-selectbar {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0 calc(-1 * var(--page-x)) 12px;
+    padding: 8px calc(var(--page-x) - 8px);
+    background: color-mix(in srgb, var(--bg) 88%, transparent);
+    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+  }
+  .phone-selectbar-label {
+    flex: 1;
+    text-align: center;
+    font-size: 16px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+  .phone-actionbar {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 30;
+    display: flex;
+    height: calc(61px + var(--lr-safe-bottom));
+    padding: 0 var(--lr-safe-right) var(--lr-safe-bottom) var(--lr-safe-left);
+    background: var(--card);
+    border-top: 1px solid var(--border);
+    animation: actionbar-in var(--dur) var(--ease);
+  }
+  .phone-actionbar button {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    border: none;
+    background: none;
+    color: var(--text);
+    font-size: 11px;
+  }
+  .phone-actionbar button.danger {
+    color: var(--danger);
+  }
+  .phone-actionbar button:disabled {
+    opacity: 0.35;
+  }
+  .phone-actionbar button:active:not(:disabled) {
+    background: var(--surface-2);
   }
   .grid {
-    grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
-    gap: 16px 12px;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 22px 14px;
   }
   /* 书单在手机上去掉卡片外框, 只留一行可横滑的书单标签 */
   .booklist-section {
@@ -1807,6 +2400,17 @@ async function batchClearTags() {
     border-radius: var(--radius-pill);
     padding: 0 12px;
   }
+  .booklist-add-chip {
+    flex-shrink: 0;
+    width: var(--control-h-sm);
+    height: var(--control-h-sm);
+    display: grid;
+    place-items: center;
+    border: 1px dashed var(--border-strong);
+    border-radius: var(--radius-pill);
+    background: none;
+    color: var(--text-3);
+  }
   .booklist-manage-row {
     grid-template-columns: minmax(0, 1fr) auto auto;
   }
@@ -1821,5 +2425,82 @@ async function batchClearTags() {
   .drop-hint {
     inset: 8px;
   }
+}
+/* 横屏手机 / 小平板竖屏 (仍走手机布局): 书格按宽度自适应 */
+@media (min-width: 540px) and (max-width: 720px) {
+  .grid {
+    grid-template-columns: repeat(auto-fill, minmax(112px, 1fr));
+  }
+}
+@keyframes actionbar-in {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: none;
+  }
+}
+
+/* 手机底部面板 (AppModal 内容) */
+.sheet-list {
+  padding: 6px 0 10px;
+}
+.sheet-row {
+  width: 100%;
+  min-height: 56px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 9px 20px;
+  border: none;
+  background: none;
+  color: var(--text);
+  text-align: left;
+}
+.sheet-row:active:not(:disabled),
+.sheet-row:focus-visible {
+  background: var(--surface-2);
+  outline: none;
+}
+.sheet-row:disabled {
+  opacity: 0.45;
+}
+.sheet-ico {
+  flex-shrink: 0;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  background: var(--surface-2);
+  color: var(--text-2);
+}
+.sheet-ico.brand {
+  background: var(--brand-soft);
+  color: var(--brand);
+}
+.sheet-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.sheet-label {
+  font-size: 15px;
+}
+.sheet-desc {
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-3);
+}
+.sheet-row.danger .sheet-label,
+.sheet-row.danger .sheet-ico {
+  color: var(--danger);
+}
+.sheet-sep {
+  height: 8px;
+  margin: 6px 0;
+  background: var(--bg);
 }
 </style>

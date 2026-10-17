@@ -9,7 +9,7 @@
  *   前进到窗口末尾附近时再补测; 重排 (改字号、窗口尺寸) 后以当前行的字符偏移为锚点重测。
  * - 呈现: CSS Custom Highlight `lr-ly-dim` / `lr-ly-hide` 覆盖「全节减去聚焦带」, 只改颜色, 不改 DOM;
  *   旧 WebView 改用 foliate overlayer 在聚焦带上下各画一块主题背景色矩形。3 行时左侧画一条强调色竖条。
- * - 定位: 当前行中心固定在视口 anchor (默认 40%) 处, 平滑滚动 250ms; 减少动效 / 墨水屏直接跳,
+ * - 定位: 当前行中心固定在视口 anchor (默认 38.2%) 处, 平滑滚动 250ms; 减少动效 / 墨水屏直接跳,
  *   墨水屏改为「整屏跳」(当前行越过 80% 才一次性放回 10% 处)。
  * - 推进: pace 按 字/分 逐行停留 (lyric.lineDwellMs); tts 由 followRange 驱动 (句子跨行时按估计语速逐行);
  *   manual 只响应 next / prev / 点按。
@@ -54,7 +54,7 @@ const SECTION_WATCHDOG_MS = 4000
 const DEFAULT_FOLLOW_RATE = 240
 
 export interface LyricConfig {
-  lines: 1 | 3
+  lines: number
   others: 'dim' | 'hide'
   /** 当前行中心在视口高度的位置 (0.4 / 0.5) */
   anchor: number

@@ -9,7 +9,8 @@ import {
   buildSettingsRegs, createSettingsSyncPort, initSettingsMeta, planSettingsApply, readSyncedSettings,
   recordSettingsChanges, writeSyncedSetting,
 } from '../src/services/sync/settingsSync.ts'
-import { settingsDefaults } from '../src/stores/settings.ts'
+import { createPinia } from 'pinia'
+import { useSettings, settingsDefaults } from '../src/stores/settings.ts'
 import { createFakeAccountServer, createFakeDav, createFakeStorage, tr } from './sync-test-fakes.mjs'
 
 const isObj = v => !!v && typeof v === 'object' && !Array.isArray(v)
@@ -76,6 +77,29 @@ test('点睛阅读基础版「标什么」: 新安装默认重点词, 老存档�
 test('可选功能 (书单推荐 / 互传) 默认关闭, 作为使用偏好随同步', () => {
   assert.deepEqual(settingsDefaults().features, { recommendedBooklists: false, transfer: false })
   assert.deepEqual(SETTINGS_SYNC_SPEC.features, { recommendedBooklists: 'sync', transfer: 'sync' })
+})
+
+test('分栏默认自动, 旧自动双栏迁移, 手动选择持久化与同步', () => {
+  const previous = globalThis.localStorage
+  try {
+    assert.equal(settingsDefaults().reader.maxColumnCount, 'auto')
+    for (const [version, saved, expected] of [
+      [14, 2, 'auto'], [14, 1, 1], [14, undefined, 'auto'],
+      [15, 'auto', 'auto'], [15, 1, 1], [15, 2, 2],
+    ]) {
+      globalThis.localStorage = { getItem: () => JSON.stringify({ version, reader: { ...(saved == null ? {} : { maxColumnCount: saved }) } }) }
+      const store = useSettings(createPinia())
+      assert.equal(store.reader.maxColumnCount, expected)
+    }
+    for (const choice of ['auto', 1, 2]) {
+      const state = settingsDefaults()
+      assert.ok(writeSyncedSetting(state, 'reader.maxColumnCount', choice))
+      assert.equal(readSyncedSettings(state)['reader.maxColumnCount'], choice)
+    }
+  } finally {
+    if (previous === undefined) delete globalThis.localStorage
+    else globalThis.localStorage = previous
+  }
 })
 
 // ---- 预设 ----
@@ -493,4 +517,27 @@ test('响应式 (Proxy) 的对象 / 数组设置也能写进同步文档, 不抛
   const path = 'ambient.layers'
   const regs = buildSettingsRegs({ values: { [path]: proxied }, stamps: { [path]: { t: 5, d: 'dev' } } }, 'dev', false)
   assert.deepEqual(regs[path]?.value, [{ id: 'rain', volume: 0.4 }])
+})
+
+
+test('歌词高度迁移保留坐标含义，自定义行数和位置参与同步', () => {
+  const previous = globalThis.localStorage
+  try {
+    for (const [version, anchor, expected] of [[15, 0.4, 0.382], [15, 0.5, 0.5], [16, 0.4, 0.4], [16, 0, 0], [16, 1, 1]]) {
+      globalThis.localStorage = { getItem: () => JSON.stringify({ version, readingMode: { lyric: { anchor, lines: 7 } } }) }
+      const store = useSettings(createPinia())
+      assert.equal(store.readingMode.lyric.anchor, expected)
+      assert.equal(store.readingMode.lyric.lines, 7)
+      assert.equal(store.version, 16)
+    }
+    const state = settingsDefaults()
+    assert.equal(state.readingMode.lyric.anchor, 0.382)
+    assert.ok(writeSyncedSetting(state, 'readingMode.lyric.anchor', 0.127))
+    assert.ok(writeSyncedSetting(state, 'readingMode.lyric.lines', 8))
+    assert.equal(readSyncedSettings(state)['readingMode.lyric.anchor'], 0.127)
+    assert.equal(readSyncedSettings(state)['readingMode.lyric.lines'], 8)
+  } finally {
+    if (previous === undefined) delete globalThis.localStorage
+    else globalThis.localStorage = previous
+  }
 })

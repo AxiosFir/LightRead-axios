@@ -1,10 +1,10 @@
 {
   "id": "hugo-best-novel",
   "title": "雨果奖最佳长篇小说",
-  "description": "世界科幻大会读者投票选出的年度最佳长篇小说，1953 年至今的获奖作品，按获奖年份排列。",
+  "description": "1953 年起的雨果奖最佳长篇小说，按获奖年份排列。",
   "en": {
     "title": "Hugo Award for Best Novel",
-    "description": "Novels voted best of the year by members of the World Science Fiction Convention, from 1953 to the present, in award order."
+    "description": "Hugo Best Novel winners since 1953, in award order."
   },
   "curator": "轻阅 · 据 Wikidata 整理",
   "tags": [

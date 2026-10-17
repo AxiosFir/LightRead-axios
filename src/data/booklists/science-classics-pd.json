@@ -1,10 +1,10 @@
 {
   "id": "science-classics-pd",
   "title": "科学史与科普经典",
-  "description": "从近代科学革命到相对论的原典与科普名作，均有公版英文本，可在古登堡计划免费阅读。",
+  "description": "从科学革命到相对论，附免费公版英文原著。",
   "en": {
     "title": "Classics of Science",
-    "description": "Primary works and popular classics from the Scientific Revolution to relativity. All have public-domain English editions free on Project Gutenberg."
+    "description": "Science classics through relativity, with free English editions."
   },
   "curator": "轻阅编辑部",
   "tags": [

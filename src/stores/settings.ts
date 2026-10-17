@@ -1,3 +1,4 @@
+import { normalizeFocusLines, normalizeLyricAnchor } from '../services/readingModes/lyric.ts'
 import { defineStore } from 'pinia'
 import { watch } from 'vue'
 import { startSettingsTracking } from '../services/sync/settingsTracker.ts'
@@ -12,7 +13,8 @@ export interface ReaderPrefs {
   /** 阅读主题; auto 跟随界面外观在浅色/夜间间切换 */
   theme: 'auto' | 'light' | 'sepia' | 'green' | 'dark'
   flow: 'paginated' | 'scrolled'
-  maxColumnCount: 1 | 2
+  /** auto 根据版面判断; 1 / 2 固定栏数 */
+  maxColumnCount: 'auto' | 1 | 2
   /** 平板竖屏 (高于宽) 时改为单栏连续滚动, 横屏恢复上面的 flow / 分栏; PDF 同样适用 */
   portraitScroll: boolean
   /** 滚动模式下跨章连续滚动: 章与章首尾相接 (docs/continuous-scroll.md); 关掉回到单章滚动 */
@@ -63,12 +65,12 @@ export interface TypewriterPrefs {
 
 /** 歌词模式 (docs/research/reading-modes-landscape.md §4.7); 速度复用 typewriter.cpm / wpm */
 export interface LyricPrefs {
-  /** 聚焦行数: 1 行 / 3 行 (滑动窗口) */
-  lines: 1 | 3
+  /** 聚焦行数: 1–99 行 (滑动窗口) */
+  lines: number
   /** 其余行: 淡显 (正文色 30%) / 隐藏 */
   others: 'dim' | 'hide'
-  /** 当前行固定在视口高度的位置 */
-  anchor: 0.4 | 0.5
+  /** 内部坐标: 顶部 0、底部 1; UI 高度为 1 - anchor */
+  anchor: number
   /** 推进: 按速度自动 / 跟听书 / 手动 */
   driver: 'pace' | 'tts' | 'manual'
   /** 歌词字号: 正文字号的倍数 (1.0–1.6) */
@@ -124,7 +126,7 @@ export interface FeaturePrefs {
 }
 
 /** 结构版本: 修正历史默认值时递增 */
-const SETTINGS_VERSION = 14
+const SETTINGS_VERSION = 16
 
 /** v3 时代曾并入用户设置的内置书库 (v4 起社区清单独立远程拉取, 此表仅供迁移清理) */
 const BUILTIN_BOOK_REPOS = [
@@ -268,7 +270,7 @@ const defaults: SettingsState = {
     gap: 6,
     theme: 'auto',
     flow: 'paginated',
-    maxColumnCount: 2,
+    maxColumnCount: 'auto',
     portraitScroll: true,
     continuousScroll: true,
     fontFamily: '',
@@ -333,7 +335,7 @@ const defaults: SettingsState = {
       soundVolume: 0.4,
       pageDwellMs: 800,
     },
-    lyric: { lines: 1, others: 'dim', anchor: 0.4, driver: 'pace', scale: 1.2 },
+    lyric: { lines: 1, others: 'dim', anchor: 0.382, driver: 'pace', scale: 1.2 },
     wordGuide: { enabled: false, style: 'auto', strength: 'normal', intensity: 0.7, color: 'rose', mark: BASIC_MARK_DEFAULT },
     largeText: { enabled: false, size: 'large', custom: {} },
     eink: { enabled: false, suggestDismissed: false },
@@ -486,6 +488,14 @@ function load(): SettingsState {
     merged.dianjing.level = normalizeLevel(merged.dianjing.level)
     // 基础版「标什么」: 新增字段, 已有存档保持原来的词与词 (新安装默认重点词); 不需要升版本
     merged.readingMode.wordGuide.mark = savedBasicMark(saved.readingMode?.wordGuide?.mark)
+    // v15: 旧值 2 表示自动双栏, 迁为 auto; 显式单栏保持不变。
+    if ((saved.version ?? 1) < 15 && merged.reader.maxColumnCount === 2) {
+      merged.reader.maxColumnCount = 'auto'
+    }
+    // v16: the upper preset now uses height 0.618; preserve the centered preset.
+    if ((saved.version ?? 1) < 16 && merged.readingMode.lyric.anchor === 0.4) merged.readingMode.lyric.anchor = 0.382
+    merged.readingMode.lyric.lines = normalizeFocusLines(merged.readingMode.lyric.lines)
+    merged.readingMode.lyric.anchor = normalizeLyricAnchor(merged.readingMode.lyric.anchor)
     merged.version = SETTINGS_VERSION
     return merged
   } catch {

@@ -570,9 +570,9 @@ async function runSmoothAuto(browser) {
         r.driftEnd = () => { window.__smooth.ends++; return end() }
       })
       await page.getByRole('button', { name: '阅读模式', exact: true }).filter({ visible: true }).first().click()
-      await page.getByRole('button', { name: '自动滚动', exact: true }).click()
+      await page.locator('.rm-guide[data-guide=auto] .rm-gear').click()
       await page.locator('.auto-panel input[type=range]').fill('17') // 90 seconds/screen
-      await page.locator('.auto-panel').getByRole('button', { name: '开始', exact: true }).click()
+      await page.locator('.rm-guide[data-guide=auto]').getByRole('button', { name: '开始', exact: true }).click()
       await sleep(1200)
       await page.evaluate(() => { window.__smooth.moves = []; window.__smooth.ends = 0 })
       await sleep(1000)

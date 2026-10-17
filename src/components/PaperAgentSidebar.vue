@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AppSelect from './AppSelect.vue'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import type { AnnotationRec, BookMeta } from '../storage/types.ts'
@@ -709,12 +710,12 @@ onBeforeUnmount(() => {
           <p>{{ interaction.prompt }}</p>
           <div v-for="field in interaction.fields" :key="field.id" class="interaction-field">
             <label>{{ field.label }}</label>
-            <select v-if="field.options.length" v-model="field.value" class="input" :multiple="field.multiSelect">
+            <AppSelect v-if="field.options.length" v-model="field.value" class="input" :multiple="field.multiSelect" :aria-label="field.label">
               <option v-if="!field.multiSelect" value="" disabled>{{ t('paper.agentChooseAnswer') }}</option>
               <option v-for="option in field.options" :key="option.label" :value="option.label">
                 {{ option.label }}{{ option.description ? ` — ${option.description}` : '' }}
               </option>
-            </select>
+            </AppSelect>
             <input v-if="field.allowOther" v-model="field.other" class="input" :placeholder="t('paper.agentOtherAnswer')" />
           </div>
           <textarea
@@ -848,12 +849,12 @@ onBeforeUnmount(() => {
         <p>{{ interaction.prompt }}</p>
         <div v-for="field in interaction.fields" :key="field.id" class="interaction-field">
           <label>{{ field.label }}</label>
-          <select v-if="field.options.length" v-model="field.value" class="input" :multiple="field.multiSelect">
+          <AppSelect v-if="field.options.length" v-model="field.value" class="input" :multiple="field.multiSelect" :aria-label="field.label">
             <option v-if="!field.multiSelect" value="" disabled>{{ t('paper.agentChooseAnswer') }}</option>
             <option v-for="option in field.options" :key="option.label" :value="option.label">
               {{ option.label }}{{ option.description ? ` — ${option.description}` : '' }}
             </option>
-          </select>
+          </AppSelect>
           <input v-if="field.allowOther" v-model="field.other" class="input" :placeholder="t('paper.agentOtherAnswer')" />
         </div>
         <textarea

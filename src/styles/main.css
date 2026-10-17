@@ -37,6 +37,16 @@
   --skeleton: #e9ebef;
   --skeleton-shine: rgba(255, 255, 255, 0.7);
 
+  /* 手机书格: 无封面的生成封面 (纸色 + 墨色, 按书名哈希取一组) */
+  --cover-paper-0: #efe6d6; --cover-ink-0: #5a4630;
+  --cover-paper-1: #dde4ea; --cover-ink-1: #2f4656;
+  --cover-paper-2: #e1e7da; --cover-ink-2: #3d4f35;
+  --cover-paper-3: #ecdcd4; --cover-ink-3: #6a3b2e;
+  --cover-paper-4: #e4dfec; --cover-ink-4: #45395c;
+  --cover-paper-5: #e9e6df; --cover-ink-5: #3f3b33;
+  --cover-edge: rgba(29, 33, 41, 0.08);
+  --cover-shadow: 0 1px 2px rgba(29, 33, 41, 0.1), 0 6px 14px -4px rgba(29, 33, 41, 0.18);
+
   /* 状态 */
   --danger: #e5383b;
   --danger-soft: color-mix(in srgb, var(--danger) 10%, transparent);
@@ -149,6 +159,15 @@
   --overlay: rgba(0, 0, 0, 0.6);
   --skeleton: #262a31;
   --skeleton-shine: rgba(255, 255, 255, 0.06);
+
+  --cover-paper-0: #3a3226; --cover-ink-0: #e6d5b8;
+  --cover-paper-1: #26313a; --cover-ink-1: #c4d6e4;
+  --cover-paper-2: #2b3327; --cover-ink-2: #cfdcc2;
+  --cover-paper-3: #3a2a25; --cover-ink-3: #ecc7b8;
+  --cover-paper-4: #2f2a3a; --cover-ink-4: #d6cce8;
+  --cover-paper-5: #33312c; --cover-ink-5: #ddd8cc;
+  --cover-edge: rgba(255, 255, 255, 0.06);
+  --cover-shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 6px 14px -4px rgba(0, 0, 0, 0.6);
 
   --danger: #ff6b6b;
   --success: #4ade80;
@@ -713,6 +732,10 @@ input[type='range'] {
   line-height: 1.45;
   animation: toast-in var(--dur-slow) var(--ease);
   pointer-events: auto;
+}
+.toast > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 .toast-icon {
   flex-shrink: 0;

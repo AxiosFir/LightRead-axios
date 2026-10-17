@@ -1,16 +1,17 @@
 <script setup lang="ts">
-import { AUTO_SPEED_LEVELS, AUTO_SPEED_STEPS, speedPosition, secondsAtPosition, type AutoReadMotion } from '../services/autoReadSpeed'
+import { AUTO_SPEED_STEPS, speedPosition, secondsAtPosition, type AutoReadMotion } from '../services/autoReadSpeed'
+import { normalizeFocusLines, lyricHeight, anchorAtHeight } from '../services/readingModes/lyric'
 import LevelSlider from './LevelSlider.vue'
 /**
- * 「阅读模式」面板 (docs/reader-panels.md §3.2): 书页怎么动、怎么带你读。桌面为顶栏下的浮层卡片, 手机为底部抽屉
+ * 「阅读模式」面板 (docs/reader-panels.md §3.2): 场景与带读。桌面为顶栏下的浮层卡片, 手机为底部抽屉
  * (遮罩由 ReaderView 的 sheet-scrim 提供)。自上而下:
- *   #top 插槽 (点睛阅读: 总开关 + 基础 / 智能, 见 DianjingToggle) → 运行进度 → 场景 (夜读 / 护眼 / 墨水屏 / 大字 / 沉浸)
+ *   运行条 → #top 插槽 (点睛阅读: 总开关 + 基础 / 智能, 见 DianjingToggle) → 场景 (夜读 / 护眼 / 墨水屏 / 大字 / 沉浸)
  *   → 带读 [自动翻页 | 打字机 | 歌词 | 听书] (同一时间只运行一个)。
  * 场景是开关卡片: 一键套用一组「排版」里的值 (记快照, 关闭写回), 自己不保存也不提供这些值的控件;
  * 点卡片角上的 ⓘ 展开「会调整什么」、场景自己的选项 (定时、休息提醒、大 / 特大…) 和「在排版里微调」。
  * 自动翻页沿用 ReaderView 的实现 (props/emits), 容器保留 .auto-panel 类名供 e2e 使用。
  */
-import { computed, nextTick, onMounted, ref } from 'vue'
+import { computed, ref } from 'vue'
 import { t } from '../i18n'
 import { matchesMQ, MQ } from '../composables/useMediaQuery'
 import { useSettings } from '../stores/settings'
@@ -25,6 +26,7 @@ const props = defineProps<{
   modes: ReadingModes
   /** 自动翻页是否在运行 (ReaderView 的 autoReading) */
   autoReading: boolean
+  autoPaused?: boolean
   /** 自动翻页速度, 秒/页 (v-model:auto-read-seconds); 滚动模式下为秒/屏 */
   autoReadSeconds: number
   /** 自动阅读的推进方式 (翻页 / 匀速滚动 / 墨水屏整屏推进), 见 services/autoReadSpeed autoReadMotion */
@@ -33,12 +35,6 @@ const props = defineProps<{
   effectiveFlow?: 'paginated' | 'scrolled'
   /** 固定版式 (漫画 / 版式 EPUB): 没有翻页 / 滚动之分 */
   fixedLayout?: boolean
-  /** 竖屏单栏滚动锁定生效中 */
-  portraitLocked?: boolean
-  /** 歌词运行中临时单栏滚动 */
-  modeLocked?: boolean
-  /** 打开时滚到这个分区 (从「排版」的版式入口跳来) */
-  focus?: 'layout' | null
   /** 打字机 / 歌词运行时的进度与剩余时间 (阅读器计算); 未运行为 null */
   progress?: ReadingModeProgress | null
   /** 听书正在播放 */
@@ -48,10 +44,11 @@ const props = defineProps<{
 const emit = defineEmits<{
   'start-auto': []
   'stop-auto': []
+  'toggle-auto': []
   'update:autoReadSeconds': [value: number]
-  /** 「听书」分段的主按钮: 打开现有听书面板 */
+  /** 「听书」行的主按钮: 打开现有听书面板 */
   'open-tts': []
-  /** 场景详情的「在排版里微调」: 打开排版面板并滚到对应分区 */
+  /** 场景微调 / 带读版式入口: 打开排版面板并滚到对应分区 */
   'open-typography': [section: TypographySection]
   close: []
 }>()
@@ -61,15 +58,43 @@ const tw = computed(() => settings.readingMode.typewriter)
 const ly = computed(() => settings.readingMode.lyric)
 const eye = computed(() => settings.readingMode.eyeCare)
 
-const tab = computed<ReadingModeTab>({
-  get: () => props.modes.panelTab.value,
-  set: v => { props.modes.panelTab.value = v },
-})
+const expanded = ref<ReadingModeTab | null>(props.modes.panelTab.value === 'tts' ? null : props.modes.panelTab.value)
+function toggleSettings(guide: ReadingModeTab) {
+  expanded.value = expanded.value === guide ? null : guide
+  if (expanded.value) props.modes.panelTab.value = guide
+}
 const twState = computed(() => props.modes.typewriterState.value)
 const twActive = computed(() => twState.value !== 'idle')
 const lyActive = computed(() => props.modes.lyricActive.value)
 const lyState = computed(() => props.modes.lyricState.value)
+const lyricDriver = computed(() => lyActive.value ? props.modes.lyricDriver.value : ly.value.driver)
 const supported = computed(() => props.modes.supported.value)
+
+const lyricPosition = computed(() => lyricHeight(ly.value.anchor))
+function onLyricLines(event: Event) {
+  const input = event.target as HTMLInputElement
+  if (input.value.trim()) settings.readingMode.lyric.lines = normalizeFocusLines(Number(input.value))
+  input.value = String(ly.value.lines)
+}
+function onLyricPosition(event: Event) {
+  const input = event.target as HTMLInputElement
+  if (input.value.trim() && Number.isFinite(Number(input.value))) settings.readingMode.lyric.anchor = anchorAtHeight(Number(input.value))
+  input.value = String(lyricPosition.value)
+}
+
+function onLyricSlider(event: Event) {
+  const value = Math.round(Number((event.target as HTMLInputElement).value) * 10) / 10
+  settings.readingMode.lyric.anchor = anchorAtHeight(value)
+}
+function onLyricSliderKey(event: KeyboardEvent) {
+  const direction = ['ArrowUp', 'ArrowRight'].includes(event.key) ? 1 : ['ArrowDown', 'ArrowLeft'].includes(event.key) ? -1 : 0
+  if (!direction && !['Home', 'End'].includes(event.key)) return
+  event.preventDefault()
+  event.stopPropagation()
+  const value = event.key === 'Home' ? 0 : event.key === 'End' ? 1
+    : (direction > 0 ? Math.floor(lyricPosition.value * 10 + 0.00001) + 1 : Math.ceil(lyricPosition.value * 10 - 0.00001) - 1) / 10
+  settings.readingMode.lyric.anchor = anchorAtHeight(value)
+}
 
 // ---- 场景卡片 ----
 type SceneId = 'night' | 'eyeCare' | 'eink' | 'largeText' | 'immersive'
@@ -140,53 +165,65 @@ const reminderIntervals = [20, 30, 45] as const
 
 function onClock(which: 'from' | 'to', e: Event) {
   const v = (e.target as HTMLInputElement).value
-  if (/^\d{1,2}:\d{2}$/.test(v)) settings.readingMode.night[which] = v
+  if (/^([01]\d|2[0-3]):[0-5]\d$/.test(v)) settings.readingMode.night[which] = v
+  else (e.target as HTMLInputElement).value = settings.readingMode.night[which]
 }
 
 // ---- 带读 ----
 const autoScrolled = computed(() => !!props.autoMotion && props.autoMotion !== 'page')
-const guideTabs = computed(() => [
-  // 滚动方式下自动翻页是匀速滚动, 页签随之改名
+const guides = computed(() => [
+  // 滚动方式下自动翻页是匀速滚动, 列表行随之改名
   { value: 'auto' as const, key: autoScrolled.value ? 'readingMode.tabAutoScroll' : 'readingMode.tabAuto' },
   { value: 'typewriter' as const, key: 'readingMode.tabTypewriter' },
   { value: 'lyric' as const, key: 'readingMode.tabLyric' },
   { value: 'tts' as const, key: 'readingMode.tabTts' },
 ])
 
-/**
- * 带读与版式: 同一个带读在翻页 / 滚动版式下动法不同, 在页签下说清楚现在会怎么动, 并可跳去排版换版式
- * (docs/reader-panels.md §3.2: 版式的值只在排版里改, 这里只说明和跳转)
- */
-/** 读者自己的版式 (含竖屏锁定, 不含歌词的临时滚动): 带读各自怎么动由它决定 */
-const baseFlow = computed(() => (props.modeLocked ? 'paginated' : props.effectiveFlow ?? settings.reader.flow))
-const guideLayoutNote = computed(() => {
-  if (props.fixedLayout) return ''
-  const scrolled = baseFlow.value === 'scrolled'
-  switch (tab.value) {
-    case 'auto': return props.autoMotion === 'screen' ? t('readingMode.autoScreenNote') : ''
+/** 说明与跳转都按当前生效版式; 歌词退出后恢复保存的选择。 */
+function guideLayoutNote(guide: ReadingModeTab) {
+  if ((guide === 'typewriter' || guide === 'lyric') && !supported.value) return t('readingMode.modeUnsupported')
+  const scrolled = props.effectiveFlow === 'scrolled'
+  switch (guide) {
+    case 'auto': return t(props.autoMotion === 'screen' ? 'readingMode.autoScreenNote' : scrolled && !props.fixedLayout ? 'readingMode.autoScrollNote' : 'readingMode.autoPageNote')
     case 'typewriter': return t(scrolled ? 'readingMode.typewriterScrollNote' : 'readingMode.typewriterPageNote')
-    // 歌词运行中版式行下已有「临时一栏滚动」的说明, 不再重复
-    case 'lyric': return scrolled || props.modeLocked ? '' : t('readingMode.lyricLayoutNote')
-    case 'tts': return t(scrolled ? 'readingMode.ttsScrollNote' : 'readingMode.ttsPageNote')
-    default: return ''
+    case 'lyric': return t(scrolled ? 'readingMode.lyricRowNote' : 'readingMode.lyricLayoutNote')
+    case 'tts': return t('readingMode.ttsHint')
   }
-})
-
-// ---- 版式 (翻页 / 滚动 / 跨章 / 分栏 / 竖屏): 与带读同在「阅读方式」, 书页怎么动只在这一处设置 ----
-const root = ref<HTMLElement>()
-onMounted(async () => {
-  if (props.focus !== 'layout') return
-  await nextTick()
-  root.value?.querySelector<HTMLElement>('[data-section="layout"]')?.scrollIntoView({ block: 'start' })
-})
-
+}
 const runningTab = computed<ReadingModeTab | null>(() => {
   if (props.autoReading) return 'auto'
   if (twActive.value) return 'typewriter'
   if (lyActive.value) return 'lyric'
-  if (props.ttsActive) return 'tts'
   return null
 })
+const runningName = computed(() => t(guides.value.find(g => g.value === runningTab.value)?.key ?? 'readingMode.title'))
+const paused = computed(() => runningTab.value === 'auto' ? props.autoPaused : runningTab.value === 'typewriter' ? twState.value === 'paused' : lyState.value === 'paused')
+const canPause = computed(() => runningTab.value !== 'lyric' || props.modes.lyricDriver.value === 'pace')
+function toggleRunning() {
+  if (runningTab.value === 'auto') emit('toggle-auto')
+  else props.modes.togglePause()
+}
+function stopRunning() {
+  if (runningTab.value === 'auto') emit('stop-auto')
+  else props.modes.stop()
+}
+function actionLabel(guide: ReadingModeTab) {
+  if (guide === 'tts') return t('readingMode.openGuideTts')
+  if (guide !== runningTab.value) return t('common.start')
+  if (guide === 'lyric' && !canPause.value) return t('readingMode.exitGuide')
+  return t(paused.value ? 'common.resume' : 'common.pause')
+}
+function act(guide: ReadingModeTab) {
+  if (guide === 'tts') return openTts()
+  if (guide === runningTab.value) {
+    if (guide === 'lyric' && !canPause.value) stopRunning()
+    else toggleRunning()
+    return
+  }
+  if (guide === 'auto') toggleAuto()
+  else if (guide === 'typewriter') props.modes.start()
+  else void props.modes.startLyric()
+}
 
 const units = [
   { value: 'char', key: 'readingMode.unitChar' },
@@ -202,28 +239,33 @@ const drivers = [
 
 const scales = [
   { value: 1, label: () => t('readingMode.scaleOriginal') },
-  { value: 1.2, label: () => '×1.2' },
-  { value: 1.4, label: () => '×1.4' },
+  { value: 1.2, label: () => t('readingMode.scaleFactor', { n: 1.2 }) },
+  { value: 1.4, label: () => t('readingMode.scaleFactor', { n: 1.4 }) },
 ] as const
 
-const presetLabels = ['readingMode.presetSlow', 'readingMode.presetMedium', 'readingMode.presetFast']
-
-/** 打字机、歌词 (自动) 共用速度; 歌词的手动 / 跟听书不用速度 */
-const showSpeed = computed(() => tab.value === 'typewriter' || (tab.value === 'lyric' && ly.value.driver === 'pace'))
-
+const speedLabels = ['readingMode.speedSlow', 'readingMode.speedMedium', 'readingMode.speedFast']
+const autoStops = computed(() => [1, 50, 100].map((value, i) => ({ value, label: t(speedLabels[i]) })))
+// 常用速度集中在总范围的低端；把三个预设分散到滑轨上，避免窄屏刻度重叠。
+// 两端仍能到达完整速度范围，存储和直接输入继续使用字/分或词/分。
+const speedPositions = [0, 15, 50, 85, 100]
+const speedStops = computed(() => speedPositions.slice(1, -1).map((value, i) => ({ value, label: t(speedLabels[i]) })))
+const speedValues = computed(() => [props.modes.speedLimits.value[0], ...props.modes.presets.value, props.modes.speedLimits.value[1]])
+function interpolate(value: number, from: number[], to: number[]) {
+  const n = Math.max(from[0], Math.min(from[from.length - 1], value))
+  const i = Math.max(0, from.findIndex((end, index) => index > 0 && n <= end) - 1)
+  return to[i] + (n - from[i]) / (from[i + 1] - from[i]) * (to[i + 1] - to[i])
+}
+const guidedSpeedPosition = computed(() => interpolate(props.modes.speed.value, speedValues.value, speedPositions))
+function setGuidedSpeed(position: number) {
+  props.modes.speed.value = Math.round(interpolate(position, speedPositions, speedValues.value) / 10) * 10
+}
 function close() {
   props.modes.closePanel()
   emit('close')
 }
 
 
-
 function toggleAuto() {
-  if (props.autoReading) {
-    emit('stop-auto')
-    return
-  }
-  props.modes.stopForExternal('auto')
   // 手机上面板是盖住正文的底部抽屉: 开始后收起 (同打字机 / 歌词), 暂停、调速用底部迷你条或轻点正文
   if (matchesMQ(MQ.phone)) close()
   emit('start-auto')
@@ -242,14 +284,17 @@ function onSpeedExact(e: Event) {
   el.value = String(props.modes.speed.value)
 }
 
-function onSpeedInput(e: Event) {
-  const n = Number((e.target as HTMLInputElement).value)
-  if (Number.isFinite(n)) props.modes.speed.value = n
+function onAutoSpeedExact(e: Event) {
+  const el = e.target as HTMLInputElement
+  const n = Number(el.value)
+  const value = el.value.trim() && Number.isFinite(n) ? Math.round(Math.min(300, Math.max(3, n)) * 10) / 10 : props.autoReadSeconds
+  emit('update:autoReadSeconds', value)
+  el.value = String(value)
 }
 </script>
 
 <template>
-  <section ref="root" class="rm-panel card" role="dialog" :aria-label="t('readingMode.title')">
+  <section class="rm-panel card" role="dialog" :aria-label="t('readingMode.title')">
     <header class="rm-head">
       <strong>{{ t('readingMode.title') }}</strong>
       <button class="rm-close" type="button" :title="t('common.close')" :aria-label="t('common.close')" @click="close">
@@ -257,30 +302,36 @@ function onSpeedInput(e: Event) {
       </button>
     </header>
 
-    <!-- 主会话放点睛阅读开关 -->
-    <slot name="top" />
+    <div v-if="runningTab" class="rm-running">
+      <div class="rm-running-head">
+        <span class="rm-running-dot" aria-hidden="true" />
+        <strong>{{ runningName }}</strong>
+        <button v-if="canPause" type="button" class="btn" @click="toggleRunning">{{ t(paused ? 'common.resume' : 'common.pause') }}</button>
+        <button type="button" class="btn" @click="stopRunning">{{ t('readingMode.exitGuide') }}</button>
+      </div>
+      <div v-if="progress" class="rm-progress">
+        <div class="rm-progress-head">
+          <span class="rm-progress-chapter">{{ progress.chapter }}</span>
+          <span class="rm-progress-eta">{{ progress.chapterLeft || progress.percent }}</span>
+        </div>
+        <div
+          class="rm-progress-track"
+          role="progressbar"
+          aria-valuemin="0"
+          aria-valuemax="100"
+          :aria-valuenow="Math.round(progress.chapterProgress * 100)"
+          :aria-label="t('tts.chapterProgress')"
+        >
+          <span :style="{ transform: `scaleX(${progress.chapterProgress})` }" />
+        </div>
+        <div class="rm-progress-sub">
+          <span>{{ progress.finish }}</span>
+          <span>{{ progress.book }}</span>
+        </div>
+      </div>
 
-    <!-- 打字机 / 歌词运行中: 读到哪、还要多久 -->
-    <div v-if="progress" class="rm-progress">
-      <div class="rm-progress-head">
-        <span class="rm-progress-chapter">{{ progress.chapter }}</span>
-        <span class="rm-progress-eta">{{ progress.chapterLeft || progress.percent }}</span>
-      </div>
-      <div
-        class="rm-progress-track"
-        role="progressbar"
-        aria-valuemin="0"
-        aria-valuemax="100"
-        :aria-valuenow="Math.round(progress.chapterProgress * 100)"
-        :aria-label="t('tts.chapterProgress')"
-      >
-        <span :style="{ transform: `scaleX(${progress.chapterProgress})` }" />
-      </div>
-      <div class="rm-progress-sub">
-        <span>{{ progress.finish }}</span>
-        <span>{{ progress.book }}</span>
-      </div>
     </div>
+    <slot name="top" />
 
     <!-- 场景: 一键套用一组排版值, 关闭恢复; 数值本身在「排版」里调 -->
     <section class="rm-group" :aria-label="t('readingMode.groupScenes')">
@@ -339,9 +390,9 @@ function onSpeedInput(e: Event) {
           </label>
           <div v-if="settings.readingMode.night.schedule" class="rm-row rm-clock">
             <span class="rm-label">{{ t('readingMode.nightFrom') }}</span>
-            <input class="rm-time" type="time" :value="settings.readingMode.night.from" :aria-label="t('readingMode.nightFrom')" @change="onClock('from', $event)" />
+            <input class="rm-time" type="text" inputmode="text" maxlength="5" placeholder="HH:MM" :value="settings.readingMode.night.from" :aria-label="t('readingMode.nightFrom')" @change="onClock('from', $event)" />
             <span>{{ t('readingMode.nightTo') }}</span>
-            <input class="rm-time" type="time" :value="settings.readingMode.night.to" :aria-label="t('readingMode.nightTo')" @change="onClock('to', $event)" />
+            <input class="rm-time" type="text" inputmode="text" maxlength="5" placeholder="HH:MM" :value="settings.readingMode.night.to" :aria-label="t('readingMode.nightTo')" @change="onClock('to', $event)" />
           </div>
           <p v-if="settings.readingMode.night.schedule" class="rm-hint">{{ t('readingMode.nightScheduleHint') }}</p>
         </template>
@@ -405,380 +456,250 @@ function onSpeedInput(e: Event) {
       </div>
     </section>
 
-    <!-- 阅读方式: 版式 (书页怎么排、怎么翻) + 带读 (怎么带着你读), 书页怎么动只在这一处设置 (docs/reader-panels.md) -->
-    <section class="rm-group" data-section="layout" :aria-label="t('readingMode.groupHow')">
-      <h3 class="rm-group-title">{{ t('readingMode.groupHow') }}</h3>
-
-      <template v-if="!fixedLayout">
-        <div class="rm-row">
-          <span class="rm-label">{{ t('reader.flow') }}</span>
-          <div class="segmented" role="group" :aria-label="t('reader.flow')">
-            <button type="button" :class="{ active: settings.reader.flow === 'paginated' }" :aria-pressed="settings.reader.flow === 'paginated'" @click="settings.reader.flow = 'paginated'">{{ t('reader.paginated') }}</button>
-            <button type="button" :class="{ active: settings.reader.flow === 'scrolled' }" :aria-pressed="settings.reader.flow === 'scrolled'" @click="settings.reader.flow = 'scrolled'">{{ t('reader.scrolled') }}</button>
-          </div>
-        </div>
-        <p v-if="portraitLocked" class="rm-hint rm-indent" role="note">{{ t('reader.portraitLockedNote') }}</p>
-        <p v-else-if="modeLocked" class="rm-hint rm-indent" role="note">{{ t('reader.modeLockedNote') }}</p>
-
-        <!-- 滚动: 跨章连续 / 逐章 (按生效方式, 竖屏锁定时也能调) -->
-        <div v-if="effectiveFlow === 'scrolled'" class="rm-row">
-          <span class="rm-label" :title="t('reader.continuousScrollTitle')">{{ t('reader.continuousScroll') }}</span>
-          <div class="segmented" role="group" :aria-label="t('reader.continuousScroll')">
-            <button type="button" :class="{ active: settings.reader.continuousScroll }" :aria-pressed="settings.reader.continuousScroll" @click="settings.reader.continuousScroll = true">{{ t('reader.continuousScrollOn') }}</button>
-            <button type="button" :class="{ active: !settings.reader.continuousScroll }" :aria-pressed="!settings.reader.continuousScroll" @click="settings.reader.continuousScroll = false">{{ t('reader.continuousScrollOff') }}</button>
-          </div>
-        </div>
-
-        <!-- 翻页: 分栏 (按保存的方式, 竖屏锁定时仍可预设横屏的分栏) -->
-        <template v-if="settings.reader.flow === 'paginated'">
-          <div class="rm-row">
-            <span class="rm-label">{{ t('reader.columns') }}</span>
-            <div class="segmented" role="group" :aria-label="t('reader.columns')">
-              <button type="button" :class="{ active: settings.reader.maxColumnCount === 1 }" :aria-pressed="settings.reader.maxColumnCount === 1" @click="settings.reader.maxColumnCount = 1">{{ t('reader.singleColumn') }}</button>
-              <button type="button" :class="{ active: settings.reader.maxColumnCount === 2 }" :aria-pressed="settings.reader.maxColumnCount === 2" @click="settings.reader.maxColumnCount = 2">{{ t('reader.autoTwoColumns') }}</button>
-            </div>
-          </div>
-          <p v-if="modes.forceSingleColumn.value && settings.reader.maxColumnCount === 2 && !modeLocked" class="rm-hint rm-indent" role="note">{{ t('reader.forcedSingleColumn') }}</p>
-        </template>
-
-        <div class="rm-row">
-          <span class="rm-label" :title="t('reader.portraitScrollTitle')">{{ t('reader.portrait') }}</span>
-          <div class="segmented" role="group" :aria-label="t('reader.portraitScrollMenu')" :title="t('reader.portraitScrollTitle')">
-            <button type="button" :class="{ active: settings.reader.portraitScroll }" :aria-pressed="settings.reader.portraitScroll" @click="settings.reader.portraitScroll = true">{{ t('reader.portraitScrollOn') }}</button>
-            <button type="button" :class="{ active: !settings.reader.portraitScroll }" :aria-pressed="!settings.reader.portraitScroll" @click="settings.reader.portraitScroll = false">{{ t('reader.portraitScrollOff') }}</button>
-          </div>
-        </div>
-      </template>
-
-      <!-- 带读: 同一时间只运行一个; 在上面的版式下各自怎么动, 见页签下的说明 -->
-      <h4 class="rm-subtitle">{{ t('readingMode.groupGuide') }}</h4>
-      <div class="segmented rm-tabs" role="group" :aria-label="t('readingMode.groupGuide')">
-        <button
-          v-for="g in guideTabs"
-          :key="g.value"
-          type="button"
-          :class="{ active: tab === g.value, running: runningTab === g.value }"
-          :aria-pressed="tab === g.value"
-          @click="tab = g.value"
-        >
-          {{ t(g.key) }}
-        </button>
-      </div>
-      <p v-if="guideLayoutNote" class="rm-hint rm-guide-note">{{ guideLayoutNote }}</p>
-
-      <!-- 自动翻页 (原自动阅读): 行为不变, 秒/页 3–60 -->
-      <div v-if="tab === 'auto'" class="auto-panel rm-body">
-        <p class="rm-hint">{{ t(autoScrolled ? 'readingMode.autoScrollHint' : 'readingMode.autoHint') }}</p>
-        <div class="rm-row">
-          <span class="rm-label">{{ t('reader.speed') }}</span>
-          <LevelSlider
-            :model-value="speedPosition(autoReadSeconds)"
-            :min="1"
-            :max="AUTO_SPEED_STEPS"
-            :step="1"
-            :stops="AUTO_SPEED_LEVELS.map(l => ({ value: l.position, label: t(l.key) }))"
-            :value-text="String(speedPosition(autoReadSeconds))"
-            :label="t('reader.speed')"
-            @update:model-value="emit('update:autoReadSeconds', secondsAtPosition($event))"
-          />
-        </div>
-        <button type="button" class="btn btn-primary rm-main" @click="toggleAuto">
-          <svg v-if="autoReading" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M8 5a1 1 0 0 1 1 1v12a1 1 0 1 1-2 0V6a1 1 0 0 1 1-1zm8 0a1 1 0 0 1 1 1v12a1 1 0 1 1-2 0V6a1 1 0 0 1 1-1z"/></svg>
-          <svg v-else viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M8 5.14v13.72a1 1 0 0 0 1.52.85l11-6.86a1 1 0 0 0 0-1.7l-11-6.86A1 1 0 0 0 8 5.14z"/></svg>
-          {{ autoReading ? t('common.pause') : t('common.start') }}
-        </button>
-      </div>
-
-      <!-- 听书: 只放入口, 设置仍在听书面板里 (不复制一份) -->
-      <div v-else-if="tab === 'tts'" class="tts-entry rm-body">
-        <p class="rm-hint">{{ t('readingMode.ttsHint') }}</p>
-        <div class="rm-actions">
-          <button type="button" class="btn btn-primary rm-main" @click="openTts">
-            <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M12 3a7 7 0 0 0-7 7v1.1A3.5 3.5 0 0 0 3 14.5v2A3.5 3.5 0 0 0 6.5 20H8a1 1 0 0 0 1-1v-7a1 1 0 0 0-1-1h-.9A5 5 0 0 1 12 5a5 5 0 0 1 4.9 6H16a1 1 0 0 0-1 1v7a1 1 0 0 0 1 1h1.5a3.5 3.5 0 0 0 3.5-3.5v-2a3.5 3.5 0 0 0-2-3.16V10a7 7 0 0 0-7-7z"/></svg>
-            {{ t('readingMode.openTts') }}
-          </button>
-          <button v-if="ttsActive && !lyActive && supported" type="button" class="btn rm-main" @click="modes.startLyric('tts')">
-            {{ t('readingMode.lyricWithTts') }}
-          </button>
-        </div>
-      </div>
-
-      <!-- 打字机 / 歌词 -->
-      <div v-else class="rm-body" :class="tab === 'typewriter' ? 'tw-panel' : 'ly-panel'">
-        <p v-if="!supported" class="rm-note" role="note">{{ t('readingMode.modeUnsupported') }}</p>
-        <fieldset class="rm-fields" :disabled="!supported">
-          <!-- 打字机: 粒度 -->
-          <div v-if="tab === 'typewriter'" class="rm-row">
-            <span class="rm-label">{{ t('readingMode.granularity') }}</span>
-            <div class="segmented">
-              <button
-                v-for="u in units"
-                :key="u.value"
-                type="button"
-                :class="{ active: tw.unit === u.value }"
-                :aria-pressed="tw.unit === u.value"
-                @click="settings.readingMode.typewriter.unit = u.value"
-              >
-                {{ t(u.key) }}
-              </button>
-            </div>
-          </div>
-
-          <!-- 歌词: 推进 / 聚焦 / 其余行 / 位置 / 字号 -->
-          <template v-if="tab === 'lyric'">
-            <div class="rm-row">
-              <span class="rm-label">{{ t('readingMode.lyricDriver') }}</span>
-              <div class="segmented">
-                <button
-                  v-for="d in drivers"
-                  :key="d.value"
-                  type="button"
-                  :class="{ active: ly.driver === d.value }"
-                  :aria-pressed="ly.driver === d.value"
-                  @click="settings.readingMode.lyric.driver = d.value"
-                >
-                  {{ t(d.key) }}
+    <section class="rm-group" :aria-label="t('readingMode.groupGuide')">
+      <h3 class="rm-group-title rm-guide-title">{{ t('readingMode.groupGuide') }}<small>{{ t('readingMode.oneGuide') }}</small></h3>
+      <div class="rm-guides">
+        <div v-for="g in guides" :key="g.value" class="rm-guide" :data-guide="g.value" :class="{ 'is-running': runningTab === g.value || (g.value === 'tts' && ttsActive) }">
+          <div class="rm-guide-main">
+            <div class="rm-guide-text">
+              <div class="rm-guide-name">{{ t(g.key) }}</div>
+              <div class="rm-hint">
+                <button v-if="g.value === 'tts' && ttsActive && !lyActive && supported" type="button" class="rm-layout-link" @click="modes.startLyric('tts')">{{ t('readingMode.lyricWithTts') }}</button>
+                <template v-else>{{ guideLayoutNote(g.value) }}</template>
+                <button v-if="g.value !== 'tts' && !fixedLayout" type="button" class="rm-layout-link" @click="emit('open-typography', 'page')">
+                  {{ t(effectiveFlow === 'scrolled' ? 'readingMode.changeScroll' : 'readingMode.changePages') }}
+                  <svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true"><path d="m9 6 6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" /></svg>
                 </button>
               </div>
             </div>
-            <p v-if="ly.driver === 'tts'" class="rm-hint rm-indent">{{ t('readingMode.driverTtsHint') }}</p>
-            <p v-else-if="ly.driver === 'manual'" class="rm-hint rm-indent">{{ t('readingMode.driverManualHint') }}</p>
-            <div class="rm-row">
-              <span class="rm-label">{{ t('readingMode.lyricLines') }}</span>
-              <div class="segmented">
-                <button type="button" :class="{ active: ly.lines === 1 }" :aria-pressed="ly.lines === 1" @click="settings.readingMode.lyric.lines = 1">
-                  {{ t('readingMode.lines1') }}
-                </button>
-                <button type="button" :class="{ active: ly.lines === 3 }" :aria-pressed="ly.lines === 3" @click="settings.readingMode.lyric.lines = 3">
-                  {{ t('readingMode.lines3') }}
-                </button>
-              </div>
-            </div>
-            <div class="rm-row">
-              <span class="rm-label">{{ t('readingMode.lyricOthers') }}</span>
-              <div class="segmented">
-                <button type="button" :class="{ active: ly.others === 'dim' }" :aria-pressed="ly.others === 'dim'" @click="settings.readingMode.lyric.others = 'dim'">
-                  {{ t('readingMode.upcomingGhost') }}
-                </button>
-                <button type="button" :class="{ active: ly.others === 'hide' }" :aria-pressed="ly.others === 'hide'" @click="settings.readingMode.lyric.others = 'hide'">
-                  {{ t('readingMode.upcomingHidden') }}
-                </button>
-              </div>
-            </div>
-            <div class="rm-row">
-              <span class="rm-label">{{ t('readingMode.lyricAnchor') }}</span>
-              <div class="segmented">
-                <button type="button" :class="{ active: ly.anchor === 0.4 }" :aria-pressed="ly.anchor === 0.4" @click="settings.readingMode.lyric.anchor = 0.4">
-                  {{ t('readingMode.anchorUpper') }}
-                </button>
-                <button type="button" :class="{ active: ly.anchor === 0.5 }" :aria-pressed="ly.anchor === 0.5" @click="settings.readingMode.lyric.anchor = 0.5">
-                  {{ t('readingMode.anchorCenter') }}
-                </button>
-              </div>
-            </div>
-            <div class="rm-row">
-              <span class="rm-label">{{ t('readingMode.lyricScale') }}</span>
-              <div class="segmented">
-                <button
-                  v-for="s in scales"
-                  :key="s.value"
-                  type="button"
-                  :class="{ active: Math.abs(ly.scale - s.value) < 0.01 }"
-                  :aria-pressed="Math.abs(ly.scale - s.value) < 0.01"
-                  @click="settings.readingMode.lyric.scale = s.value"
-                >
-                  {{ s.label() }}
-                </button>
-              </div>
-            </div>
-          </template>
-
-          <!-- 速度: 打字机与歌词 (自动) 共用 -->
-          <template v-if="showSpeed">
-            <div class="rm-row">
-              <span class="rm-label">{{ t('readingMode.speed') }}</span>
-              <button type="button" class="rm-step" :title="t('readingMode.slower')" :aria-label="t('readingMode.slower')" @click="modes.adjustSpeed(-1)">
-                <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M5 12a1 1 0 0 1 1-1h12a1 1 0 1 1 0 2H6a1 1 0 0 1-1-1z"/></svg>
-              </button>
-              <input
-                class="rm-range"
-                type="range"
-                :min="modes.speedLimits.value[0]"
-                :max="modes.speedLimits.value[1]"
-                step="10"
-                :value="modes.speed.value"
-                :aria-label="t('readingMode.speed')"
-                :aria-valuetext="modes.speedText.value"
-                @input="onSpeedInput"
-              />
-              <button type="button" class="rm-step" :title="t('readingMode.faster')" :aria-label="t('readingMode.faster')" @click="modes.adjustSpeed(1)">
-                <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M12 5a1 1 0 0 1 1 1v5h5a1 1 0 1 1 0 2h-5v5a1 1 0 1 1-2 0v-5H6a1 1 0 1 1 0-2h5V6a1 1 0 0 1 1-1z"/></svg>
-              </button>
-              <!-- 直接输入具体速度; 越界时收敛到可用范围并回显 -->
-              <label class="rm-value rm-speed-field">
-                <input
-                  class="rm-speed-input"
-                  type="number"
-                  inputmode="numeric"
-                  :min="modes.speedLimits.value[0]"
-                  :max="modes.speedLimits.value[1]"
-                  step="10"
-                  :value="modes.speed.value"
-                  :aria-label="t('readingMode.speedExact', { min: modes.speedLimits.value[0], max: modes.speedLimits.value[1] })"
-                  :title="t('readingMode.speedExact', { min: modes.speedLimits.value[0], max: modes.speedLimits.value[1] })"
-                  @change="onSpeedExact"
-                  @keydown.enter="($event.target as HTMLInputElement).blur()"
-                />
-                <span>{{ modes.speedUnit.value === 'cpm' ? t('readingMode.unitCpm') : t('readingMode.unitWpm') }}</span>
+            <button v-if="g.value !== 'tts'" type="button" class="rm-gear" :aria-expanded="expanded === g.value" :aria-controls="`guide-settings-${g.value}`" :aria-label="t('readingMode.guideSettings', { name: t(g.key) })" @click="toggleSettings(g.value)">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="m10 3-.5 2-2 .9-1.9-.6-2 3.4L5 10v2l-1.4 1.3 2 3.4 1.9-.6 2 .9.5 2h4l.5-2 2-.9 1.9.6 2-3.4L19 12v-2l1.4-1.3-2-3.4-1.9.6-2-.9-.5-2Z"/><circle cx="12" cy="11" r="3"/></svg>
+            </button>
+            <button type="button" class="btn rm-guide-action" :class="{ 'btn-primary': g.value !== 'tts' && runningTab !== g.value }" :disabled="(g.value === 'typewriter' || g.value === 'lyric') && !supported" :title="g.value === 'typewriter' ? t('readingMode.keysHint') : g.value === 'lyric' ? t('readingMode.lyricKeysHint') : undefined" @click="act(g.value)">
+              <svg v-if="g.value === 'tts'" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg>
+              <svg v-else-if="runningTab !== g.value || paused" viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M7 4v16l13-8Z" /></svg>
+              <svg v-else-if="g.value !== 'lyric' || canPause" viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M6 4h4v16H6zm8 0h4v16h-4z" /></svg>
+              {{ actionLabel(g.value) }}
+            </button>
+          </div>
+          <div v-if="expanded === g.value && g.value !== 'tts'" :id="`guide-settings-${g.value}`" class="rm-guide-settings" :class="{ 'auto-panel': g.value === 'auto', 'tw-panel': g.value === 'typewriter', 'ly-panel': g.value === 'lyric' }">
+            <div v-if="g.value === 'auto'" class="rm-row rm-speed-row">
+              <span class="rm-label">{{ t('reader.speed') }}</span>
+              <LevelSlider :model-value="speedPosition(autoReadSeconds)" :min="1" :max="AUTO_SPEED_STEPS" :step="1" :stops="autoStops" :label="t('reader.speed')" @update:model-value="emit('update:autoReadSeconds', secondsAtPosition($event))" />
+              <label class="rm-speed-field">
+                <input class="rm-speed-input" type="number" inputmode="decimal" min="3" max="300" step="0.1" :value="autoReadSeconds" :aria-label="t('readingMode.speedExact', { min: 3, max: 300 })" @blur="onAutoSpeedExact" @keydown.enter="($event.target as HTMLInputElement).blur()" />
+                <span>{{ t(autoScrolled ? 'readingMode.secondsScreen' : 'readingMode.secondsPage') }}</span>
               </label>
             </div>
-            <div class="rm-presets">
-              <button
-                v-for="(n, i) in modes.presets.value"
-                :key="n"
-                type="button"
-                class="rm-chip"
-                :class="{ on: modes.speed.value === n }"
-                :aria-pressed="modes.speed.value === n"
-                :title="modes.speedUnit.value === 'cpm' ? t('readingMode.cpm', { n }) : t('readingMode.wpm', { n })"
-                @click="modes.speed.value = n"
-              >
-                {{ t(presetLabels[i]) }}
-              </button>
-            </div>
-          </template>
-
-          <!-- 打字机: 后文 / 开关 -->
-          <template v-if="tab === 'typewriter'">
-            <div class="rm-row">
-              <span class="rm-label">{{ t('readingMode.upcoming') }}</span>
-              <div class="segmented">
-                <button
-                  type="button"
-                  :class="{ active: tw.upcoming === 'hidden' }"
-                  :aria-pressed="tw.upcoming === 'hidden'"
-                  @click="settings.readingMode.typewriter.upcoming = 'hidden'"
-                >
-                  {{ t('readingMode.upcomingHidden') }}
-                </button>
-                <button
-                  type="button"
-                  :class="{ active: tw.upcoming === 'ghost' }"
-                  :aria-pressed="tw.upcoming === 'ghost'"
-                  @click="settings.readingMode.typewriter.upcoming = 'ghost'"
-                >
-                  {{ t('readingMode.upcomingGhost') }}
-                </button>
-              </div>
-            </div>
-          </template>
-
-          <div class="rm-toggles">
-            <label class="rm-toggle">
-              <span>{{ t('readingMode.punctuationPause') }}</span>
-              <span class="rm-switch">
-                <input v-model="settings.readingMode.typewriter.punctuationPause" type="checkbox" role="switch" :aria-checked="tw.punctuationPause" />
-                <span class="rm-switch-track" aria-hidden="true"></span>
-              </span>
-            </label>
-            <template v-if="tab === 'typewriter'">
-              <label class="rm-toggle">
-                <span>{{ t('readingMode.freshInk') }}</span>
-                <span class="rm-switch">
-                  <input v-model="settings.readingMode.typewriter.freshInk" type="checkbox" role="switch" :aria-checked="tw.freshInk" />
-                  <span class="rm-switch-track" aria-hidden="true"></span>
-                </span>
-              </label>
-              <label class="rm-toggle">
-                <span>{{ t('readingMode.sound') }}</span>
-                <span class="rm-switch">
-                  <input v-model="settings.readingMode.typewriter.sound" type="checkbox" role="switch" :aria-checked="tw.sound" />
-                  <span class="rm-switch-track" aria-hidden="true"></span>
-                </span>
-              </label>
-              <!-- 打字声音色 (CC0 录音, 见 docs/ambient-sources.md) + 音量 + 试听 -->
-              <div v-if="tw.sound" class="rm-sound">
-                <div class="rm-sound-presets" role="radiogroup" :aria-label="t('readingMode.soundPreset')">
+            <fieldset v-else class="rm-fields" :disabled="!supported">
+              <!-- 打字机: 粒度 -->
+              <div v-if="g.value === 'typewriter'" class="rm-row">
+                <span class="rm-label">{{ t('readingMode.granularity') }}</span>
+                <div class="segmented">
                   <button
-                    v-for="p in TYPING_SOUND_PRESETS"
-                    :key="p.id"
+                    v-for="u in units"
+                    :key="u.value"
                     type="button"
-                    role="radio"
-                    class="rm-chip"
-                    :class="{ on: tw.soundPreset === p.id }"
-                    :aria-checked="tw.soundPreset === p.id"
-                    @click="settings.readingMode.typewriter.soundPreset = p.id; void previewTypingSound(p.id, tw.soundVolume)"
-                  >{{ t(p.nameKey) }}</button>
+                    :class="{ active: tw.unit === u.value }"
+                    :aria-pressed="tw.unit === u.value"
+                    @click="settings.readingMode.typewriter.unit = u.value"
+                  >
+                    {{ t(u.key) }}
+                  </button>
+                </div>
+              </div>
+
+              <!-- 歌词: 推进 / 聚焦 / 其余行 / 位置 / 字号 -->
+              <template v-if="g.value === 'lyric'">
+                <div class="rm-row">
+                  <span class="rm-label">{{ t('readingMode.lyricDriver') }}</span>
+                  <div class="segmented">
+                    <button
+                      v-for="d in drivers"
+                      :key="d.value"
+                      type="button"
+                      :class="{ active: lyricDriver === d.value }"
+                      :aria-pressed="lyricDriver === d.value"
+                      @click="modes.setLyricDriver(d.value)"
+                    >
+                      {{ t(d.key) }}
+                    </button>
+                  </div>
+                </div>
+                <p v-if="lyricDriver === 'tts'" class="rm-hint rm-indent">{{ t('readingMode.driverTtsHint') }}</p>
+                <p v-else-if="lyricDriver === 'manual'" class="rm-hint rm-indent">{{ t('readingMode.driverManualHint') }}</p>
+              </template>
+              <div v-if="g.value === 'typewriter' || lyricDriver === 'pace'" class="rm-row rm-speed-row">
+                <span class="rm-label">{{ t('readingMode.speed') }}</span>
+                <LevelSlider :model-value="guidedSpeedPosition" :min="0" :max="100" :step="1" :stops="speedStops" :label="t('readingMode.speed')" @update:model-value="setGuidedSpeed" />
+                <label class="rm-speed-field">
+                  <input class="rm-speed-input" type="number" inputmode="numeric" :min="modes.speedLimits.value[0]" :max="modes.speedLimits.value[1]" step="10" :value="modes.speed.value" :aria-label="t('readingMode.speedExact', { min: modes.speedLimits.value[0], max: modes.speedLimits.value[1] })" @blur="onSpeedExact" @keydown.enter="($event.target as HTMLInputElement).blur()" />
+                  <span>{{ t(modes.speedUnit.value === 'cpm' ? 'readingMode.unitCpm' : 'readingMode.unitWpm') }}</span>
+                </label>
+              </div>
+              <details class="rm-more">
+                <summary>{{ t('reader.more') }}</summary>
+                <div class="rm-more-body">
+                  <template v-if="g.value === 'lyric'">
+                <div class="rm-row">
+                  <span class="rm-label">{{ t('readingMode.lyricLines') }}</span>
+                  <div class="segmented">
+                    <button type="button" :class="{ active: ly.lines === 1 }" :aria-pressed="ly.lines === 1" @click="settings.readingMode.lyric.lines = 1">
+                      {{ t('readingMode.lines1') }}
+                    </button>
+                    <button type="button" :class="{ active: ly.lines === 3 }" :aria-pressed="ly.lines === 3" @click="settings.readingMode.lyric.lines = 3">
+                      {{ t('readingMode.lines3') }}
+                    </button>
+                  </div>
+                  <input class="rm-number-input rm-lines-input" type="number" inputmode="numeric" min="1" max="99" step="1" :value="ly.lines" :aria-label="t('readingMode.customLines')" @blur="onLyricLines" @keydown.enter="($event.target as HTMLInputElement).blur()" />
                 </div>
                 <div class="rm-row">
-                  <span class="rm-label">{{ t('readingMode.soundVolume') }}</span>
-                  <input
-                    v-model.number="settings.readingMode.typewriter.soundVolume"
-                    class="rm-sound-volume"
-                    type="range"
-                    min="0"
-                    max="1"
-                    step="0.05"
-                    :aria-label="t('readingMode.soundVolume')"
-                  />
-                  <span class="rm-value">{{ Math.round(tw.soundVolume * 100) }}%</span>
-                  <button type="button" class="btn btn-sm" @click="void previewTypingSound(tw.soundPreset, tw.soundVolume)">{{ t('readingMode.soundPreview') }}</button>
+                  <span class="rm-label">{{ t('readingMode.lyricOthers') }}</span>
+                  <div class="segmented">
+                    <button type="button" :class="{ active: ly.others === 'dim' }" :aria-pressed="ly.others === 'dim'" @click="settings.readingMode.lyric.others = 'dim'">
+                      {{ t('readingMode.upcomingGhost') }}
+                    </button>
+                    <button type="button" :class="{ active: ly.others === 'hide' }" :aria-pressed="ly.others === 'hide'" @click="settings.readingMode.lyric.others = 'hide'">
+                      {{ t('readingMode.upcomingHidden') }}
+                    </button>
+                  </div>
                 </div>
+                <div class="rm-row">
+                  <span class="rm-label">{{ t('readingMode.lyricAnchor') }}</span>
+                  <div class="segmented">
+                    <button type="button" :class="{ active: ly.anchor === 0.382 }" :aria-pressed="ly.anchor === 0.382" @click="settings.readingMode.lyric.anchor = 0.382">
+                      {{ t('readingMode.anchorUpper') }}
+                    </button>
+                    <button type="button" :class="{ active: ly.anchor === 0.5 }" :aria-pressed="ly.anchor === 0.5" @click="settings.readingMode.lyric.anchor = 0.5">
+                      {{ t('readingMode.anchorCenter') }}
+                    </button>
+                  </div>
+                </div>
+                <div class="rm-position-row">
+                  <label class="rm-position-slider">
+                    <span class="sr-only">{{ t('readingMode.positionHeight') }}</span>
+                    <input type="range" min="0" max="1" step="any" :value="lyricPosition" :aria-valuetext="String(lyricPosition)" @input="onLyricSlider" @keydown="onLyricSliderKey" />
+                    <span class="rm-position-ends"><span>{{ t('readingMode.positionBottom') }}</span><span>{{ t('readingMode.positionTop') }}</span></span>
+                  </label>
+                  <input class="rm-number-input rm-position-input" type="number" inputmode="decimal" min="0" max="1" step="0.001" :value="lyricPosition" :aria-label="t('readingMode.positionExact')" @blur="onLyricPosition" @keydown.enter="($event.target as HTMLInputElement).blur()" />
+                </div>
+                <div class="rm-row">
+                  <span class="rm-label">{{ t('readingMode.lyricScale') }}</span>
+                  <div class="segmented">
+                    <button
+                      v-for="s in scales"
+                      :key="s.value"
+                      type="button"
+                      :class="{ active: Math.abs(ly.scale - s.value) < 0.01 }"
+                      :aria-pressed="Math.abs(ly.scale - s.value) < 0.01"
+                      @click="settings.readingMode.lyric.scale = s.value"
+                    >
+                      {{ s.label() }}
+                    </button>
+                  </div>
+                </div>
+                  </template>
+              <!-- 打字机: 后文 / 开关 -->
+              <template v-if="g.value === 'typewriter'">
+                <div class="rm-row">
+                  <span class="rm-label">{{ t('readingMode.upcoming') }}</span>
+                  <div class="segmented">
+                    <button
+                      type="button"
+                      :class="{ active: tw.upcoming === 'hidden' }"
+                      :aria-pressed="tw.upcoming === 'hidden'"
+                      @click="settings.readingMode.typewriter.upcoming = 'hidden'"
+                    >
+                      {{ t('readingMode.upcomingHidden') }}
+                    </button>
+                    <button
+                      type="button"
+                      :class="{ active: tw.upcoming === 'ghost' }"
+                      :aria-pressed="tw.upcoming === 'ghost'"
+                      @click="settings.readingMode.typewriter.upcoming = 'ghost'"
+                    >
+                      {{ t('readingMode.upcomingGhost') }}
+                    </button>
+                  </div>
+                </div>
+              </template>
+
+              <div class="rm-toggles">
+                <label class="rm-toggle">
+                  <span>{{ t('readingMode.punctuationPause') }}</span>
+                  <span class="rm-switch">
+                    <input v-model="settings.readingMode.typewriter.punctuationPause" type="checkbox" role="switch" :aria-checked="tw.punctuationPause" />
+                    <span class="rm-switch-track" aria-hidden="true"></span>
+                  </span>
+                </label>
+                <template v-if="g.value === 'typewriter'">
+                  <label class="rm-toggle">
+                    <span>{{ t('readingMode.freshInk') }}</span>
+                    <span class="rm-switch">
+                      <input v-model="settings.readingMode.typewriter.freshInk" type="checkbox" role="switch" :aria-checked="tw.freshInk" />
+                      <span class="rm-switch-track" aria-hidden="true"></span>
+                    </span>
+                  </label>
+                  <label class="rm-toggle">
+                    <span>{{ t('readingMode.sound') }}</span>
+                    <span class="rm-switch">
+                      <input v-model="settings.readingMode.typewriter.sound" type="checkbox" role="switch" :aria-checked="tw.sound" />
+                      <span class="rm-switch-track" aria-hidden="true"></span>
+                    </span>
+                  </label>
+                  <!-- 打字声音色 (CC0 录音, 见 docs/ambient-sources.md) + 音量 + 试听 -->
+                  <div v-if="tw.sound" class="rm-sound">
+                    <div class="rm-sound-presets" role="radiogroup" :aria-label="t('readingMode.soundPreset')">
+                      <button
+                        v-for="p in TYPING_SOUND_PRESETS"
+                        :key="p.id"
+                        type="button"
+                        role="radio"
+                        class="rm-chip"
+                        :class="{ on: tw.soundPreset === p.id }"
+                        :aria-checked="tw.soundPreset === p.id"
+                        @click="settings.readingMode.typewriter.soundPreset = p.id; void previewTypingSound(p.id, tw.soundVolume)"
+                      >{{ t(p.nameKey) }}</button>
+                    </div>
+                    <div class="rm-row">
+                      <span class="rm-label">{{ t('readingMode.soundVolume') }}</span>
+                      <input
+                        v-model.number="settings.readingMode.typewriter.soundVolume"
+                        class="rm-sound-volume"
+                        type="range"
+                        min="0"
+                        max="1"
+                        step="0.05"
+                        :aria-label="t('readingMode.soundVolume')"
+                      />
+                      <span class="rm-value">{{ Math.round(tw.soundVolume * 100) }}%</span>
+                      <button type="button" class="btn btn-sm" @click="void previewTypingSound(tw.soundPreset, tw.soundVolume)">{{ t('readingMode.soundPreview') }}</button>
+                    </div>
+                  </div>
+                </template>
               </div>
-            </template>
+
+              <p class="rm-hint">{{ g.value === 'typewriter' ? t('readingMode.typewriterHint') : t('readingMode.lyricHint') }}</p>
+              <p v-if="modes.reducedMotion.value && g.value === 'typewriter'" class="rm-hint">{{ t('readingMode.reducedMotionHint') }}</p>
+                </div>
+              </details>
+            </fieldset>
           </div>
-
-          <p class="rm-hint">{{ tab === 'typewriter' ? t('readingMode.typewriterHint') : t('readingMode.lyricHint') }}</p>
-          <p v-if="modes.reducedMotion.value && tab === 'typewriter'" class="rm-hint">{{ t('readingMode.reducedMotionHint') }}</p>
-        </fieldset>
-
-        <!-- 打字机 -->
-        <div v-if="tab === 'typewriter'" class="rm-actions">
-          <template v-if="!twActive">
-            <button type="button" class="btn btn-primary rm-main" :disabled="!supported" @click="modes.start()">
-              <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M8 5.14v13.72a1 1 0 0 0 1.52.85l11-6.86a1 1 0 0 0 0-1.7l-11-6.86A1 1 0 0 0 8 5.14z"/></svg>
-              {{ t('readingMode.startFromPage') }}
-            </button>
-          </template>
-          <template v-else>
-            <button type="button" class="btn btn-primary rm-main" @click="modes.togglePause()">
-              <svg v-if="twState === 'paused'" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M8 5.14v13.72a1 1 0 0 0 1.52.85l11-6.86a1 1 0 0 0 0-1.7l-11-6.86A1 1 0 0 0 8 5.14z"/></svg>
-              <svg v-else viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M8 5a1 1 0 0 1 1 1v12a1 1 0 1 1-2 0V6a1 1 0 0 1 1-1zm8 0a1 1 0 0 1 1 1v12a1 1 0 1 1-2 0V6a1 1 0 0 1 1-1z"/></svg>
-              {{ twState === 'paused' ? t('common.resume') : t('common.pause') }}
-            </button>
-            <button type="button" class="btn rm-main" @click="modes.stop()">
-              {{ t('readingMode.exitTypewriter') }}
-            </button>
-          </template>
         </div>
-        <!-- 歌词 -->
-        <div v-else class="rm-actions">
-          <template v-if="!lyActive">
-            <button type="button" class="btn btn-primary rm-main" :disabled="!supported" @click="modes.startLyric()">
-              <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M8 5.14v13.72a1 1 0 0 0 1.52.85l11-6.86a1 1 0 0 0 0-1.7l-11-6.86A1 1 0 0 0 8 5.14z"/></svg>
-              {{ t('readingMode.startFromPage') }}
-            </button>
-          </template>
-          <template v-else>
-            <button v-if="modes.lyricDriver.value === 'pace'" type="button" class="btn btn-primary rm-main" @click="modes.togglePause()">
-              <svg v-if="lyState === 'paused'" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M8 5.14v13.72a1 1 0 0 0 1.52.85l11-6.86a1 1 0 0 0 0-1.7l-11-6.86A1 1 0 0 0 8 5.14z"/></svg>
-              <svg v-else viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M8 5a1 1 0 0 1 1 1v12a1 1 0 1 1-2 0V6a1 1 0 0 1 1-1zm8 0a1 1 0 0 1 1 1v12a1 1 0 1 1-2 0V6a1 1 0 0 1 1-1z"/></svg>
-              {{ lyState === 'paused' ? t('common.resume') : t('common.pause') }}
-            </button>
-            <button type="button" class="btn rm-main" @click="modes.stopLyric()">
-              {{ t('readingMode.exitLyric') }}
-            </button>
-          </template>
-        </div>
-        <p class="rm-keys">{{ tab === 'typewriter' ? t('readingMode.keysHint') : t('readingMode.lyricKeysHint') }}</p>
       </div>
-      <p class="rm-hint">{{ t('readingMode.guideExclusive') }}</p>
     </section>
 
   </section>
 </template>
 
 <style scoped>
+.rm-position-row { display: flex; align-items: flex-start; gap: 12px; }
+.rm-position-slider { flex: 1; min-width: 0; }
+.rm-position-slider input { width: 100%; min-height: 44px; }
+.rm-position-ends { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-3); }
+.rm-position-input { width: 80px !important; min-height: 44px; }
+.rm-lines-input { width: 64px !important; min-height: 44px; }
+
 .rm-sound {
   display: flex;
   flex-direction: column;
@@ -891,14 +812,6 @@ function onSpeedInput(e: Event) {
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.rm-tabs {
-  align-self: flex-start;
-}
-.rm-body {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
 .rm-fields {
   display: flex;
   flex-direction: column;
@@ -923,18 +836,13 @@ function onSpeedInput(e: Event) {
   font-size: 13px;
   color: var(--text-2);
 }
-.rm-range {
-  flex: 1;
-  min-width: 0;
-  accent-color: var(--brand);
-}
 .rm-speed-field {
   display: inline-flex;
   align-items: center;
   justify-content: flex-end;
   gap: 4px;
 }
-.rm-speed-input {
+:is(.rm-speed-input, .rm-number-input) {
   width: 64px;
   height: 30px;
   padding: 0 6px;
@@ -948,12 +856,12 @@ function onSpeedInput(e: Event) {
   font-variant-numeric: tabular-nums;
   -moz-appearance: textfield;
 }
-.rm-speed-input::-webkit-outer-spin-button,
-.rm-speed-input::-webkit-inner-spin-button {
+:is(.rm-speed-input, .rm-number-input)::-webkit-outer-spin-button,
+:is(.rm-speed-input, .rm-number-input)::-webkit-inner-spin-button {
   -webkit-appearance: none;
   margin: 0;
 }
-.rm-speed-input:focus {
+:is(.rm-speed-input, .rm-number-input):focus {
   outline: none;
   border-color: var(--brand);
   box-shadow: 0 0 0 2px var(--brand-soft);
@@ -966,32 +874,9 @@ function onSpeedInput(e: Event) {
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
-.rm-step {
-  flex-shrink: 0;
-  width: 32px;
-  height: 32px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--card);
-  color: var(--text-2);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-.rm-step:hover {
-  color: var(--brand);
-  border-color: var(--brand);
-}
-.rm-step:focus-visible,
 .rm-chip:focus-visible {
   outline: none;
   box-shadow: var(--ring);
-}
-.rm-presets {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  padding-left: 74px;
 }
 .rm-chip {
   height: 26px;
@@ -1072,40 +957,15 @@ function onSpeedInput(e: Event) {
 .rm-switch input:focus-visible + .rm-switch-track {
   box-shadow: var(--ring);
 }
-.rm-hint,
-.rm-keys,
-.rm-note {
+.rm-hint {
   margin: 0;
   font-size: 12px;
   line-height: 1.6;
   color: var(--text-3);
 }
-.rm-note {
-  padding: 8px 10px;
-  border-radius: var(--radius);
-  background: var(--surface-2);
-  color: var(--text-2);
-}
-.rm-actions {
-  display: flex;
-  gap: 8px;
-}
-.rm-main {
-  flex: 1;
-  justify-content: center;
-}
-.auto-panel .rm-main {
-  flex: none;
-  align-self: stretch;
-}
-@media (hover: none) {
-  .rm-keys {
-    display: none;
-  }
-}
 @media (max-width: 720px) {
   /* 16px 以下 iOS 聚焦时会放大页面 */
-  .rm-speed-input {
+  :is(.rm-speed-input, .rm-number-input) {
     font-size: 16px;
   }
   .rm-panel {
@@ -1136,22 +996,15 @@ function onSpeedInput(e: Event) {
   .rm-label {
     width: 52px;
   }
-  .rm-presets {
-    padding-left: 62px;
-  }
   .rm-value {
     min-width: 64px;
   }
-  .rm-step,
   .rm-close {
     width: 44px;
     height: 44px;
   }
   .rm-chip {
     height: 32px;
-  }
-  .rm-main {
-    min-height: 44px;
   }
 }
 @keyframes rm-sheet-up {
@@ -1305,17 +1158,6 @@ function onSpeedInput(e: Event) {
 .rm-self-start {
   align-self: flex-start;
 }
-.rm-subtitle {
-  margin: 6px 0 0;
-  padding-top: 10px;
-  border-top: 1px dashed color-mix(in srgb, var(--border) 80%, transparent);
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-3);
-}
-.rm-guide-note {
-  margin-top: -2px;
-}
 .rm-tune {
   align-self: flex-start;
   display: inline-flex;
@@ -1356,19 +1198,6 @@ function onSpeedInput(e: Event) {
 .rm-indent {
   padding-left: 74px;
 }
-.rm-tabs button.running {
-  position: relative;
-}
-.rm-tabs button.running::after {
-  content: '';
-  position: absolute;
-  top: 4px;
-  right: 4px;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--success);
-}
 @media (pointer: coarse) {
   .rm-card-info {
     width: 30px;
@@ -1391,17 +1220,15 @@ function onSpeedInput(e: Event) {
   .rm-chip {
     height: 40px;
   }
-  .rm-step,
   .rm-close {
     width: 44px;
     height: 44px;
   }
-  .rm-speed-input,
+  :is(.rm-speed-input, .rm-number-input),
   .rm-time {
     height: 40px;
   }
-  .rm-toggle,
-  .rm-main {
+  .rm-toggle {
     min-height: 44px;
   }
 }
@@ -1421,6 +1248,152 @@ function onSpeedInput(e: Event) {
 @media (prefers-reduced-motion: reduce) {
   .rm-card-main {
     transition: none;
+  }
+}
+
+.rm-running {
+  padding: 10px 12px;
+  border-radius: var(--radius-lg);
+  background: var(--brand-light);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.rm-running-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.rm-running-head strong {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+}
+.rm-running-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--brand);
+  flex-shrink: 0;
+}
+.rm-guide-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+.rm-guide-title small {
+  font-weight: 400;
+  font-size: inherit;
+}
+.rm-guides {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+.rm-guide + .rm-guide {
+  border-top: 1px solid var(--border);
+}
+.rm-guide-main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+}
+.rm-guide.is-running .rm-guide-main {
+  background: var(--brand-light);
+}
+.rm-guide-text {
+  flex: 1;
+  min-width: 0;
+}
+.rm-guide-name {
+  font-size: 14px;
+  font-weight: 600;
+}
+.rm-layout-link {
+  display: inline-flex;
+  align-items: center;
+  margin-inline-start: 4px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--brand);
+  font: inherit;
+  text-align: start;
+  border-radius: var(--radius-sm);
+}
+.rm-gear {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  border: none;
+  border-radius: var(--radius);
+  background: none;
+  color: var(--text-3);
+}
+.rm-gear[aria-expanded='true'] {
+  background: var(--surface-2);
+  color: var(--brand);
+}
+.rm-guide-action {
+  flex-shrink: 0;
+}
+.rm-guide-settings {
+  padding: 4px 12px 12px;
+}
+.rm-more {
+  font-size: 13px;
+  color: var(--text-2);
+}
+.rm-more summary {
+  cursor: pointer;
+  padding: 4px 0;
+}
+.rm-more-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 8px;
+}
+.rm-speed-row {
+  gap: 6px;
+}
+.rm-speed-row .rm-label {
+  width: auto;
+}
+.rm-speed-field {
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  max-width: 96px;
+  font-size: 12px;
+  color: var(--text-2);
+}
+:is(.rm-speed-input, .rm-number-input) {
+  width: 54px;
+  padding: 0 3px;
+  border-style: dashed;
+}
+.rm-gear:focus-visible, .rm-layout-link:focus-visible, .rm-more summary:focus-visible {
+  outline: none;
+  box-shadow: var(--ring);
+}
+@media (max-width: 720px), (pointer: coarse) {
+  .rm-gear {
+    width: 44px;
+    height: 44px;
+  }
+  .rm-guide-action, .rm-running .btn {
+    min-width: 44px;
+    min-height: 44px;
+  }
+  .rm-guide-main {
+    gap: 6px;
+    padding: 10px 8px;
+  }
+  .rm-layout-link, .rm-more summary {
+    min-height: 44px;
   }
 }
 </style>

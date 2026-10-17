@@ -1,10 +1,10 @@
 {
   "id": "chinese-classics",
   "title": "中国古典名著",
-  "description": "从先秦典籍到明清小说，中国人绕不开的古典书目。多数可在古登堡计划找到繁体原文。",
+  "description": "从先秦典籍到明清小说，多数可在古登堡读繁体原文。",
   "en": {
     "title": "Chinese Classics",
-    "description": "From pre-Qin classics to Ming and Qing novels: the essential works of classical Chinese literature. Most are available in traditional-character originals on Project Gutenberg."
+    "description": "Chinese classics, mostly available free on Project Gutenberg."
   },
   "curator": "轻阅编辑部",
   "tags": [

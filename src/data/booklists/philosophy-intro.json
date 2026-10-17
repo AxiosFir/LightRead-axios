@@ -1,10 +1,10 @@
 {
   "id": "philosophy-intro",
   "title": "哲学入门经典",
-  "description": "从古希腊到二十世纪初，一条读得下去的西方哲学主线。每本都有公版英译，可在应用内的哲学文库、Standard Ebooks 或古登堡计划免费获取。",
+  "description": "西方哲学入门经典，附免费公版英译获取途径。",
   "en": {
     "title": "Philosophy Classics for Beginners",
-    "description": "A readable path through Western philosophy from ancient Greece to the early twentieth century. Every title has a public-domain English edition available free through the in-app philosophy library, Standard Ebooks or Project Gutenberg."
+    "description": "Western philosophy classics with free public-domain English editions."
   },
   "curator": "轻阅编辑部",
   "tags": [

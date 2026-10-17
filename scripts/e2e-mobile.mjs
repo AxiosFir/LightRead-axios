@@ -93,7 +93,7 @@ function auditInPage({ safeTop, safeBottom }) {
   const visible = el => {
     for (let p = el; p && p !== document.documentElement; p = p.parentElement) {
       const s = getComputedStyle(p)
-      if (s.display === 'none' || s.visibility === 'hidden' || Number(s.opacity) === 0) return false
+      if (p.inert || s.display === 'none' || s.visibility === 'hidden' || Number(s.opacity) === 0) return false
       if (p !== el && s.pointerEvents === 'none' && p.classList.contains('hidden')) return false
     }
     const r = el.getBoundingClientRect()
@@ -259,6 +259,14 @@ for (const device of devices) {
   for (const path of ['/papers', '/catalogs', '/stats', '/transfer', '/settings', '/manual']) {
     await go(path)
     await check(path.slice(1))
+    if (path === '/settings') {
+      await page.locator('#ai-provider').click()
+      await check('settings-ai-picker')
+      await page.evaluate(() => document.documentElement.dataset.theme = 'dark')
+      await check('settings-ai-picker-dark')
+      await page.getByRole('dialog').getByRole('button', { name: '关闭', exact: true }).click()
+      await page.evaluate(() => document.documentElement.dataset.theme = 'light')
+    }
   }
 
   const readers = [['novel', '测试小说'], ['md', '轻阅使用指南'], ['html', 'HTML 测试页'], ['code', 'config.json'], ['ts', 'readerTheme.ts']]
@@ -283,12 +291,52 @@ for (const device of devices) {
       const shown = await ensureBars()
       await check(`read-${key}-bars`, shown ? [] : [{ type: 'bars-not-shown', level: 'error', el: '', detail: '轻点屏幕中间没有呼出工具栏' }])
       if (key === 'novel') {
-        for (const [index, label] of [[0, 'toc'], [4, 'typography']]) {
+        for (const [index, label] of [[0, 'toc'], [4, 'typography'], [3, 'modes']]) {
           try {
             if (!(await barsShown()) && !(await ensureBars())) throw new Error('工具栏没有呼出')
             await page.locator('.dock button').nth(index).click({ timeout: 3000 })
             await page.waitForTimeout(700)
             await check(`read-novel-${label}`)
+            if (label === 'modes') {
+              for (const guide of ['auto', 'typewriter', 'lyric']) {
+                const gear = page.locator(`.rm-guide[data-guide=${guide}] .rm-gear`)
+                if (await gear.getAttribute('aria-expanded') !== 'true') await gear.click()
+                await check(`read-novel-modes-${guide}`)
+                for (const selector of ['.rm-gear', '.rm-guide-action']) {
+                  const box = await page.locator(`.rm-guide[data-guide=${guide}] ${selector}`).boundingBox()
+                  if (!box || box.width < 44 || box.height < 44) throw new Error(`${guide} ${selector} 小于 44px`)
+                }
+              }
+              await page.locator('.rm-guide[data-guide=lyric] .rm-more summary').click()
+              await page.locator('.rm-position-input').scrollIntoViewIfNeeded()
+              await check('read-novel-lyric-custom')
+              await page.evaluate(() => document.documentElement.dataset.theme = 'dark')
+              await check('read-novel-modes-dark')
+              await page.evaluate(() => document.documentElement.dataset.theme = 'light')
+              for (const guide of ['auto', 'typewriter', 'lyric']) {
+                await page.locator(`.rm-guide[data-guide=${guide}] .rm-guide-action`).click()
+                await page.locator('.rm-panel').waitFor({ state: 'hidden' })
+                if (!(await barsShown()) && !(await ensureBars())) throw new Error('带读开始后工具栏没有呼出')
+                await page.locator('.dock button').nth(3).click()
+                await page.locator(`.rm-guide[data-guide=${guide}].is-running`).waitFor()
+                await page.locator('.rm-running').getByRole('button', { name: '退出', exact: true }).click()
+                await page.locator('.rm-running').waitFor({ state: 'hidden' })
+              }
+            }
+            if (label === 'typography') {
+              const toggle = page.getByRole('switch', { name: '手机竖握时改为连续滚动', exact: true })
+              await toggle.scrollIntoViewIfNeeded()
+              await check('read-novel-typography-page')
+              await toggle.click()
+              await page.getByRole('group', { name: '翻页方式', exact: true }).getByRole('button', { name: '翻页', exact: true }).click()
+              await page.waitForFunction(() => !document.querySelector('foliate-view')?.renderer?.scrolled)
+              await toggle.click()
+              await page.waitForFunction(() => document.querySelector('foliate-view')?.renderer?.scrolled)
+              if (await page.getByRole('button', { name: '翻页', exact: true }).getAttribute('aria-pressed') !== 'true') throw new Error('竖屏覆盖了保存版式')
+              await page.evaluate(() => document.documentElement.dataset.theme = 'dark')
+              await check('read-novel-typography-dark')
+              await page.evaluate(() => document.documentElement.dataset.theme = 'light')
+            }
             await page.keyboard.press('Escape')
             await page.waitForTimeout(400)
           } catch (e) {

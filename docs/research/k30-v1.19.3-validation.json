@@ -1,0 +1,52 @@
+{
+  "version": "1.19.3",
+  "device": {
+    "model": "Redmi K30 Pro",
+    "android": "12",
+    "api": 31,
+    "abi": "arm64-v8a",
+    "webview": "155.0.8059.43"
+  },
+  "upgrade": {
+    "from": "1.19.2",
+    "to": "1.19.3",
+    "install": "adb install -r: Success",
+    "stateEqualBeforeAfter": true,
+    "existingBooks": 33
+  },
+  "apk": {
+    "file": "LightRead_v1.19.3_android_arm64.apk",
+    "packageName": "com.yzfly.lightread.debug",
+    "versionName": "1.19.3",
+    "versionCode": 1019003,
+    "minSdk": 24,
+    "targetSdk": 36,
+    "abis": [
+      "arm64-v8a"
+    ],
+    "certificateSha256": "56103db2e518cf800db66d148d45f886e93c12b1afc8944ec668713636c7bada",
+    "sha256": "e9ade0ad94eff8a213042c74474bde48326e115d7c0f3c03e24fdc0bf4ff89db"
+  },
+  "checks": [
+    "手机藏书页标题、添加按钮、搜索和紧凑书卡布局",
+    "真实触屏打开添加面板、Android返回关闭并留在藏书页",
+    "书卡操作面板、真实长按选择与底部四项操作栏",
+    "AI通道顺序、Android返回关闭、焦点层恢复",
+    "Android原生存储导入TXT",
+    "Android原生TXT阅读器打开",
+    "自动阅读/打字机启停与互斥、速度范围及预设",
+    "歌词7行、0.618精确高度、0.1调节和0/1端点",
+    "歌词退出恢复版式",
+    "WebView断网模拟重新加载33本书库、设置页显示v1.19.3（未关闭设备网络）"
+  ],
+  "restoration": {
+    "existingBooks": 33,
+    "existingProgressUnchanged": true,
+    "preferencesRestored": true,
+    "testBookRemoved": true
+  },
+  "limitations": [
+    "短时真机验收，不覆盖长时间阅读",
+    "未对全部格式和AI/听书服务进行真机验收"
+  ]
+}

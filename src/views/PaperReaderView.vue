@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AppSelect from '../components/AppSelect.vue'
 import { AutoScrollClock, ScrollAccumulator } from '../services/autoScroll'
 import { AUTO_SPEED_LEVELS, AUTO_SPEED_STEPS, speedPosition, secondsAtPosition } from '../services/autoReadSpeed'
 import LevelSlider from '../components/LevelSlider.vue'
@@ -3986,7 +3987,7 @@ onBeforeUnmount(() => {
           <p v-if="!bdProviderOk" class="bd-warn">{{ t('paper.bdTrialUnsupported') }}</p>
           <label class="bd-field">
             {{ t('paper.bdTargetLanguage') }}
-            <select v-model="bd.targetLanguage" class="input" @change="onBdTargetLanguageChange">
+            <AppSelect v-model="bd.targetLanguage" class="input" :aria-label="t('paper.bdTargetLanguage')" @change="onBdTargetLanguageChange">
               <option
                 v-for="language in BABELDOC_TARGET_LANGUAGES"
                 :key="language.code"
@@ -3994,7 +3995,7 @@ onBeforeUnmount(() => {
               >
                 {{ t(language.labelKey) }}
               </option>
-            </select>
+            </AppSelect>
           </label>
           <section v-if="isPaper" class="bd-context">
             <div class="bd-context-head">
@@ -4395,10 +4396,10 @@ onBeforeUnmount(() => {
           </label>
           <label>
             <span>{{ t('reader.font') }}</span>
-            <select v-model="settings.reader.fontFamily" class="input">
+            <AppSelect v-model="settings.reader.fontFamily" class="input" :aria-label="t('reader.font')">
               <option v-for="font in FONT_FAMILIES" :key="font.value" :value="font.value">{{ t(font.labelKey) }}</option>
               <option v-for="font in settings.customFonts" :key="font.file" :value="`custom:${font.name}`">{{ font.name }}</option>
-            </select>
+            </AppSelect>
           </label>
           <div class="reflow-theme-row">
             <span>{{ t('reader.theme') }}</span>
@@ -4614,26 +4615,26 @@ onBeforeUnmount(() => {
       </div>
       <div v-if="edgeAvailable() && settings.ttsEngine === 'edge'" class="tts-row">
         <label>{{ t('tts.voice') }}</label>
-        <select v-model="settings.edgeVoice" class="input">
+        <AppSelect v-model="settings.edgeVoice" class="input" :aria-label="t('tts.voice')">
           <option v-for="v in EDGE_VOICES" :key="v.id" :value="v.id">{{ v.label }}</option>
-        </select>
+        </AppSelect>
       </div>
       <div v-else-if="edgeAvailable() && settings.ttsEngine === 'local'" class="tts-row">
         <label>{{ t('tts.voice') }}</label>
         <template v-if="localInstalled">
-          <select v-model.number="settings.localVoiceId" class="input">
+          <AppSelect v-model="settings.localVoiceId" class="input" :aria-label="t('tts.voice')">
             <option v-for="v in KOKORO_VOICES" :key="v.sid" :value="v.sid">{{ kokoroVoiceLabel(v, settings.language === 'en' ? 'en' : 'zh') }}{{ v.sid === DEFAULT_KOKORO_SID ? t('tts.voiceDefault') : '' }}</option>
-          </select>
+          </AppSelect>
           <button class="btn btn-sm" :disabled="ttsState !== 'stopped'" @click="auditionLocal">{{ t('tts.audition') }}</button>
         </template>
         <LocalTtsPack v-else />
       </div>
       <div v-else class="tts-row">
         <label>{{ t('tts.voice') }}</label>
-        <select v-model="settings.ttsVoice" class="input">
+        <AppSelect v-model="settings.ttsVoice" class="input" :aria-label="t('tts.voice')">
           <option value="">{{ t('tts.autoVoice') }}</option>
           <option v-for="v in ttsVoices" :key="v.name" :value="v.name">{{ v.name }} ({{ v.lang }})</option>
-        </select>
+        </AppSelect>
       </div>
       <p v-if="edgeAvailable() && settings.ttsEngine === 'local'" class="tts-local-hint">{{ t('tts.hintLocal') }}</p>
     </div>
@@ -5536,7 +5537,7 @@ onBeforeUnmount(() => {
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
-.reflow-settings select {
+.reflow-settings .app-select-trigger {
   grid-column: 2 / 4;
   min-width: 0;
 }

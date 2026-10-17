@@ -25,6 +25,18 @@ test('带读要求滚动 (歌词): 只改生效值为单栏滚动, 竖屏本就�
   assert.deepEqual(effectiveReaderLayout({ ...base, forceScrolled: false, portrait: false }), { flow: 'paginated', maxColumnCount: 2, portraitLocked: false, modeLocked: false })
 })
 
+test('自动分栏与手动分栏: 临时单栏约束解除后恢复原选择', () => {
+  for (const maxColumnCount of ['auto', 1, 2]) {
+    const base = { flow: 'paginated', maxColumnCount, portraitScroll: true, portrait: false }
+    assert.equal(effectiveReaderLayout(base).maxColumnCount, maxColumnCount)
+    for (const override of [{ portrait: true }, { forceScrolled: true }, { forceSingleColumn: true }, { flow: 'scrolled' }]) {
+      assert.equal(effectiveReaderLayout({ ...base, ...override }).maxColumnCount, 1)
+    }
+    assert.equal(effectiveReaderLayout(base).maxColumnCount, maxColumnCount)
+    assert.equal(base.maxColumnCount, maxColumnCount, '临时约束不修改已存偏好')
+  }
+})
+
 test('竖屏判定: 占满屏宽时按屏幕方向, 屏幕键盘压矮视口不翻成横屏', () => {
   // Surface 竖放最大化 (960×1440), 点墨 / 系统键盘停靠后视口只剩 960×880
   const surface = { screenWidth: 960, screenHeight: 1440, orientationType: 'portrait-primary' }

@@ -528,7 +528,7 @@ export class Paginator extends HTMLElement {
     static observedAttributes = [
         'flow', 'gap', 'margin',
         'max-inline-size', 'max-block-size', 'max-column-count',
-        'continuous', // LightRead
+        'continuous', 'column-count', // LightRead: auto / fixed columns
     ]
     // LightRead: marker so the build can be checked for the fork (scripts / grep dist)
     static lightreadFork = 'lightread-continuous-paginator/1'
@@ -803,6 +803,11 @@ export class Paginator extends HTMLElement {
             case 'continuous':
                 this.#syncMode()
                 break
+            case 'column-count':
+                // Fixed columns also apply in portrait when portrait scrolling is off.
+                this.#top.style.setProperty('--_max-column-count-portrait', value === '2' ? '2' : '1')
+                this.render()
+                break
             case 'gap':
             case 'margin':
             case 'max-block-size':
@@ -925,7 +930,10 @@ export class Paginator extends HTMLElement {
             return { flow, margin, gap, columnWidth }
         }
 
-        const divisor = Math.min(maxColumnCount, Math.ceil(size / maxInlineSize))
+        const fixedColumns = Number(this.getAttribute('column-count'))
+        const divisor = fixedColumns === 1 || fixedColumns === 2
+            ? fixedColumns
+            : Math.min(maxColumnCount, Math.max(1, Math.ceil(size / maxInlineSize)))
         const columnWidth = vertical ? (size / divisor - margin) : (size / divisor - gap)
         this.setAttribute('dir', rtl ? 'rtl' : 'ltr')
 

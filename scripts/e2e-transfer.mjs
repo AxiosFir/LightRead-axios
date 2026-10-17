@@ -118,7 +118,6 @@ async function device(name, { viewport = { width: 1280, height: 800 }, settings,
   }, [API, settings ?? null, transfer])
   const page = await context.newPage()
   page.on('pageerror', e => errors.push(`[${name}] ${e.message}`))
-  page.on('dialog', d => d.accept())
   await page.goto(APP + '#/library', { waitUntil: 'networkidle' })
   return page
 }
@@ -188,7 +187,9 @@ try {
   // B 打开一次互传页: 登记设备, 记下已见
   await openTransfer(B)
   await openTransfer(A)
-  await A.locator('select[aria-label="发送到"] option', { hasText: 'Web' }).first().waitFor({ state: 'attached', timeout: 10000 })
+  await A.getByRole('button', { name: '发送到', exact: true }).click()
+  await A.locator('.app-select-option', { hasText: 'Web' }).first().waitFor({ timeout: 10000 })
+  await A.getByRole('dialog').getByRole('button', { name: '关闭', exact: true }).click()
   ok('A、B 登录同一账号; A 的目标设备列表里出现 B')
 
   await B.goto(APP + '#/library', { waitUntil: 'networkidle' })
@@ -227,6 +228,7 @@ try {
 
   await openTransfer(B)
   await B.locator('.xfer-item', { hasText: TEXT }).getByRole('button', { name: '删除' }).click()
+  await B.locator('.confirm-accept').click()
   await B.locator('.xfer-item', { hasText: TEXT }).waitFor({ state: 'detached', timeout: 10000 })
   await A.getByRole('button', { name: '刷新' }).click()
   await A.locator('.xfer-item', { hasText: TEXT }).waitFor({ state: 'detached', timeout: 10000 })
@@ -281,6 +283,7 @@ try {
   assert(existsSync(join(davRoot, 'dav/LightRead/transfer')), 'WebDAV 上应有 LightRead/transfer 目录')
   await shot(E, 'phone-dark-webdav')
   await davItem.getByRole('button', { name: '删除' }).click()
+  await E.locator('.confirm-accept').click()
   await davItem.waitFor({ state: 'detached', timeout: 10000 })
   const left = readdirSync(join(davRoot, 'dav/LightRead/transfer')).filter(n => n.startsWith('item-'))
   assert(left.length === 0, `WebDAV 上应已删除条目: ${left}`)

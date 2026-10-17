@@ -1,12 +1,12 @@
 {
   "name": "lightread",
   "private": true,
-  "version": "1.19.2",
+  "version": "1.19.3",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc -b && vite build",
-    "test:book-sources": "node --experimental-strip-types --test scripts/test-open-library.mjs scripts/test-internet-archive.mjs scripts/test-philosophy-archive.mjs scripts/test-web-book-sources.mjs scripts/test-opds-download.mjs scripts/test-github-books.mjs scripts/test-book-query.mjs scripts/test-china-textbook.mjs scripts/test-wendian.mjs",
+    "test:book-sources": "node --experimental-strip-types --test scripts/test-catalog-errors.mjs scripts/test-open-library.mjs scripts/test-internet-archive.mjs scripts/test-philosophy-archive.mjs scripts/test-web-book-sources.mjs scripts/test-opds-download.mjs scripts/test-github-books.mjs scripts/test-book-query.mjs scripts/test-china-textbook.mjs scripts/test-wendian.mjs",
     "test:archive": "node scripts/test-library-archive.mjs",
     "e2e:mobile": "node scripts/e2e-mobile.mjs",
     "test:plain-text": "node --experimental-strip-types --test scripts/test-plain-text.mjs",
@@ -50,6 +50,7 @@
     "test:reading-modes": "node --experimental-strip-types --test scripts/test-reading-modes.mjs",
     "test:reader-tap-zone": "node --experimental-strip-types --test scripts/test-reader-tap-zone.mjs",
     "test:reading-focus": "node --experimental-strip-types --test scripts/test-reading-focus.mjs",
+    "test:display-title": "node --experimental-strip-types --test scripts/test-display-title.mjs",
     "test:key-words": "node --experimental-strip-types --test scripts/test-key-words.mjs",
     "test:zh-segment": "node --experimental-strip-types --test scripts/test-zh-segment.mjs",
     "e2e:sync": "node scripts/e2e-sync.mjs",

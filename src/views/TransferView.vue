@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AppSelect from '../components/AppSelect.vue'
 /**
  * 互传: 在自己的设备间发送文字 / 链接 / 文件 (轻阅账号或 WebDAV), 或用取件码临时传给任何设备.
  * 设计见 docs/device-transfer.md. 深链 #/transfer?code=123456 直接取件.
@@ -286,17 +287,17 @@ onBeforeUnmount(() => {
             <input ref="deviceFileInput" type="file" hidden data-transfer-file @change="pickFile(draft, $event)" />
             <label class="field">
               <span class="field-label">{{ t('transfer.to') }}</span>
-              <select v-model="target" class="input field-select" :disabled="draft.sending" :aria-label="t('transfer.to')">
+              <AppSelect v-model="target" class="input field-select" :disabled="draft.sending" :aria-label="t('transfer.to')">
                 <option value="">{{ t('transfer.allDevices') }}</option>
                 <option v-for="d in devices" :key="d.id" :value="d.id">{{ d.name || d.id.slice(0, 8) }}</option>
-              </select>
+              </AppSelect>
             </label>
             <label v-if="channels.length > 1" class="field">
               <span class="field-label">{{ t('transfer.via') }}</span>
-              <select v-model="via" class="input field-select" :disabled="draft.sending" :aria-label="t('transfer.via')">
+              <AppSelect v-model="via" class="input field-select" :disabled="draft.sending" :aria-label="t('transfer.via')">
                 <option value="account">{{ t('transfer.viaAccount') }}</option>
                 <option value="webdav">{{ t('transfer.viaWebdav') }}</option>
-              </select>
+              </AppSelect>
             </label>
             <span class="spacer" />
             <button

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AppSelect from './AppSelect.vue'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { getStorage } from '../storage'
 import type { BookFormat, BookMeta, BooklistRec, CatalogSourceRec } from '../storage/types'
@@ -171,7 +172,7 @@ function upload() {
         <div class="upload-body">
           <label class="upload-field">{{ t('upload.target') }}
             <strong v-if="source">{{ source.title }}</strong>
-            <select v-else v-model="sourceId" class="input"><option value="">{{ t('upload.chooseTarget') }}</option><option v-for="item in sources" :key="item.id" :value="item.id">{{ item.title }}</option></select>
+            <AppSelect v-else v-model="sourceId" class="input" :aria-label="t('upload.chooseTarget')"><option value="">{{ t('upload.chooseTarget') }}</option><option v-for="item in sources" :key="item.id" :value="item.id">{{ item.title }}</option></AppSelect>
           </label>
           <p v-if="target" class="upload-muted upload-url">{{ target.url }}</p>
           <p v-else-if="!sources.length" class="upload-muted">{{ t('upload.noSources') }}</p>
@@ -187,7 +188,7 @@ function upload() {
             <div v-if="mode === 'device'" class="upload-device"><input ref="picker" type="file" multiple :accept="accept" hidden @change="chooseFiles" /><button class="btn" @click="picker?.click()">{{ t('upload.chooseFiles') }}</button><button v-if="folderSupported" class="btn upload-folder" @click="chooseFolder()">{{ t('folder.choose') }}</button></div>
             <div v-else class="upload-existing">
               <input v-model="query" class="input" type="search" :placeholder="t('upload.search')" :aria-label="t('upload.search')" />
-              <div class="upload-filters"><select v-model="listFilter" class="input" :aria-label="t('upload.allBooks')"><option value="">{{ t('upload.allBooks') }}</option><option v-for="list in booklists" :key="list.id" :value="list.id">{{ list.name }}</option></select><label><input v-model="pinnedOnly" type="checkbox" /> {{ t('upload.pinned') }}</label></div>
+              <div class="upload-filters"><AppSelect v-model="listFilter" class="input" :aria-label="t('upload.allBooks')"><option value="">{{ t('upload.allBooks') }}</option><option v-for="list in booklists" :key="list.id" :value="list.id">{{ list.name }}</option></AppSelect><label><input v-model="pinnedOnly" type="checkbox" /> {{ t('upload.pinned') }}</label></div>
               <div class="upload-actions"><button class="btn btn-sm" @click="selected = new Set([...selected, ...visibleBooks.map(b => b.id)])">{{ t('upload.selectVisible') }}</button><button class="btn btn-sm" :disabled="!selected.size" @click="selected = new Set()">{{ t('upload.clearSelection') }}</button></div>
               <div class="upload-books"><label v-for="book in visibleBooks" :key="book.id" class="upload-book"><input type="checkbox" :checked="selected.has(book.id)" @change="toggle(book.id, $event)" /><span><strong>{{ book.title }}</strong><small>{{ book.author }} · {{ book.format.toUpperCase() }}</small></span></label><p v-if="!visibleBooks.length" class="upload-muted">{{ t('upload.noBooks') }}</p></div>
               <button class="btn" :disabled="!selected.size" @click="addSelected">{{ t('upload.addSelected', { n: selected.size }) }}</button>
