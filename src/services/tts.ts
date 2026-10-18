@@ -4,10 +4,13 @@
  * macOS 可在 系统设置 > 辅助功能 > 朗读内容 中下载更高质量音色.
  */
 
+export const systemSpeechAvailable = () => typeof speechSynthesis !== 'undefined' && typeof SpeechSynthesisUtterance !== 'undefined'
+
 let voicesReady: Promise<SpeechSynthesisVoice[]> | null = null
 
 /** 部分平台 getVoices 首次调用为空, 需等 voiceschanged */
 export function getVoices(): Promise<SpeechSynthesisVoice[]> {
+  if (!systemSpeechAvailable()) return Promise.resolve([])
   if (!voicesReady) {
     voicesReady = new Promise(resolve => {
       const load = () => speechSynthesis.getVoices()
@@ -218,7 +221,7 @@ export function reportNeuralFailure(error: unknown) {
     toast(t('tts.localCrashedPaused'), 'error', 8000)
     return
   }
-  toast(t('tts.neuralUnavailable'), 'error', 4000)
+  toast(t(systemSpeechAvailable() ? 'tts.neuralUnavailable' : 'tts.neuralUnavailableNoFallback'), 'error', 6000)
 }
 
 /** 语音包被删除/重装后调用, 下次合成重新提示加载 */

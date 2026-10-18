@@ -1,5 +1,15 @@
 /** 中文字典 (默认语言, 缺失回退的最终来源) */
 export default {
+  'v2.readingStatus': '阅读状态',
+  'v2.shelf.all': '全部',
+  'v2.shelf.reading': '在读',
+  'v2.shelf.unread': '未读',
+  'v2.shelf.finished': '读完',
+
+  'v2.listenReady': '从当前阅读位置开始听书',
+  'v2.listenTools': '听书工具',
+  'v2.originalText': '原文',
+
   // ---- 应用与导航 ----
   'app.name': '轻阅',
   'nav.library': '藏书',
@@ -1094,6 +1104,9 @@ export default {
   'tts.hintSystem': '不用联网，使用设备已有的音色',
   'tts.error': '听书暂时中断，请重试或换一种语音',
   'tts.pdfNoText': '这份 PDF 没有可听的文字，打开原书继续读',
+  'tts.localUnsupported': '此设备暂不支持离线语音包，请选择在线语音',
+  'tts.systemUnsupported': '此设备没有可用的系统语音，请选择在线语音',
+  'tts.neuralUnavailableNoFallback': '语音连接失败，此设备没有系统语音可供切换。请检查网络后重试',
   'tts.neuralUnavailable': '这个音色暂时用不了，已换成系统语音',
   'tts.localLoading': '正在准备离线语音，第一次大约需要 10–20 秒…',
 

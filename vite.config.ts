@@ -42,7 +42,7 @@ export default defineConfig({
       // MuPDF wasm 约 10MB，网页版需要完整预缓存以支持离线阅读。
       maximumFileSizeToCacheInBytes: 16 * 1024 * 1024,
       // 与插件默认一致的 js / css / html / wasm, 另加打字机打字声 (约 95KB): 网页版离线也能用真实录音
-      globPatterns: ['**/*.{js,css,html,wasm}', 'sounds/typewriter/**/*.{ogg,m4a,json}'],
+      globPatterns: ['**/*.{js,css,html,wasm}', 'fonts/*.woff2', 'sounds/typewriter/**/*.{ogg,m4a,json}'],
       // 仿生阅读的中文词表 (约 230KB gzip) 不预缓存: 第一次在中文书里开启时才下载, 之后离线也能用。
       // 文件名带内容哈希, CacheFirst 不会拿到旧版; 只留最近两版
       runtimeCaching: [{

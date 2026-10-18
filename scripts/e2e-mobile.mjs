@@ -94,6 +94,9 @@ function auditInPage({ safeTop, safeBottom }) {
     for (let p = el; p && p !== document.documentElement; p = p.parentElement) {
       const s = getComputedStyle(p)
       if (p.inert || s.display === 'none' || s.visibility === 'hidden' || Number(s.opacity) === 0) return false
+      // Closed details retain layout boxes in Chromium; their body is not visible or clickable.
+      if (p.getAttribute('aria-hidden') === 'true') return false
+      if (p.tagName === 'DETAILS' && !p.open && !p.querySelector(':scope > summary')?.contains(el)) return false
       if (p !== el && s.pointerEvents === 'none' && p.classList.contains('hidden')) return false
     }
     const r = el.getBoundingClientRect()
@@ -156,7 +159,7 @@ function auditInPage({ safeTop, safeBottom }) {
     const el = n.parentElement
     if (!el || seen.has(el) || !n.textContent.trim()) continue
     seen.add(el)
-    if (!visible(el)) continue
+    if (!visible(el) || el.closest('.sr-only')) continue
     const fs = parseFloat(getComputedStyle(el).fontSize)
     if (fs < 11) push('text-tiny', 'warn', el, `${fs}px`)
     // 文字被裁切 (溢出隐藏又没有省略号)
@@ -188,14 +191,16 @@ async function auditReaderContent(page) {
           if (w > 0 && w < fs * 3 && cell.textContent.trim().length > 2) { out.push(`squeezed-cell "${cell.textContent.trim().slice(0, 8)}" ${Math.round(w)}px`); break }
         }
         for (const el of body.querySelectorAll('table, pre, img, div, p, ol, li')) {
-          const r = el.getBoundingClientRect()
+          // A paginated block can span many columns. Its bounding box is the
+          // union of those pages; only an individual fragment can overflow.
+          const width = Math.max(0, ...Array.from(el.getClientRects(), r => r.width))
           // 横滑容器 (如 .table-wrap) 里的内容超宽属于设计
           let scroller = false
           for (let p = el.parentElement; p && p !== body; p = p.parentElement) {
             if (/(auto|scroll)/.test(getComputedStyle(p).overflowX)) { scroller = true; break }
           }
-          if (!scroller && r.width > colWidth + 2 && getComputedStyle(el).overflowX === 'visible') {
-            out.push(`${el.tagName.toLowerCase()}${el.className ? '.' + el.className : ''} ${Math.round(r.width)} > ${Math.round(colWidth)}`)
+          if (!scroller && width > colWidth + 2 && getComputedStyle(el).overflowX === 'visible') {
+            out.push(`${el.tagName.toLowerCase()}${el.className ? '.' + el.className : ''} ${Math.round(width)} > ${Math.round(colWidth)}`)
           }
         }
         return out.slice(0, 5)
@@ -330,14 +335,16 @@ for (const device of devices) {
               }
             }
             if (label === 'typography') {
-              const toggle = page.getByRole('switch', { name: '手机竖握时改为连续滚动', exact: true })
+              await page.getByRole('tab', { name: '页面', exact: true }).click()
+              const toggle = page.getByRole('switch', { name: '自动适配屏幕', exact: true })
               await toggle.scrollIntoViewIfNeeded()
               await check('read-novel-typography-page')
               await toggle.click()
               await page.getByRole('group', { name: '翻页方式', exact: true }).getByRole('button', { name: '翻页', exact: true }).click()
               await page.waitForFunction(() => !document.querySelector('foliate-view')?.renderer?.scrolled)
               await toggle.click()
-              await page.waitForFunction(() => document.querySelector('foliate-view')?.renderer?.scrolled)
+              // Explicit paginated choice survives re-enabling automatic screen adaptation.
+              await page.waitForFunction(() => !document.querySelector('foliate-view')?.renderer?.scrolled)
               if (await page.getByRole('button', { name: '翻页', exact: true }).getAttribute('aria-pressed') !== 'true') throw new Error('竖屏覆盖了保存版式')
               await page.evaluate(() => document.documentElement.dataset.theme = 'dark')
               await check('read-novel-typography-dark')

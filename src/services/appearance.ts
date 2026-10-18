@@ -14,7 +14,7 @@ export const resolvedTheme = ref<ResolvedTheme>(
 )
 
 const THEME_COLOR: Record<ResolvedTheme, string> = {
-  light: '#f5f6f8',
+  light: '#f3f5f8',
   dark: '#121417',
 }
 

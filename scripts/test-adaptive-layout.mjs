@@ -11,10 +11,10 @@ const landscape = screenLayout({width:1280,height:800,keyboardOpen:false})
 const resolve = (preset, reader = base.reader, overrides = emptyLayoutOverrides().reader) => resolveReaderPrefs(reader,overrides,preset)
 
 test('手机、高DPI、平板与桌面按可用CSS窗口选预设, 横屏窄窗不强行双栏',()=>{
- assert.equal(portrait.reader.flow,'scrolled');assert.equal(portrait.reader.maxColumnCount,1);assert.equal(portrait.reader.fontSize,18)
+ assert.equal(portrait.reader.flow,'scrolled');assert.equal(portrait.reader.maxColumnCount,1);assert.equal(portrait.reader.fontSize,19)
  assert.equal(landscape.reader.flow,'paginated');assert.equal(landscape.reader.maxColumnCount,2);assert.equal(landscape.reader.fontSize,20)
  const phone=screenLayout({width:872,height:392,screenWidth:872,screenHeight:392,keyboardOpen:false})
- assert.equal(phone.reader.maxColumnCount,1);assert.equal(phone.reader.fontSize,18);assert.equal(phone.pageMargin,24)
+ assert.equal(phone.reader.maxColumnCount,1);assert.equal(phone.reader.fontSize,19);assert.equal(phone.pageMargin,24)
  const tablet=screenLayout({width:820,height:1180,keyboardOpen:false});assert.equal(tablet.reader.flow,'scrolled');assert.equal(tablet.reader.fontSize,20)
  const narrow=screenLayout({width:500,height:800,screenWidth:1920,screenHeight:1080,keyboardOpen:false});assert.equal(narrow.orientation,'portrait')
 })

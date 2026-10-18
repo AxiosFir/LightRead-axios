@@ -1410,4 +1410,35 @@ function onAutoSpeedExact(e: Event) {
     min-height: 44px;
   }
 }
+
+
+.rm-panel { background: var(--bg); border: 0; gap: 20px; }
+.rm-head { position: relative; justify-content: center; min-height: 44px; }
+.rm-head strong { font-size: 18px; }
+.rm-close { position: absolute; right: 0; width: 44px; height: 44px; }
+.rm-guides { background: var(--card); border-radius: var(--radius-lg); overflow: clip; }
+.rm-guide-main { padding: 16px; min-height: 76px; }
+.rm-guide + .rm-guide { border-color: var(--bg); }
+.rm-guide-action { border-radius: var(--radius-pill); min-height: 44px; }
+.rm-cards { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
+.rm-card-main { min-height: 88px; background: transparent; border: 0; padding: 8px 0; gap: 8px; }
+.rm-card-main svg { box-sizing: content-box; padding: 10px; background: var(--card); border-radius: 50%; }
+.rm-card.on .rm-card-main { background: transparent; }
+.rm-card.on .rm-card-main svg { background: var(--brand-light); color: var(--brand); }
+.rm-card-name { font-size: 12px; white-space: nowrap; }
+.rm-card-state { display: none; }
+.rm-card-info { position: static; display: flex; margin: 0 auto; min-width: 44px; min-height: 32px; justify-content: center; align-items: center; }
+@media (max-width: 720px) {
+  .rm-panel { padding-inline: 20px; max-height: 88%; }
+  .rm-group-title { font-size: 16px; }
+  .rm-card-info { min-height: 44px; }
+}
+
+
+
+.rm-group { border: 0; padding-top: 4px; }
+.rm-group-title { color: var(--text); }
+.rm-guide-action.btn-primary { background: var(--surface-2); color: var(--text); border-color: transparent; }
+.rm-panel :slotted(.dj-toggle) { padding: 16px; background: var(--card); border-radius: var(--radius-lg); }
+
 </style>

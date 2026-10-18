@@ -1,5 +1,15 @@
 /** 英文字典 (缺失的 key 自动回退中文) */
 export default {
+  'v2.readingStatus': 'Reading status',
+  'v2.shelf.all': 'All',
+  'v2.shelf.reading': 'Reading',
+  'v2.shelf.unread': 'Unread',
+  'v2.shelf.finished': 'Finished',
+
+  'v2.listenReady': 'Listen from your reading position',
+  'v2.listenTools': 'Listening tools',
+  'v2.originalText': 'Read text',
+
   // ---- 应用与导航 ----
   'app.name': 'LightRead',
   'nav.library': 'Library',
@@ -1094,6 +1104,9 @@ export default {
   'tts.hintSystem': "Listen offline with the voices on your device",
   'tts.error': "Listening stopped. Try again or choose another voice source",
   'tts.pdfNoText': "This PDF has no text to listen to. Open the original to read",
+  'tts.localUnsupported': 'Offline voice packs are unavailable on this device. Choose an online voice.',
+  'tts.systemUnsupported': 'System speech is unavailable on this device. Choose an online voice.',
+  'tts.neuralUnavailableNoFallback': 'Voice connection failed and no system voice is available. Check your network and try again.',
   'tts.neuralUnavailable': "This voice is unavailable. System voice is now on",
   'tts.localLoading': "Getting offline voice ready, about 10–20 seconds the first time…",
 

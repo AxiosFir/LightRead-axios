@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import AppSelect from '../components/AppSelect.vue'
+import AppModal from '../components/AppModal.vue'
+import BookCover from '../components/BookCover.vue'
 import { pingUsage } from '../services/usageStats'
 import { noteDjReading } from '../services/usageCounters'
 import type { DjLevelIdx, DjState } from '../services/usageStatsCore'
@@ -16,13 +18,13 @@ import { resolvedTheme } from '../services/appearance'
 import { setPageBarsDark, setSystemBarsHidden, setKeepScreenOn } from '../services/systemBars'
 import { injectFontIntoDoc, resolveFontFamily } from '../services/fonts'
 import { isTauri } from '../storage/types'
-import { listVoicesSorted, warmUpSpeech, resetEdgeFailure } from '../services/tts'
+import { listVoicesSorted, warmUpSpeech, resetEdgeFailure, systemSpeechAvailable } from '../services/tts'
 import { ListenPlayer, type ListenFeed } from '../services/listenPlayer'
 import { SentenceCursor, loadListenBookmark, saveListenBookmark, agoBucket, type CursorPos, type ListenBookmark } from '../services/readAloud'
 import { readingArea, followTarget, jumpLine, isOnScreen, followHeld, scrollMotion, prefersReducedMotion, type Area } from '../services/readingFocus'
 import { EDGE_VOICES, edgeAvailable, playAudio } from '../services/edgeTts'
 import { KOKORO_VOICES, DEFAULT_KOKORO_SID, kokoroVoiceLabel } from '../services/kokoroVoices'
-import { localPack, localTtsSynthesize, refreshLocalPack } from '../services/localTts'
+import { localPack, localTtsSynthesize, refreshLocalPack, localTtsAvailable } from '../services/localTts'
 import LocalTtsPack from '../components/LocalTtsPack.vue'
 import LevelSlider from '../components/LevelSlider.vue'
 import { useReadingTimer } from '../composables/useReadingTimer'
@@ -115,6 +117,8 @@ function closeOverlays() {
   panel.value = 'none'
   settingsOpen.value = false
   ttsPanel.value = false
+  ttsOptions.value = null
+  listenToc.value = false
   modes.closePanel()
   dj.closeOverlays()
   ambientPanel.value = false
@@ -201,6 +205,18 @@ const isBookmarked = computed(() => bookmarks.value.some(b => b.cfi === currentC
 
 // 听书
 const ttsPanel = ref(false)
+const ttsOptions = ref<'rate' | 'sleep' | 'voice' | null>(null)
+const ttsFailure = ref(false)
+const ttsEnded = ref(false)
+const listenToc = ref(false)
+const listenQuote = computed(() => currentListenKey.value ? listenTexts.get(currentListenKey.value) || '' : listenBookmark.value?.snippet || '')
+const listenChapter = computed(() => listenDetached.value ? listenBookmark.value?.chapter || chapterLabel.value : chapterLabel.value)
+const ttsStatus = computed(() => unavailableVoice.value || (ttsFailure.value ? t('tts.error') : ttsBuffering.value ? t('tts.buffering') : ttsState.value === 'playing' ? t('tts.reading') : ttsState.value === 'paused' ? t('tts.paused') : ttsEnded.value ? t('tts.bookFinished') : t('v2.listenReady')))
+const unavailableVoice = computed(() => settings.ttsEngine === 'local' && !localTtsAvailable() ? t('tts.localUnsupported') : (settings.ttsEngine === 'system' || !edgeAvailable()) && !systemSpeechAvailable() ? t('tts.systemUnsupported') : '')
+const voiceSummary = computed(() => !edgeAvailable() || settings.ttsEngine === 'system' ? t('tts.engineSystem') : settings.ttsEngine === 'local' ? t('tts.engineLocal') : t('tts.engineEdge'))
+function openListenToc() { closeOverlays(); listenToc.value = true; panel.value = 'toc' }
+function openListenLyrics() { ttsPanel.value = false; void modes.startLyric('tts') }
+
 /** 背景音面板 (见 services/ambient); 背景音本身是全局单例, 只在阅读器里提供入口 */
 const ambientPanel = ref(false)
 const ambient = useAmbient()
@@ -368,7 +384,7 @@ const effectiveFlow = computed(() => readerLayout.value.flow)
 const themeColors = computed(() => resolveReaderColors(settings.readerPrefs.theme, appDark.value, lateModes.value?.readerStyle.value))
 // 正文主题铺满全屏 (含状态栏下方), 安卓系统栏图标按正文深浅切换
 watch(
-  () => resolveReaderTheme(settings.readerPrefs.theme, appDark.value) === 'dark',
+  () => ttsPanel.value ? appDark.value : resolveReaderTheme(settings.readerPrefs.theme, appDark.value) === 'dark',
   dark => setPageBarsDark(dark),
   { immediate: true },
 )
@@ -803,6 +819,12 @@ function handleKeydown(e: KeyboardEvent) {
   // 在输入框里打字 (跳页 / 搜索 / AI) 时, 方向键和空格属于输入框
   const el = e.target as HTMLElement | null
   if (e.key !== 'Escape' && el && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName))) return
+  // Open panels own keyboard input; arrows/space must not turn the book behind a dialog.
+  if (anyOverlayOpen()) {
+    if (e.key === 'Escape') { e.preventDefault(); closeOverlays() }
+    return
+  }
+  if (e.key === ' ' && el?.closest('button, [role="button"], [role="tab"], [role="switch"]')) return
   // 阅读模式快捷键 (M 面板 / Shift+T 打字机; 打字机运行中空格暂停等)
   if (modes.handleKey(e)) return
   if (dj.handleKey(e)) return
@@ -1212,6 +1234,8 @@ const listenPlayer = new ListenPlayer({
   },
   onEnd: reason => {
     ttsBuffering.value = false
+    ttsFailure.value = reason === 'error'
+    ttsEnded.value = reason === 'finished'
     if (reason === 'error') toast(t('tts.error'), 'error')
     if (reason === 'finished') toast(t('tts.bookFinished'), 'success')
     if (reason !== 'stopped') finishListenSession()
@@ -1594,6 +1618,9 @@ type ListenFrom = 'auto' | 'page' | 'bookmark' | { range: Range }
 /** 开始朗读: auto = 断点在本页则接着断点, 否则从本页第一句 */
 async function startTTS(from: ListenFrom = 'auto') {
   if (!view) return
+  if (unavailableVoice.value) { ttsOptions.value = 'voice'; ttsPanel.value = true; return }
+  ttsFailure.value = false
+  ttsEnded.value = false
   modes.stopForExternal('tts')
   if (autoReading.value) toast(t('readingMode.autoStopped'))
   stopAutoRead()
@@ -2470,10 +2497,16 @@ async function untilLoaded() {
 }
 
 async function navigateToc(href: string) {
+  const forListening = listenToc.value
+  listenToc.value = false
   panel.value = 'none'
-  interruptTTSForReposition()
+  if (forListening) stopTTS()
+  else interruptTTSForReposition()
   await untilLoaded()
-  view?.goTo(href).catch(() => toast(t('reader.cantGoto'), 'error'))
+  try {
+    await view?.goTo(href)
+    if (forListening) { ttsPanel.value = true; await startTTS('page') }
+  } catch { toast(t('reader.cantGoto'), 'error') }
 }
 
 /** 上一章 / 下一章: 按目录条目跳转; 书无目录时退回按分节跳 */
@@ -2766,6 +2799,59 @@ watch(() => modes.progressActive.value, on => {
 })
 
 function resetAutoScrollClock() { autoClock.reset() }
+
+watch(() => [panel.value, settingsOpen.value, ttsPanel.value, modes.panelOpen.value, ambientPanel.value], async (_state, _old, cleanup) => {
+  if (!sheetOpen.value || !matchesMQ('(max-width: 720px)')) return
+  let disposed = false
+  const previous = document.activeElement as HTMLElement | null
+  const held: Array<[HTMLElement, boolean]> = []
+  let dialog: HTMLElement | null = null
+  const focusable = () => Array.from(dialog?.querySelectorAll<HTMLElement>('button:not([disabled]), input:not([disabled]), [href], [tabindex="0"], summary') ?? []).filter(el => el.getClientRects().length && !el.closest('[inert]'))
+  const trap = (event: KeyboardEvent) => {
+    if (event.key !== 'Tab' || document.querySelector('[data-app-modal]')) return
+    const items = focusable(), first = items[0], last = items.at(-1)
+    if (!first) { event.preventDefault(); dialog?.focus(); return }
+    if (event.shiftKey && (document.activeElement === first || !dialog?.contains(document.activeElement))) { event.preventDefault(); last?.focus() }
+    else if (!event.shiftKey && (document.activeElement === last || !dialog?.contains(document.activeElement))) { event.preventDefault(); first.focus() }
+  }
+  cleanup(() => {
+    disposed = true
+    document.removeEventListener('keydown', trap, true)
+    held.forEach(([el, inert]) => { el.inert = inert })
+    if (previous?.isConnected && !previous.closest('[inert]')) previous.focus({ preventScroll: true })
+  })
+  await nextTick()
+  if (disposed) return
+  const root = document.querySelector('.reader')
+  dialog = root?.querySelector<HTMLElement>('.settings-pop, .rm-panel, .tts-panel, .panel, .ambient-panel') ?? null
+  if (!dialog) return
+  dialog.setAttribute('role', 'dialog'); dialog.setAttribute('aria-modal', 'true'); dialog.tabIndex = -1
+  root?.querySelectorAll<HTMLElement>(':scope > .content, :scope > .bar, :scope > .listen-entry').forEach(el => { held.push([el, el.inert]); el.inert = true })
+  document.addEventListener('keydown', trap, true)
+  ;(focusable()[0] ?? dialog).focus({ preventScroll: true })
+})
+
+watch(sheetOpen, (open, _previous, cleanup) => {
+  if (!open) return
+  let disposed = false
+  let unregister: (() => void) | undefined
+  const closeTopPanel = () => {
+    if (document.querySelector('[data-app-modal]')) return
+    closeOverlays()
+  }
+  if (isTauri() && /Android/i.test(navigator.userAgent)) {
+    void import('@tauri-apps/api/app').then(async ({ onBackButtonPress }) => {
+      if (disposed) return
+      const listener = await onBackButtonPress(closeTopPanel)
+      if (disposed) await listener.unregister()
+      else unregister = () => { void listener.unregister() }
+    }).catch(() => {})
+  }
+  const Watcher = (window as unknown as { CloseWatcher?: new () => EventTarget & { destroy(): void } }).CloseWatcher
+  const watcher = Watcher ? new Watcher() : null
+  watcher?.addEventListener('close', closeTopPanel)
+  cleanup(() => { disposed = true; unregister?.(); watcher?.destroy() })
+})
 
 onMounted(async () => {
   document.addEventListener('visibilitychange', resetAutoScrollClock)
@@ -3079,9 +3165,9 @@ onBeforeUnmount(() => {
           <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="currentColor" d="M4 5.5A2.5 2.5 0 0 1 6.5 3H19a1 1 0 0 1 1 1v15a2 2 0 0 1-2 2H6.5A2.5 2.5 0 0 1 4 18.5v-13zM6.5 5a.5.5 0 0 0-.5.5v11.34c.16-.05.33-.08.5-.08H18V5H6.5z"/></svg>
           <span>{{ t('reader.dockNotes') }}</span>
         </button>
-        <button :class="{ active: ttsPanel || ttsState !== 'stopped' }" @click="openTTSPanel">
-          <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="currentColor" d="M12 3a7 7 0 0 0-7 7v1.1A3.5 3.5 0 0 0 3 14.5v2A3.5 3.5 0 0 0 6.5 20H8a1 1 0 0 0 1-1v-7a1 1 0 0 0-1-1h-.9A5 5 0 0 1 12 5a5 5 0 0 1 4.9 6H16a1 1 0 0 0-1 1v7a1 1 0 0 0 1 1h1.5a3.5 3.5 0 0 0 3.5-3.5v-2a3.5 3.5 0 0 0-2-3.16V10a7 7 0 0 0-7-7z"/></svg>
-          <span>{{ t('tts.title') }}</span>
+        <button :class="{ active: jumpOpen }" @click="toggleJump">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/><circle cx="9" cy="6" r="2" fill="var(--card)"/><circle cx="16" cy="12" r="2" fill="var(--card)"/><circle cx="7" cy="18" r="2" fill="var(--card)"/></svg>
+          <span>{{ t('reader.progress') }}</span>
         </button>
         <button :class="{ active: readingModeActive }" :aria-label="t('readingMode.title')" @click="modes.togglePanel()">
           <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="currentColor" d="M6 3h9.59L20 7.41V20a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1zm1 2v14h11V8.24L14.76 5H7zm2 4h6a1 1 0 1 1 0 2H9a1 1 0 1 1 0-2zm0 4h3a1 1 0 1 1 0 2H9a1 1 0 1 1 0-2zm6 0h.5a1 1 0 0 1 1 1v2a1 1 0 1 1-2 0v-2a1 1 0 0 1 .5-1z"/></svg>
@@ -3093,6 +3179,11 @@ onBeforeUnmount(() => {
         </button>
       </nav>
     </footer>
+
+    <button v-if="barsVisible && !sheetOpen && !loading && !error && ttsState === 'stopped'" class="listen-entry" :aria-label="t('tts.title')" @click="openTTSPanel">
+      <svg viewBox="0 0 24 24" width="23" height="23" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M4 14v-3a8 8 0 0 1 16 0v3"/><rect x="3" y="12" width="4" height="8" rx="2"/><rect x="17" y="12" width="4" height="8" rx="2"/></svg>
+      <span>{{ t('tts.title') }}</span>
+    </button>
 
     <!-- 手机端面板为底部抽屉, 点遮罩收起 -->
     <div v-if="sheetOpen" class="sheet-scrim" aria-hidden="true" @click="closeOverlays" />
@@ -3290,6 +3381,20 @@ onBeforeUnmount(() => {
         <button v-if="ttsState !== 'stopped'" class="btn btn-sm" @click="stopTTS"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><rect x="6.5" y="6.5" width="11" height="11" rx="2" fill="currentColor"/></svg>{{ t('common.stop') }}</button>
         <button class="icon-btn" :title="t('tts.collapseHint')" :aria-label="t('tts.collapse')" @click="ttsPanel = false"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M5.3 8.3a1 1 0 0 1 1.4 0L12 13.6l5.3-5.3a1 1 0 1 1 1.4 1.4l-6 6a1 1 0 0 1-1.4 0l-6-6a1 1 0 0 1 0-1.4z"/></svg></button>
       </div>
+      <div class="listen-hero">
+        <div class="listen-cover"><BookCover :title="meta?.title || ''" :author="meta?.author" :src="library.coverUrls[bookId]" /></div>
+        <h2>{{ meta?.title }}</h2>
+        <p>{{ listenChapter || meta?.author }}</p>
+      </div>
+      <div class="listen-options">
+        <button @click="ttsOptions = 'sleep'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 6v6l4 2"/></svg><span>{{ sleepShort || t('tts.sleep') }}</span></button>
+        <button @click="ttsOptions = 'voice'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><rect x="9" y="3" width="6" height="12" rx="3"/><path d="M6 11a6 6 0 0 0 12 0M12 17v4m-4 0h8"/></svg><span>{{ voiceSummary }}</span></button>
+        <button @click="ttsOptions = 'rate'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M4 19a9 9 0 1 1 16 0M12 13l5-6"/></svg><span>{{ t('tts.rate') }} {{ rateText(settings.ttsRate) }}</span></button>
+      </div>
+      <p class="listen-state" :class="{ error: ttsFailure }" role="status">{{ ttsStatus }}</p>
+      <div v-if="unavailableVoice && edgeAvailable()" class="tts-notice">
+        <button class="btn btn-sm btn-primary" @click="switchToOnline">{{ t('tts.useOnline') }}</button>
+      </div>
       <!-- 听到哪了、还要多久 -->
       <div v-if="listenEta" class="tts-progress">
         <div class="tts-progress-head">
@@ -3353,32 +3458,41 @@ onBeforeUnmount(() => {
         {{ bookmarkOnPage ? t('tts.startFromBookmark') : t('tts.startFromPage') }} · {{ t('tts.selectHint') }}
       </p>
 
-      <div class="tts-row tts-rate-row">
+      <nav class="listen-links" :aria-label="t('v2.listenTools')">
+        <button @click="ttsPanel = false">{{ t('v2.originalText') }}</button>
+        <button :aria-pressed="modes.lyricFollowing.value" @click="openListenLyrics">{{ t('readingMode.tabLyric') }}</button>
+        <button @click="openListenToc">{{ t('reader.toc') }}</button>
+      </nav>
+      <button class="listen-ambient" @click="toggleAmbientPanel">{{ t('ambient.title') }}</button>
+      <blockquote v-if="listenQuote" class="listen-quote">{{ listenQuote }}</blockquote>
+      <AppModal v-if="ttsOptions" :title="t(ttsOptions === 'rate' ? 'tts.rate' : ttsOptions === 'sleep' ? 'tts.sleep' : 'tts.voice')" @close="ttsOptions = null">
+        <div class="listen-setting-body">
+      <div v-show="ttsOptions === 'rate'" class="tts-row tts-rate-row">
         <label>{{ t('tts.rate') }}</label>
         <LevelSlider v-model="settings.ttsRate" :min="TTS_RATE_MIN" :max="TTS_RATE_MAX" :step="0.05" :stops="rateStops" :label="t('tts.rate')" />
         <span class="tts-value">{{ rateText(settings.ttsRate) }}</span>
       </div>
-      <div class="tts-row tts-row-stacked">
+      <div v-show="ttsOptions === 'sleep'" class="tts-row tts-row-stacked">
         <label>{{ t('tts.sleep') }}</label>
         <div class="seg">
           <button v-for="c in SLEEP_CHOICES" :key="c.mode" :class="{ active: sleepMode === c.mode }" @click="setSleep(c.mode)">{{ t(c.key) }}</button>
         </div>
       </div>
-      <div v-if="edgeAvailable()" class="tts-row">
+      <div v-show="ttsOptions === 'voice'" v-if="edgeAvailable()" class="tts-row">
         <label>{{ t('tts.engine') }}</label>
         <div class="seg" style="flex: 1">
           <button :class="{ active: settings.ttsEngine === 'edge' }" @click="settings.ttsEngine = 'edge'; resetEdgeFailure()">{{ t('tts.engineEdge') }}</button>
-          <button :class="{ active: settings.ttsEngine === 'local' }" :title="t('tts.engineLocalTitle')" @click="settings.ttsEngine = 'local'; resetEdgeFailure(); refreshLocalStatus()">{{ t('tts.engineLocal') }}</button>
-          <button :class="{ active: settings.ttsEngine === 'system' }" @click="settings.ttsEngine = 'system'">{{ t('tts.engineSystem') }}</button>
+          <button :class="{ active: settings.ttsEngine === 'local' }" :disabled="!localTtsAvailable()" :title="localTtsAvailable() ? t('tts.engineLocalTitle') : t('tts.localUnsupported')" @click="settings.ttsEngine = 'local'; resetEdgeFailure(); refreshLocalStatus()">{{ t('tts.engineLocal') }}</button>
+          <button :disabled="!systemSpeechAvailable()" :class="{ active: settings.ttsEngine === 'system' }" @click="settings.ttsEngine = 'system'">{{ t('tts.engineSystem') }}</button>
         </div>
       </div>
-      <div v-if="edgeAvailable() && settings.ttsEngine === 'edge'" class="tts-row">
+      <div v-show="ttsOptions === 'voice'" v-if="edgeAvailable() && settings.ttsEngine === 'edge'" class="tts-row">
         <label>{{ t('tts.voice') }}</label>
         <AppSelect v-model="settings.edgeVoice" class="input" :aria-label="t('tts.voice')">
           <option v-for="v in EDGE_VOICES" :key="v.id" :value="v.id">{{ v.label }}</option>
         </AppSelect>
       </div>
-      <div v-else-if="edgeAvailable() && settings.ttsEngine === 'local'" class="tts-row">
+      <div v-show="ttsOptions === 'voice'" v-else-if="edgeAvailable() && settings.ttsEngine === 'local'" class="tts-row">
         <label>{{ t('tts.voice') }}</label>
         <template v-if="localInstalled">
           <AppSelect v-model="settings.localVoiceId" class="input" :aria-label="t('tts.voice')">
@@ -3386,22 +3500,26 @@ onBeforeUnmount(() => {
           </AppSelect>
           <button class="btn btn-sm" :disabled="ttsState !== 'stopped'" @click="auditionLocal">{{ t('tts.audition') }}</button>
         </template>
-        <LocalTtsPack v-else />
+        <LocalTtsPack v-else-if="localTtsAvailable()" />
+        <p v-else class="tts-hint">{{ t('tts.localUnsupported') }}</p>
       </div>
-      <div v-else class="tts-row">
+      <div v-show="ttsOptions === 'voice'" v-else class="tts-row">
         <label>{{ t('tts.voice') }}</label>
         <AppSelect v-model="settings.ttsVoice" class="input" :aria-label="t('tts.voice')">
           <option value="">{{ t('tts.autoVoice') }}</option>
           <option v-for="v in ttsVoices" :key="v.name" :value="v.name">{{ v.name }} ({{ v.lang }})</option>
         </AppSelect>
       </div>
-      <p class="tts-hint">
+      <p v-show="ttsOptions === 'voice'" class="tts-hint">
         {{ !edgeAvailable() ? t('tts.hintSystem') : settings.ttsEngine === 'edge' ? t('tts.hintEdge') : settings.ttsEngine === 'local' ? t('tts.hintLocal') : t('tts.hintSystem') }}
       </p>
+        </div>
+      </AppModal>
     </div>
 
     <!-- 侧栏面板 -->
     <aside v-if="panel !== 'none'" ref="panelEl" class="panel card">
+      <button class="reader-panel-close icon-btn" :aria-label="t('common.close')" @click="panel = 'none'; listenToc = false"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
       <template v-if="panel === 'toc'">
         <h3>{{ t('reader.toc') }}</h3>
         <div class="panel-body">
@@ -4764,4 +4882,59 @@ onBeforeUnmount(() => {
     animation: none;
   }
 }
+
+
+.reader-panel-close { position: absolute; top: 10px; right: 12px; z-index: 1; }
+.panel > h3, .panel .anno-tabs { padding-right: 38px; min-height: 40px; }
+.listen-entry { position: absolute; z-index: 10; bottom: calc(var(--footer-h) + var(--safe-bottom) + 20px); right: max(20px, var(--lr-safe-right)); border: 1px solid var(--border); background: var(--card); color: var(--text-2); border-radius: var(--radius-pill); padding: 12px; display: flex; gap: 8px; align-items: center; min-height: 48px; box-shadow: var(--shadow-sm); }
+.tts-panel { width: min(460px, calc(100% - 24px)); background: var(--bg); color: var(--text); gap: 18px; border: 0; }
+.tts-head { min-height: 44px; flex-shrink: 0; }
+.tts-head strong { font-size: 17px; }
+.listen-hero { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 10px; }
+.listen-cover { width: 150px; height: 210px; margin: 10px auto 8px; flex-shrink: 0; }
+.listen-hero h2 { font-size: 20px; line-height: 1.4; overflow-wrap: anywhere; max-width: 100%; }
+.listen-hero p { font-size: 13px; color: var(--text-3); }
+.listen-options, .listen-links { display: flex; justify-content: space-around; gap: 8px; }
+.listen-options button { display: flex; flex-direction: column; align-items: center; gap: 10px; border: 0; background: none; color: var(--text-2); font-size: 12px; min-height: 56px; flex: 1; min-width: 0; padding: 8px 0; }
+.listen-options svg { width: 23px; height: 23px; }
+.listen-options span { white-space: nowrap; }
+.listen-state { text-align: center; color: var(--text-3); font-size: 12px; line-height: 1.6; }
+.listen-state.error { color: var(--danger); }
+.tts-transport { justify-content: space-between; gap: 4px; }
+.tts-play { width: 66px; height: 66px; flex: 0 0 66px; border-radius: 50%; }
+.tts-skip { min-width: 44px; min-height: 48px; padding: 6px 0; }
+.listen-links button { min-height: 44px; border: 0; color: var(--text-2); background: none; flex: 1; border-radius: var(--radius); }
+.listen-links button:hover, .listen-options button:hover { color: var(--brand); background: var(--brand-soft); }
+.listen-quote { margin: 0; background: var(--card); color: var(--text-2); padding: 18px; border-radius: var(--radius-lg); font-size: 16px; line-height: 1.9; }
+.listen-setting-body { padding: 20px; display: flex; flex-direction: column; gap: 20px; }
+.listen-setting-body .tts-row .input { min-height: 44px; height: auto; }
+.listen-setting-body .seg { flex-wrap: wrap; gap: 8px; }
+.listen-setting-body .seg button { min-height: 44px; flex: 1 0 60px; border-radius: var(--radius-pill); }
+@media (max-width: 720px) {
+  .bar.top { background: var(--card); }
+  .bar-actions { gap: 0; }
+  .bar-actions .ambient-btn { display: none; }
+  .icon-btn { width: 44px; height: 44px; }
+  .tts-panel { inset: 0; width: 100%; height: 100%; max-height: none; border-radius: 0; padding: calc(var(--safe-top) + 8px) max(24px, var(--lr-safe-right)) calc(var(--safe-bottom) + 24px) max(24px, var(--lr-safe-left)); gap: 20px; box-shadow: none; }
+  .tts-panel::before { display: none; }
+  .tts-head { position: sticky; top: calc(-8px - var(--safe-top)); background: var(--bg); z-index: 1; padding-block: 4px; }
+  .listen-cover { width: clamp(120px, 19vh, 172px); height: clamp(168px, 26.6vh, 241px); }
+  .tts-mini { max-width: calc(100% - 24px); }
+  .tts-mini-btn { min-width: 44px; min-height: 44px; }
+  .panel { background: var(--bg); border: 0; }
+  .listen-entry span { display: none; }
+}
+
+
+.listen-ambient { align-self: center; color: var(--text-3); border: 0; background: transparent; min-height: 44px; padding: 8px 16px; }
+
+
+.listen-cover :deep(.art-title) { font-size: 32px; }
+.tts-panel { gap: 16px; }
+.tts-head { position: relative; justify-content: center; }
+.tts-head > span[style] { display: none; }
+.tts-head > .icon-btn { order: -1; margin-right: auto; }
+.tts-head > strong { position: absolute; left: 50%; transform: translateX(-50%); pointer-events: none; }
+.tts-head > .btn { margin-left: auto; }
+
 </style>

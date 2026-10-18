@@ -26,8 +26,8 @@ export function screenLayout(probe: PortraitProbe) {
   return {
     orientation: portrait ? 'portrait' as const : 'landscape' as const,
     reader: {
-      fontSize: small ? 18 : 20,
-      lineHeight: portrait ? 1.8 : 1.7,
+      fontSize: small ? 19 : 20,
+      lineHeight: portrait ? 1.95 : 1.7,
       gap: portrait ? portraitSpacing(width, 6).gapPercent : 6,
       flow: portrait ? 'scrolled' as const : 'paginated' as const,
       maxColumnCount: wide ? 2 as const : 1 as const,

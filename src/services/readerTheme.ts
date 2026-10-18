@@ -11,9 +11,9 @@ export interface ReaderThemeColors {
 export type ReaderThemeName = Exclude<ReaderPrefs['theme'], 'auto'>
 
 export const READER_THEMES: Record<ReaderThemeName, ReaderThemeColors> = {
-  light: { bg: '#ffffff', fg: '#1d2129', link: '#1664ff' },
+  light: { bg: '#fafafa', fg: '#20252c', link: '#0066cf' },
   sepia: { bg: '#faf3e7', fg: '#453c2c', link: '#8f6c2e' },
-  green: { bg: '#c7edcc', fg: '#243528', link: '#1e6b4a' },
+  green: { bg: '#e6efdf', fg: '#243528', link: '#1e6b4a' },
   dark: { bg: '#17181a', fg: '#c5c8ce', link: '#6a9bff' },
 }
 
@@ -65,6 +65,8 @@ export function getReaderCSS(prefs: ReaderPrefs, appDark: boolean, style?: Reade
   const colors = resolveReaderColors(prefs.theme, appDark, style)
   return `
     @namespace epub "http://www.idpf.org/2007/ops";
+    ${prefs.fontFamily.includes('Noto Serif SC') ? `@font-face { font-family: "Noto Serif SC"; src: url("${new URL('/fonts/noto-serif-sc.woff2', globalThis.location?.href ?? 'http://localhost/').href}") format("woff2"); font-weight: 400; font-display: swap; }` : ''}
+    ${prefs.fontFamily.includes('Kaiti SC') ? `@font-face { font-family: "Kaiti SC"; src: url("${new URL('/fonts/lxgw-wenkai.woff2', globalThis.location?.href ?? 'http://localhost/').href}") format("woff2"); font-weight: 400; font-display: swap; }` : ''}
     html {
       color-scheme: ${theme === 'dark' ? 'dark' : 'light'};
       color: ${colors.fg};
