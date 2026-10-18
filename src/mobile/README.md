@@ -13,4 +13,4 @@
 
 字体仅通过 App 的 CSS / JS 依赖打包，许可一起分发。原生语音协议更新通过 Rust 平台条件限定 Android/iOS；桌面协议与行为保持 1.x。`src-tauri/src/mobile/edge_gec.rs` 的测试可独立用 `rustc --edition 2021 --test` 运行，不需要构建桌面壳。
 
-现有全平台 Release 工作流仍面向统一版本的 1.x，不能直接用于 App 2.0 发布；版本检查会拒绝把 v2.0.0 当成桌面版本。App 2.0 当前仅候选 APK / 草稿 PR，发布前须建立独立移动发布与更新通道，不能将 App 版本作为桌面 latest 更新。
+现有全平台 Release 工作流仍面向统一版本的 1.x，不能直接用于 App 2.0 发布；版本检查会拒绝把 v2.0.0 当成桌面版本。`release-mobile.yml` 提供独立 App 发布校验，公开 App 资产时保持 `latest=false`，避免改变旧桌面更新入口。App 1.x 最终版为 v1.20.0；App 2.0 当前仅候选 APK / 草稿 PR，公开前仍须完成独立 App 更新检查，不能将 App 版本作为桌面 latest 更新。
