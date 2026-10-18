@@ -1,10 +1,10 @@
-# 轻阅 App 2.0（桌面保持 1.19.4）
+# 轻阅 App 2.0（桌面保持 1.20.0）
 
 设计基准是用户在 K30 Chrome 中确认的 [Codex v3 原型](../../prototypes/lightread-mobile-v3.html)。参考微信读书的安静配色、主次层级和阅读体验，将原型接入现有 Vue / Tauri App。没有替换存储、阅读引擎、同步或语音服务。
 
 ## 1.x 基线
 
-[v1.20.0](https://github.com/yzfly/LightRead/releases/tag/v1.20.0) 为 App 1.x 最终版，封存分支为 `release/1.20.0`；桌面继续保持 [v1.19.4](https://github.com/yzfly/LightRead/releases/tag/v1.19.4) 的界面、版本和安装包。2.0 在 `Dev` 分支开发。Release 标题只用版本号。
+[v1.20.0](https://github.com/yzfly/LightRead/releases/tag/v1.20.0) 为 1.x 全平台最终版，封存分支为 `release/1.20.0`；桌面沿用 v1.19.4 的界面和功能，版本元数据与原生安装包统一为 v1.20.0。2.0 在 `Dev` 分支开发。Release 标题只用版本号。
 
 ## 实现
 
@@ -40,7 +40,7 @@ node --test scripts/test-platform-boundary.mjs scripts/test-mobile-tts.mjs scrip
 
 `e2e-v2` 验证真实导入、字体在章节文档加载、排版标签、听书设置与四种宽度。其余回归覆盖阅读引擎、PDF、排版持久化和窄屏触控。
 
-Android 延续已有实验性 arm64 debug 安装形式及固定签名，包名保持 `com.yzfly.lightread.debug`，版本为 2.0.0 / 2000000，minSdk 24、targetSdk 36。正式公开的稳定 Release 暂时仍为 App 1.x 最终版；桌面继续保持此版本。该版本。
+Android 延续已有实验性 arm64 debug 安装形式及固定签名，包名保持 `com.yzfly.lightread.debug`，版本为 2.0.0 / 2000000，minSdk 24、targetSdk 36。正式公开的稳定 Release 暂时仍为 1.x 全平台最终版；桌面继续保持此版本。该版本。
 
 ## 语音故障定位与平台分离复验
 
