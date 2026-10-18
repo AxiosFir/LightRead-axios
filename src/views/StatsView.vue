@@ -352,8 +352,4 @@ h1 {
     animation: none;
   }
 }
-
-
-.page-head h1 { font-size: var(--page-title); letter-spacing: -.5px; }
-
 </style>

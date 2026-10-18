@@ -5,7 +5,7 @@ import { useSettings } from '../stores/settings'
 import { toast } from './toast'
 import { t } from '../i18n'
 
-export const localTtsAvailable = () => isTauri() && !/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
+export const localTtsAvailable = () => isTauri()
 
 export interface LocalTtsStatus {
   installed: boolean

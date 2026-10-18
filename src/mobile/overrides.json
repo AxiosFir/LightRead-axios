@@ -1,0 +1,20 @@
+[
+  "App.vue",
+  "components/BookCard.vue",
+  "components/ReadingModePanel.vue",
+  "components/TypographyPanel.vue",
+  "composables/useReadingModes.ts",
+  "i18n/en.ts",
+  "i18n/zh.ts",
+  "services/adaptiveLayout.ts",
+  "services/appearance.ts",
+  "services/localTts.ts",
+  "services/readerTheme.ts",
+  "services/tts.ts",
+  "styles/main.css",
+  "views/CatalogView.vue",
+  "views/LibraryView.vue",
+  "views/ReaderView.vue",
+  "views/SettingsView.vue",
+  "views/StatsView.vue"
+]

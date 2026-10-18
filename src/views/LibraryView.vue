@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import BookCover from '../components/BookCover.vue'
 import { askConfirm } from '../services/confirm'
 import AppSelect from '../components/AppSelect.vue'
 import AppModal from '../components/AppModal.vue'
@@ -51,8 +50,6 @@ watch(paperMode, () => {
 const keyword = ref('')
 /** 手机论文页的阅读状态筛选 */
 const paperStatus = ref<'' | PaperState>('')
-const shelfStatus = ref<'all' | 'reading' | 'unread' | 'finished'>('all')
-const shelfChoices = ['all', 'reading', 'unread', 'finished'] as const
 const sortBy = ref<'recent' | 'added' | 'title' | 'author'>('recent')
 const fileInput = ref<HTMLInputElement>()
 const dragging = ref(false)
@@ -223,7 +220,6 @@ const activeBooklist = computed(() =>
 
 const filtered = computed(() => {
   let list = kindBooks.value
-  if (!paperMode.value && shelfStatus.value !== 'all') list = list.filter(b => shelfStatus.value === 'finished' ? (b.progress ?? 0) >= .99 : shelfStatus.value === 'unread' ? !b.lastReadAt && !(b.progress ?? 0) : (b.progress ?? 0) < .99 && (!!b.lastReadAt || (b.progress ?? 0) > 0))
   if (!paperMode.value && activeBooklistId.value) {
     const ids = new Set(library.booklistBookIds[activeBooklistId.value] ?? [])
     list = list.filter(book => ids.has(book.id))
@@ -906,7 +902,8 @@ async function batchClearTags() {
     <!-- 手机: 继续阅读 (最近打开的书) -->
     <section v-if="resumeBook" class="resume card" role="button" tabindex="0" :aria-label="`${t('library.continueReading')}: ${resumeBook.title}`" @click="openBook(resumeBook)" @keydown.enter.prevent="openBook(resumeBook)">
       <div class="resume-cover" aria-hidden="true">
-        <BookCover :title="shortTitle(resumeBook.title)" :author="shortAuthor(resumeBook.author)" :src="library.coverUrls[resumeBook.id]" />
+        <img v-if="library.coverUrls[resumeBook.id]" :src="library.coverUrls[resumeBook.id]" alt="" decoding="async" />
+        <span v-else class="resume-cover-title">{{ shortTitle(resumeBook.title) }}</span>
       </div>
       <div class="resume-info">
         <span class="resume-eyebrow">{{ t('library.continueReadingAgo', { time: agoText(resumeBook.lastReadAt!) }) }}</span>
@@ -1040,11 +1037,6 @@ async function batchClearTags() {
       <button class="list-text-btn" @click="toggleManage">{{ t('library.select') }}</button>
     </div>
 
-    <nav v-if="!paperMode && kindBooks.length && !manageMode" class="shelf-filters" :aria-label="t('v2.readingStatus')">
-      <button v-for="state in shelfChoices" :key="state" :class="{ active: shelfStatus === state }" :aria-pressed="shelfStatus === state" @click="shelfStatus = state">{{ t(`v2.shelf.${state}`) }}</button>
-      <button @click="openBooklistManage">{{ t('library.booklists') }}</button>
-    </nav>
-
     <!-- 手机选择模式: 顶部「取消 · 已选 N 本 · 全选」 -->
     <div v-if="phone && manageMode" class="phone-selectbar">
       <button class="list-text-btn" @click="toggleManage">{{ t('common.cancel') }}</button>
@@ -1104,7 +1096,7 @@ async function batchClearTags() {
       </div>
       <p class="empty-title">{{ t('reader.noResults') }}</p>
       <div class="empty-actions">
-        <button class="btn" @click="keyword = ''; tagFilter = ''; paperStatus = ''; shelfStatus = 'all'">{{ t('common.clear') }}</button>
+        <button class="btn" @click="keyword = ''; tagFilter = ''; paperStatus = ''">{{ t('common.clear') }}</button>
       </div>
     </div>
 
@@ -2881,45 +2873,4 @@ async function batchClearTags() {
   margin: 6px 0;
   background: var(--bg);
 }
-
-
-@media (max-width: 720px) {
-  .toolbar { margin-bottom: 24px; background: var(--bg); backdrop-filter: none; }
-  .toolbar h1 { font-size: 28px; letter-spacing: -.5px; }
-  .search-field .search { height: 46px; border-radius: var(--radius-pill); background: var(--surface-2); box-shadow: none; font-size: 14px; }
-  .add-fab { background: transparent; color: var(--text-2); box-shadow: none; width: 44px; height: 44px; }
-  .resume { padding: 20px; gap: 20px; margin: 0 0 28px; box-shadow: none; border-radius: var(--radius-lg); align-items: center; }
-  .resume-cover { width: 90px; height: 128px; box-shadow: none; }
-  .resume-cover::after { display: none; }
-  .resume-title { font-size: 20px; margin: 6px 0; }
-  .resume-go { height: 40px; }
-  .resume-track { display: none; }
-  .resume-foot { flex-wrap: wrap; padding-top: 12px; gap: 10px; }
-  .resume-pct { order: 1; }
-  .list-head { margin-bottom: 16px; }
-  .list-scope { font-size: 17px; font-weight: 600; color: var(--text); }
-  .grid { column-gap: 20px; row-gap: 26px; }
-}
-@media (max-width: 380px) {
-  .resume { gap: 14px; padding: 16px; }
-  .resume-cover { width: 76px; height: 110px; }
-  .resume-title { font-size: 18px; }
-  .grid { column-gap: 16px; }
-}
-
-
-
-.shelf-filters { display: flex; gap: 6px; margin: 0 0 18px; overflow-x: auto; scrollbar-width: none; }
-.shelf-filters button { flex: 1; min-width: max-content; min-height: 44px; border: 0; border-radius: var(--radius-pill); background: transparent; color: var(--text-2); padding: 8px 12px; }
-.shelf-filters button.active { color: var(--brand); background: var(--brand-light); font-weight: 600; }
-@media (min-width: 721px) { .shelf-filters { max-width: 480px; } }
-@media (max-width: 720px) {
-  .toolbar { padding-top: 24px; top: -92px; }
-  .heading { display: grid; grid-template-columns: minmax(0,1fr) auto; height: auto; min-height: 70px; gap: 4px 8px; }
-  .heading h1 { grid-area: 1/1; }
-  .count { grid-area: 2/1; padding: 0; align-self: start; font-size: 13px; }
-  .today-link { grid-area: 1/2/3/3; margin: 0; font-size: 12px; }
-  .list-text-btn, .list-sort { min-height: 44px; }
-}
-
 </style>

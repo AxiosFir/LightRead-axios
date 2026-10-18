@@ -198,7 +198,7 @@ export function useReadingModes(opts: UseReadingModesOptions) {
   const appDark = () => !!opts.appDark?.()
 
   const panelOpen = ref(false)
-  const panelTab = ref<ReadingModeTab>('tts')
+  const panelTab = ref<ReadingModeTab>('typewriter')
   const typewriterState = ref<TypewriterState>('idle')
   const typewriterActive = computed(() => typewriterState.value !== 'idle')
   /** 书的主文字: 决定速度单位 (字/分 或 词/分) */

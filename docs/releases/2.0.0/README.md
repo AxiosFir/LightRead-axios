@@ -1,10 +1,10 @@
-# 轻阅 2.0
+# 轻阅 App 2.0（桌面保持 1.19.4）
 
 设计基准是用户在 K30 Chrome 中确认的 [Codex v3 原型](../../prototypes/lightread-mobile-v3.html)。参考微信读书的安静配色、主次层级和阅读体验，将原型接入现有 Vue / Tauri App。没有替换存储、阅读引擎、同步或语音服务。
 
 ## 1.x 基线
 
-[v1.19.4](https://github.com/yzfly/LightRead/releases/tag/v1.19.4) 为 1.x 最终版，源码与原有公开安装包保持不变，维护分支为 `release/1.x`。2.0 在 `feat/lightread-2.0` 分支开发。
+[v1.19.4](https://github.com/yzfly/LightRead/releases/tag/v1.19.4) 为 App 1.x 最终版；桌面继续保持此版本。该版本源码与原有公开安装包保持不变，维护分支为 `release/1.x`。2.0 在 `feat/lightread-2.0` 分支开发。
 
 ## 实现
 
@@ -12,7 +12,7 @@
 - 藏书采用三列封面、继续阅读卡片和全部／在读／未读／读完筛选；真实封面优先，缺少封面时根据书名生成柔和书封。书单、搜索、排序、导入和批量管理保留。
 - 阅读底栏为目录、笔记、阅读进度、模式、排版；听书有独立入口。正文排版仍由 foliate 引擎负责，PDF／DjVu 使用原有阅读器。
 - 排版分文字／配色／页面三个标签，支持键盘切换；从阅读模式的版式入口进入时直接定位对应标签。手机自动字号 19px、竖屏行距 1.95；历史手动字号、边距、翻页方式与分栏逐项优先，不重写已保存值。
-- 宋体与楷体随包提供完整字体，保留上游开源许可，支持真实书籍中的中文与离线阅读。网页版预缓存字体，首次安装下载量随之增加约 24MB；系统默认字体和用户导入字体继续可用。
+- 宋体与楷体随包提供完整字体，保留上游开源许可，支持真实书籍中的中文与离线阅读。仅 App 打包字体，资源约 24MB；桌面与默认 Web/PWA 不包含这些字体；系统默认字体和用户导入字体继续可用。
 - 阅读模式先显示场景与四种带读，详细参数按需展开。仍支持夜读、护眼、墨水屏、大字、沉浸、自动阅读、打字机、歌词与点睛阅读。
 - 听书改为完整播放器：真实书封、书名、当前朗读章节、播放／暂停、上／下句、上／下段、剩余时间和当前句。语速、定时、语音分别在底部面板设置。
 - 听书目录选章后从新章节播放；原文可以独立浏览，继续提供回到朗读位置／从这页听。歌词入口接入现有跟读模式。缓冲、暂停、播完和失败显示真实状态，未用原型的无声节奏模拟代替语音。
@@ -26,22 +26,37 @@
 自动化入口：
 
 ```sh
-npm run build
-npx vite preview --port 4175 --strictPort
-E2E_BASE=http://localhost:4175 node scripts/e2e-v2.mjs
-E2E_BASE=http://localhost:4175 node scripts/e2e-adaptive-layout.mjs
-E2E_BASE=http://localhost:4175 node scripts/e2e-smoke.mjs
-E2E_BASE=http://localhost:4175 DEVICES=se,fold-cover STRICT=1 node scripts/e2e-mobile.mjs
+# Desktop: original UI and regression
+TAURI_ENV_PLATFORM=linux npm run build
+TAURI_ENV_PLATFORM=linux npx vite preview --port 4176 --strictPort
+E2E_BASE=http://localhost:4176 node scripts/e2e-smoke.mjs
+
+# App: 2.0 UI (restart preview after building)
+TAURI_ENV_PLATFORM=android npm run build
+TAURI_ENV_PLATFORM=android npx vite preview --port 4177 --strictPort
+E2E_BASE=http://localhost:4177 node scripts/e2e-v2.mjs
+node --test scripts/test-platform-boundary.mjs scripts/test-mobile-tts.mjs scripts/test-apk-layout.mjs
 ```
 
 `e2e-v2` 验证真实导入、字体在章节文档加载、排版标签、听书设置与四种宽度。其余回归覆盖阅读引擎、PDF、排版持久化和窄屏触控。
 
-Android 延续已有实验性 arm64 debug 安装形式及固定签名，包名保持 `com.yzfly.lightread.debug`，版本为 2.0.0 / 2000000，minSdk 24、targetSdk 36。正式公开的稳定 Release 暂时仍为 1.x 最终版。
+Android 延续已有实验性 arm64 debug 安装形式及固定签名，包名保持 `com.yzfly.lightread.debug`，版本为 2.0.0 / 2000000，minSdk 24、targetSdk 36。正式公开的稳定 Release 暂时仍为 App 1.x 最终版；桌面继续保持此版本。该版本。
 
-## K30 真机验证的限制
+## 语音故障定位与平台分离复验
 
-K30 Android WebView 不提供 Web Speech API，移动端原生离线语音命令也是未支持状态。在线语音请求实测返回 `tls handshake eof`，同机访问语音服务超时。因此本次不能认定真机听书实际出声、跨句连续播放和熄屏播放通过；播放器状态与能力提示已按真实结果处理。未添加临时转发服务或模拟声音来绕过验收。
+故障有两层：
 
-真机升级前后，33 本藏书记录与保存设置逐项一致。随后使用设备已有藏书测试，并把真实书页截图留在本地忽略目录；不把这些截图、账号设置或数据库备份上传到公共仓库。
+1. K30 当前网络访问微软语音域名及微软官网在 TLS 握手时断开；直接请求和系统代理请求均复现。百度与 GitHub 对照返回 200。这是发生在音频生成之前的连接故障，尚不能仅凭此断定具体代理规则或上游节点原因。
+2. 开发机可连通微软域名，但按旧 App 的 GEC v1 协议请求返回 403。依据 [edge-tts 7.3.1 的实现](https://github.com/rany2/edge-tts/blob/7.3.1/src/edge_tts/drm.py)，App 原生端更新为 GEC v2，保留 LGPLv3 许可和来源。Rust 实现通过上游固定时间向量及五分钟边界测试；同机使用该 Rust 实现生成凭据、保持其余请求一致后成功收到 14,688 字节 MP3。桌面代码通过平台条件继续使用原有协议。
 
-本次最终前端回归：189 项核心测试、37 项完整冒烟流程通过；320 / 375 / 414 / 768px 新界面验证通过，344 / 375px 移动端审计均为 0 error、0 warn。字体在实际章节文档中加载成功，Android 包名、版本号、ABI 和固定签名校验通过。桌面平台安装包尚未构建，2.0 尚未作为公开稳定版本发布。
+App 合成请求增加 30 秒总超时。K30 WebView 不提供 Web Speech API，移动端原生离线语音也尚未实现；不能把不支持的引擎当成回退成功。手机网络未恢复前，不认定真机在线听书实际出声、跨句与熄屏播放通过。
+
+分离后的桌面构建与原有完整冒烟通过；App 构建、真实章节字体加载、播放器设置和 320 / 375 / 414 / 768px 界面回归通过。桌面原有 `src/` 文件与 `release/1.x` 基线一致，新增字体与 App 界面只在移动构建出现。
+
+此前真机用 7 本已有藏书完成 EPUB / TXT / MOBI / PDF 阅读、翻页、字体与返回层级测试；33 本藏书与用户设置保留。真实书页截图与私有备份仅保存在本地忽略目录，不上传公共仓库。
+
+## 1.19.4 APK 体积排查
+
+公开 APK：1.19.3 为 73,369,576 字节，1.19.4 为 139,600,338 字节。两个包均含 943 个有效 ZIP 项，压缩后文件合计只由 73,196,097 增至 73,204,402 字节（增加 8,305 字节）。1.19.4 在 ZIP 本地记录间存在 66,229,842 字节未被目录引用的填充区，是打包空洞，并非新增业务资源或 2.0 字体。
+
+`check-release.mjs` 新增 APK ZIP 空洞检查，拒绝超过 1 MiB 的未引用连续区域。对照测试中 1.19.3 通过、原 1.19.4 包被拒绝。应清理 Android 打包缓存后重新生成候选包，而不是把异常体积带到后续版本。本次诊断没有替换已公开的 1.19.4 资产。

@@ -1,4 +1,3 @@
-/* Hallmark · approved Codex v3 → production · pre-emit critique: P4 H4 E4 S5 R5 V4 */
 /* LightRead 轻阅 — 全局样式与设计令牌
  * 三层令牌: 原子 (颜色/间距/圆角) → 语义 (--bg / --card / --text …) → 组件类 (.btn / .input / .card …)
  * 组件里只用语义令牌, 不写裸色值; 深色模式只需在 [data-theme="dark"] 重定义语义层。
@@ -14,10 +13,10 @@
   --lr-safe-left: env(safe-area-inset-left);
 
   /* 品牌 */
-  --brand: #0066cf;
-  --brand-hover: #0054ad;
-  --brand-active: #004590;
-  --brand-light: #dceeff;
+  --brand: #1664ff;
+  --brand-hover: #0e4fd1;
+  --brand-active: #0a3ba8;
+  --brand-light: #e8f0ff;
   --brand-soft: color-mix(in srgb, var(--brand) 10%, transparent);
   --on-brand: #ffffff;
   /* 二维码: 深色模式下也保持白底深色模块, 否则部分扫码器认不出反色码 (不在深色主题里重定义) */
@@ -25,14 +24,14 @@
   --qr-fg: #111418;
 
   /* 表面与文字 */
-  --bg: #f3f5f8;
+  --bg: #f5f6f8;
   --card: #ffffff;
-  --surface-2: #ebeff3;   /* 悬停 / 次级面板 */
+  --surface-2: #f0f2f5;   /* 悬停 / 次级面板 */
   --surface-3: #e6e8ec;   /* 按下 / 轨道 */
-  --text: #202a36;
-  --text-2: #535f6d;
-  --text-3: #697787;      /* ≥4.5:1 于白底 */
-  --border: #e3e7ed;
+  --text: #1d2129;
+  --text-2: #4e5969;
+  --text-3: #6b7480;      /* ≥4.5:1 于白底 */
+  --border: #e5e6eb;
   --border-strong: #cfd3da;
   --overlay: rgba(17, 20, 26, 0.48);
   --skeleton: #e9ebef;
@@ -59,8 +58,8 @@
   /* 圆角 */
   --radius-sm: 6px;
   --radius: 8px;
-  --radius-lg: 14px;
-  --radius-xl: 22px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
   --radius-pill: 999px;
 
   /* 间距 (4pt 节奏) */
@@ -103,7 +102,7 @@
   --page-x: 28px;
   --page-top: 24px;
   --page-bottom: 40px;
-  --page-title: 28px;
+  --page-title: 22px;
 }
 
 /* ---- 尺寸层: 断点 / 页面骨架 / 触控 ----
@@ -119,14 +118,14 @@
   :root {
     /* 344 → 14px, 390 → 16px, 440 → 18px */
     --page-x: clamp(12px, 4.1vw, 20px);
-    --page-top: 24px;
+    --page-top: 16px;
     --page-bottom: 24px;
-    --page-title: 28px;
+    --page-title: 20px;
   }
 }
 @media (max-width: 380px) {
   :root {
-    --page-title: 26px;
+    --page-title: 19px;
   }
 }
 @media (pointer: coarse) {
@@ -792,22 +791,4 @@ input[type='range'] {
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
-}
-
-:root {
-  --font-book: "Noto Serif SC", "Songti SC", "STSong", serif;
-  --reader-paper: #fafafa;
-  --cover-paper-0: #c8dfcd;
-  --cover-paper-1: #c5d9e6;
-  --cover-paper-2: #efd0bf;
-  --cover-paper-3: #eae0c8;
-  --cover-paper-4: #dcd2e6;
-  --cover-paper-5: #d5dfd4;
-}
-html, body { overflow-x: clip; }
-@font-face { font-family: "Noto Serif SC"; src: url('/fonts/noto-serif-sc.woff2') format('woff2'); font-weight: 400; font-style: normal; font-display: swap; }
-@font-face { font-family: "Kaiti SC"; src: url('/fonts/lxgw-wenkai.woff2') format('woff2'); font-weight: 400; font-style: normal; font-display: swap; }
-@media (pointer: coarse) {
-  :root { --control-h: 44px; --control-h-sm: 44px; --icon-btn: 44px; }
-  button, [role=button], summary { touch-action: manipulation; }
 }

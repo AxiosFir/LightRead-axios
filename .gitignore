@@ -41,3 +41,7 @@ dev-dist
 
 # 本地暂存 (可能含凭据)
 temp/
+
+# Isolated platform verification builds
+dist-desktop/
+dist-mobile/

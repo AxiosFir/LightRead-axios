@@ -3404,15 +3404,4 @@ h2:focus {
     animation: none;
   }
 }
-
-
-.phone-settings h1 { font-size: var(--page-title); margin-bottom: 20px; letter-spacing: -.5px; }
-.pl-account { padding: 20px 18px; box-shadow: none; border-radius: var(--radius-lg); }
-.pl-avatar { background: var(--surface-2); color: var(--text-2); }
-.pl-group { border-radius: var(--radius-lg); box-shadow: none; }
-.pl-label { padding: 24px 4px 8px; }
-.pl-row { min-height: 60px; padding-block: 14px; }
-.pl-ico { color: var(--text); background: transparent; border-radius: 0; }
-.pl-row + .pl-row::before { background: var(--bg); }
-
 </style>

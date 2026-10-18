@@ -41,7 +41,7 @@ jobs:
         with:
           ref: ${{ github.workflow_sha }}
       - name: 保存当前发版审核脚本
-        run: cp scripts/check-release.mjs "$RUNNER_TEMP/check-release.mjs"
+        run: cp scripts/check-release.mjs scripts/apk-layout.mjs "$RUNNER_TEMP/"
       - name: 检出需要审核和构建的目标版本
         uses: actions/checkout@v4
         with:
@@ -232,7 +232,7 @@ jobs:
         with:
           ref: ${{ github.workflow_sha }}
       - name: 保存当前发版审核脚本
-        run: cp scripts/check-release.mjs "$RUNNER_TEMP/check-release.mjs"
+        run: cp scripts/check-release.mjs scripts/apk-layout.mjs "$RUNNER_TEMP/"
       - name: 检出需要审核和构建的目标版本
         uses: actions/checkout@v4
         with:
@@ -377,7 +377,7 @@ jobs:
         with:
           ref: ${{ github.workflow_sha }}
       - name: 保存当前审核脚本
-        run: cp scripts/check-release.mjs "$RUNNER_TEMP/check-release.mjs"
+        run: cp scripts/check-release.mjs scripts/apk-layout.mjs "$RUNNER_TEMP/"
       - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.tag || github.ref }}

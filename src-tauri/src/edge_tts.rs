@@ -2,7 +2,11 @@
 //! 端点要求特定的 Origin / User-Agent 握手头, 浏览器 JS 无法设置, 故在 Rust 侧实现.
 
 use futures_util::{SinkExt, StreamExt};
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
 use sha2::{Digest, Sha256};
+#[cfg(any(target_os = "android", target_os = "ios"))]
+#[path = "mobile/edge_gec.rs"]
+mod mobile_gec;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tokio_tungstenite::{
     connect_async,
@@ -11,9 +15,14 @@ use tokio_tungstenite::{
 
 const TRUSTED_CLIENT_TOKEN: &str = "6A5AA1D4EAFF4E9FB37E23D68491D6F4";
 const CHROMIUM_VERSION: &str = "143.0.3650.75";
+#[cfg(any(target_os = "android", target_os = "ios"))]
+const GEC_VERSION: &str = "2";
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
+const GEC_VERSION: &str = "1";
 const OUTPUT_FORMAT: &str = "audio-24khz-48kbitrate-mono-mp3";
 
 /// Sec-MS-GEC: Windows 文件时间 ticks 按 5 分钟窗口取整后与 token 拼接做 SHA-256
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
 fn sec_ms_gec() -> String {
     let unix = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -27,6 +36,16 @@ fn sec_ms_gec() -> String {
         .iter()
         .map(|b| format!("{b:02X}"))
         .collect::<String>()
+}
+
+#[cfg(any(target_os = "android", target_os = "ios"))]
+fn sec_ms_gec() -> String {
+    mobile_gec::generate(
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs(),
+    )
 }
 
 fn escape_xml(text: &str) -> String {
@@ -57,7 +76,7 @@ async fn synthesize_inner(text: &str, voice: &str, rate_percent: i32) -> Result<
         "wss://speech.platform.bing.com/consumer/speech/synthesize/readaloud/edge/v1\
          ?TrustedClientToken={TRUSTED_CLIENT_TOKEN}\
          &Sec-MS-GEC={}\
-         &Sec-MS-GEC-Version=1-{CHROMIUM_VERSION}\
+         &Sec-MS-GEC-Version={GEC_VERSION}-{CHROMIUM_VERSION}\
          &ConnectionId={connection_id}",
         sec_ms_gec()
     );
@@ -157,7 +176,15 @@ pub async fn edge_tts_synthesize(
     voice: String,
     rate_percent: i32,
 ) -> Result<tauri::ipc::Response, String> {
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
     let audio = synthesize_inner(&text, &voice, rate_percent).await?;
+    #[cfg(any(target_os = "android", target_os = "ios"))]
+    let audio = tokio::time::timeout(
+        std::time::Duration::from_secs(30),
+        synthesize_inner(&text, &voice, rate_percent),
+    )
+    .await
+    .map_err(|_| "连接语音服务超时，请检查网络后重试".to_string())??;
     Ok(tauri::ipc::Response::new(audio))
 }
 

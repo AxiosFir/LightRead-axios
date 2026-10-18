@@ -52,17 +52,6 @@ const reader = new Proxy({} as ReaderPrefs, {
 const desktop = isTauri()
 const touch = useMediaQuery(MQ.touch)
 const root = ref<HTMLElement>()
-const sections = ['text', 'color', 'page'] as const
-const activeSection = ref<TypographySection>(props.focus || 'text')
-function selectSection(section: TypographySection) { activeSection.value = section; if (root.value) root.value.scrollTop = 0 }
-function onTabKey(event: KeyboardEvent) {
-  if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return
-  event.preventDefault()
-  const i = sections.indexOf(activeSection.value)
-  const next = event.key === 'Home' ? 0 : event.key === 'End' ? 2 : (i + (event.key === 'ArrowRight' ? 1 : 2)) % 3
-  selectSection(sections[next]!)
-  nextTick(() => root.value?.querySelector<HTMLButtonElement>('[role="tab"][aria-selected="true"]')?.focus())
-}
 
 const THEME_LABEL_KEYS: Record<string, string> = {
   light: 'reader.themeLight', sepia: 'reader.themeSepia', green: 'reader.themeGreen', dark: 'reader.themeDark', auto: 'reader.themeAuto',
@@ -179,11 +168,8 @@ let systemFontsLoading = false
       <button type="button" class="tp-link" @click="emit('open-modes')">{{ t('reader.manageScenes') }}</button>
     </p>
 
-    <nav class="tp-tabs" role="tablist" :aria-label="t('reader.dockTypography')" @keydown="onTabKey">
-      <button v-for="section in sections" :key="section" :id="`typo-tab-${section}`" role="tab" :aria-selected="activeSection === section" :aria-controls="`typo-section-${section}`" :tabindex="activeSection === section ? 0 : -1" @click="selectSection(section)">{{ t(section === 'text' ? 'reader.groupText' : section === 'color' ? 'reader.groupColor' : 'reader.groupPage') }}</button>
-    </nav>
     <!-- 文字 -->
-    <section v-show="activeSection === 'text'" class="tp-group" role="tabpanel" id="typo-section-text" aria-labelledby="typo-tab-text" data-section="text" :aria-label="t('reader.groupText')">
+    <section class="tp-group" data-section="text" :aria-label="t('reader.groupText')">
       <h3 class="tp-title">{{ t('reader.groupText') }}</h3>
       <div class="set-row">
         <span class="tp-label">{{ t('reader.fontSize') }}</span>
@@ -204,8 +190,8 @@ let systemFontsLoading = false
       </div>
       <div class="set-row">
         <span class="tp-label">{{ t('reader.lineHeight') }}</span>
-        <input v-model.number="reader.lineHeight" type="range" min="1.2" max="2.6" step="0.05" :aria-label="t('reader.lineHeight')" />
-        <span class="tp-value">{{ reader.lineHeight.toFixed(2).replace(/0$/, '') }}</span>
+        <input v-model.number="reader.lineHeight" type="range" min="1.2" max="2.6" step="0.1" :aria-label="t('reader.lineHeight')" />
+        <span class="tp-value">{{ reader.lineHeight.toFixed(1) }}</span>
       </div>
       <div class="set-row">
         <span class="tp-label">{{ t('reader.margin') }}</span>
@@ -261,7 +247,7 @@ let systemFontsLoading = false
     </section>
 
     <!-- 配色 -->
-    <section v-show="activeSection === 'color'" class="tp-group" role="tabpanel" id="typo-section-color" aria-labelledby="typo-tab-color" data-section="color" :aria-label="t('reader.groupColor')">
+    <section class="tp-group" data-section="color" :aria-label="t('reader.groupColor')">
       <h3 class="tp-title">{{ t('reader.groupColor') }}</h3>
       <div class="set-row">
         <span class="tp-label">{{ t('reader.theme') }}</span>
@@ -298,7 +284,7 @@ let systemFontsLoading = false
     </section>
 
     <!-- 页面: 版式设置只在这里修改 -->
-    <section v-show="activeSection === 'page'" class="tp-group" role="tabpanel" id="typo-section-page" aria-labelledby="typo-tab-page" data-section="page" :aria-label="t('reader.groupPage')">
+    <section class="tp-group" data-section="page" :aria-label="t('reader.groupPage')">
       <h3 class="tp-title">{{ t('reader.groupPage') }}</h3>
       <template v-if="!fixedLayout">
         <div class="tp-flows" role="group" :aria-label="t('reader.flow')">
@@ -774,25 +760,4 @@ let systemFontsLoading = false
     transition: none;
   }
 }
-
-
-.settings-pop { background: var(--bg); gap: 18px; border: 0; }
-.tp-head { position: relative; justify-content: center; min-height: 44px; }
-.tp-head strong { font-size: 18px; }
-.tp-close { position: absolute; right: 0; width: 44px; height: 44px; }
-.tp-tabs { display: flex; background: var(--surface-2); padding: 4px; border-radius: var(--radius-pill); }
-.tp-tabs button { border: 0; background: transparent; min-height: 40px; flex: 1; color: var(--text-2); border-radius: var(--radius-pill); }
-.tp-tabs button[aria-selected=true] { background: var(--card); color: var(--text); font-weight: 600; }
-.tp-group { border: 0; border-radius: var(--radius-lg); background: var(--card); padding: 16px; gap: 14px; }
-.tp-title { display: none; }
-.set-row { min-height: 44px; }
-.tp-more { border-top: 1px solid var(--bg); padding-top: 8px; }
-.theme-btn { min-width: 40px; min-height: 44px; border-radius: 50%; }
-@media (max-width: 720px) {
-  .settings-pop { padding: 18px 20px calc(24px + var(--safe-bottom, 0px)); max-height: 82%; min-height: min(480px, 82%); }
-  .tp-adaptive { font-size: 11px; margin: 0; order: 5; }
-  .set-row { gap: 8px; }
-  .step-btn { width: 36px; flex: 0 0 36px; padding: 0; }
-}
-
 </style>

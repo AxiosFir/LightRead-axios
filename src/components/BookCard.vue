@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import BookCover from './BookCover.vue'
 import { computed, onBeforeUnmount, ref } from 'vue'
 import type { BookMeta } from '../storage'
 import { formatLabelOf } from '../services/plainText'
@@ -23,6 +22,9 @@ const props = defineProps<{
   /** 手机书格: 封面只留进度条, 操作收进作者行的「⋯」(由父组件弹出操作面板) */
   compact?: boolean
 }>()
+
+/** 封面占位标题的断行点: 文件名式标题 (package.json / my_notes-v2) 在 . _ - / 之后换行, 不在词中间硬断 */
+const coverTitleParts = computed(() => props.book.title.replace(/([._\-/])/g, '$1\u0000').split('\u0000'))
 
 const emit = defineEmits<{
   open: []
@@ -63,6 +65,15 @@ const ariaLabel = computed(() => {
   if (props.book.noSync) parts.push(t('library.privateBadge'))
   return parts.join(', ')
 })
+
+// 无封面时由书名生成稳定的柔和底色; compact 用其中一组纸色令牌
+const titleHash = computed(() => {
+  let hash = 0
+  for (const ch of props.book.title) hash = (hash * 31 + ch.charCodeAt(0)) | 0
+  return Math.abs(hash)
+})
+const fallbackHue = computed(() => titleHash.value % 360)
+const fallbackTone = computed(() => titleHash.value % 6)
 
 /* compact 的书名 / 元信息: 短书名; 「12% · 作者」, 读完显示「读完」, 未读不显示进度 */
 const displayTitle = computed(() => (props.compact ? shortTitle(props.book.title) : props.book.title))
@@ -148,7 +159,19 @@ function onKeydown(e: KeyboardEvent) {
       <span v-if="selectable" class="select-mark" :class="{ on: selected }" aria-hidden="true">
         <svg v-if="selected" viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M9.55 15.51 5.7 11.66a1 1 0 0 0-1.4 1.42l4.54 4.54a1 1 0 0 0 1.42 0l9.44-9.44a1 1 0 1 0-1.42-1.42l-8.73 8.75z"/></svg>
       </span>
-      <BookCover :title="displayTitle" :author="metaAuthor" :src="coverUrl || undefined" />
+      <img v-if="coverUrl" :src="coverUrl" alt="" loading="lazy" decoding="async" />
+      <div
+        v-else
+        class="cover-fallback"
+        :class="compact && `tone-${fallbackTone}`"
+        :style="{
+          '--h': fallbackHue,
+        }"
+        aria-hidden="true"
+      >
+        <span class="cover-fallback-title"><template v-if="compact">{{ displayTitle }}</template><template v-else v-for="(part, i) in coverTitleParts" :key="i">{{ part }}<wbr /></template></span>
+        <span v-if="book.author" class="cover-fallback-author">{{ compact ? metaAuthor : book.author }}</span>
+      </div>
       <span class="format" aria-hidden="true">{{ formatLabelOf(book) }}<svg v-if="book.noSync" class="private-mark" viewBox="0 0 24 24" width="11" height="11"><path fill="currentColor" d="M12 2a5 5 0 0 1 5 5v3h1a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h1V7a5 5 0 0 1 5-5zm0 2a3 3 0 0 0-3 3v3h6V7a3 3 0 0 0-3-3z"/></svg></span>
       <span v-if="progress != null" class="progress" aria-hidden="true">{{ progress }}%</span>
       <span v-if="progress != null" class="progress-track" aria-hidden="true">
@@ -718,11 +741,4 @@ function onKeydown(e: KeyboardEvent) {
     transform: none;
   }
 }
-
-
-.cover { border-radius: 3px 5px 5px 3px; box-shadow: none; }
-.book-card:hover { transform: none; }
-.book-card.compact .cover { box-shadow: none; }
-.book-card.compact .title { font-weight: 500; }
-
 </style>

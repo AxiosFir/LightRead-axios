@@ -3435,13 +3435,4 @@ async function removeSource(s: CatalogSourceRec) {
     color: var(--brand);
   }
 }
-
-
-@media (max-width: 720px) {
-  .page-title h1 { font-size: var(--page-title); letter-spacing: -.5px; }
-  .uni-section { border: 0; box-shadow: none; border-radius: var(--radius-lg); }
-  .uni-field { background: var(--surface-2); border-radius: var(--radius-pill); }
-  .source-card { box-shadow: none; border-color: transparent; border-radius: var(--radius-lg); }
-}
-
 </style>

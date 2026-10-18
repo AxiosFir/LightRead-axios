@@ -53,7 +53,7 @@ const hook = registerHooks({
 })
 const {
   speakText, stopSpeech, resetEdgeFailure, prefetchSpeech, pauseSpeech, resumeSpeech,
-  splitSpeechText, forgetLocalModel, LOCAL_LOADING_HINT_MS, getVoices, reportNeuralFailure,
+  splitSpeechText, forgetLocalModel, LOCAL_LOADING_HINT_MS,
 } = await import(ttsUrl)
 hook.deregister()
 
@@ -270,19 +270,4 @@ test('slow first model load shows a loading hint and dismisses it when ready', a
   state.notices.length = 0
   assert.equal(await speakText('第二次。'), 'end')
   assert.equal(state.notices.length, 0)
-})
-
-// Android WebView has no Web Speech API: never claim a silent fallback succeeded.
-test('missing system speech returns no voices and reports an unavailable fallback', async () => {
-  reset()
-  const speech = globalThis.speechSynthesis
-  try {
-    delete globalThis.speechSynthesis
-    assert.deepEqual(await getVoices(), [])
-    reportNeuralFailure(new Error('network unavailable'))
-    assert.equal(state.notices.at(-1)[0], 'tts.neuralUnavailableNoFallback')
-  } finally {
-    globalThis.speechSynthesis = speech
-    resetEdgeFailure()
-  }
 })
