@@ -105,6 +105,7 @@ export const SETTINGS_SYNC_SPEC: SettingsSpec = {
     /** 键是本机书 id, 各设备不同 */
     perBook: LOCAL,
     density: SYNC,
+    densityFine: LOCAL,
     kinds: SYNC,
     channel: SYNC,
     /** 键是本机书 id */

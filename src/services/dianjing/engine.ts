@@ -59,6 +59,8 @@ export interface DjHost {
   /** 当前通道; null 表示未配置 */
   channel(): DjChannel | null
   density(): Density
+  /** Optional continuous adjustment; absent keeps the original three presets. */
+  densityAmount?(): number | undefined
   kinds(): DjKinds
   fictionOverride(): 'fiction' | 'nonfiction' | null
   colors(): DjColors
@@ -619,12 +621,12 @@ export class DianjingEngine {
       if (!c.items.length) continue
       const keys = c.items.filter((i): i is KeyItem => i.t === 'key' && !this.dismissed.has(i.id) && !this.adopted.has(i.id))
       if (kinds.key && keys.length) {
-        const chosen = selectKeys(keys, k => s.model.sentenceLength(k.block, k.sentence), c.chunk.chars, density)
+        const chosen = selectKeys(keys, k => s.model.sentenceLength(k.block, k.sentence), c.chunk.chars, density, this.host.densityAmount?.())
         out.keys.push(...keys.filter(k => chosen.has(k.id)))
       }
       if (kinds.term) {
         const terms = c.items.filter((i): i is TermItem => i.t === 'term' && !this.dismissed.has(i.id))
-        out.terms.push(...selectTerms(terms, density))
+        out.terms.push(...selectTerms(terms, density, this.host.densityAmount?.()))
       }
       if (kinds.note) out.notes.push(...c.items.filter((i): i is NoteItem => i.t === 'note' && !this.dismissed.has(i.id)))
     }

@@ -361,14 +361,20 @@ async function main() {
       await m.setInputFiles('input[type=file][multiple]', [files.fb2])
       await m.waitForSelector('.book-card')
       const c = m.locator('.book-card').first()
-      await c.locator('.action.more').tap()
-      const btn = c.locator('.action.convert')
+      const sheet = await c.locator('.meta-more').isVisible()
+      await c.locator(sheet ? '.meta-more' : '.action.more').tap()
+      const btn = sheet ? m.getByRole('dialog').getByRole('button', { name: '转换为 EPUB', exact: true }) : c.locator('.action.convert')
       await btn.waitFor({ state: 'visible' })
-      const [cover, box] = await Promise.all([c.locator('.cover').boundingBox(), btn.boundingBox()])
-      assert.ok(box.y + box.height <= cover.y + cover.height && box.x >= cover.x, 'convert button inside the cover')
-      for (const sel of ['.action.remove', '.action.upload']) {
-        const b = await c.locator(sel).boundingBox()
-        assert.ok(b.y + b.height <= cover.y + cover.height + 0.5, `${sel} not clipped`)
+      if (sheet) {
+        const box = await btn.boundingBox()
+        assert.ok(box.x >= 0 && box.x + box.width <= 390 && box.y >= 0 && box.y + box.height <= 844 && box.height >= 44, 'sheet action fits viewport and touch target')
+      } else {
+        const [cover, box] = await Promise.all([c.locator('.cover').boundingBox(), btn.boundingBox()])
+        assert.ok(box.y + box.height <= cover.y + cover.height && box.x >= cover.x, 'convert button inside the cover')
+        for (const sel of ['.action.remove', '.action.upload']) {
+          const b = await c.locator(sel).boundingBox()
+          assert.ok(b.y + b.height <= cover.y + cover.height + 0.5, `${sel} not clipped`)
+        }
       }
       await m.screenshot({ path: join(SHOTS, 'convert-mobile-menu.png') })
       await btn.tap()

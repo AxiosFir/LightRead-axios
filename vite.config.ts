@@ -41,6 +41,9 @@ export default defineConfig({
     // 会把 Service Worker 缓存的旧版界面存进用户数据目录, 升级后仍加载旧代码。
     // 自毁型 SW 让已装机器上的旧 SW 在更新检查时自动注销并清缓存。
     selfDestroying: !!process.env.TAURI_ENV_PLATFORM,
+    // Native App startup already unregisters historical workers in main.ts.
+    // Do not register another worker against the Android asset protocol.
+    injectRegister: mobile && !!process.env.TAURI_ENV_PLATFORM ? false : 'auto',
     registerType: 'autoUpdate',
     workbox: {
       // MuPDF wasm 约 10MB，网页版需要完整预缓存以支持离线阅读。
@@ -105,5 +108,8 @@ export default defineConfig({
   server: {
     port: 5173,
     strictPort: true,
+    // Native build outputs can contain hundreds of thousands of files. They
+    // never participate in frontend HMR and exhaust Linux inotify otherwise.
+    watch: { ignored: ['**/src-tauri/target/**', '**/src-tauri/gen/**'] },
   },
 })

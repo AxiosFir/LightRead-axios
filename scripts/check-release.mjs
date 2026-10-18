@@ -46,9 +46,9 @@ function repositoryVersion(tag, platform = 'desktop') {
   if (platform !== 'desktop' && existsSync(`src-tauri/tauri.${platform}.conf.json`)) {
     const mobile = json(`src-tauri/tauri.${platform}.conf.json`)
     assert.ok(!mobile.identifier && !mobile.bundle, 'mobile version config must not override application identity')
-    version = validateVersions({ 'package.json': mobile.version }, tag)
+    version = validateVersions({ 'package.json': mobile.version }, tag?.replace(/^app-/, ''))
   }
-  if (tag) assert.equal(tag, `v${version}`, 'release tag does not match platform version')
+  if (tag) assert.equal(platform === 'desktop' ? tag : tag.replace(/^app-/, ''), `v${version}`, 'release tag does not match platform version')
   const [major, minor, patch] = version.split('.').map(Number)
   const versionCode = config.bundle?.android?.versionCode ?? major * 1_000_000 + minor * 1_000 + patch
   assert.ok(Number.isSafeInteger(versionCode) && versionCode > 0 && versionCode <= 2_100_000_000, 'invalid Android versionCode')

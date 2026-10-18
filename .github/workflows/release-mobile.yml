@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'App tag with locally built, signed APK assets uploaded to its draft Release'
+        description: 'app-vX.Y.Z tag with locally built, signed APK assets uploaded to its draft Release'
         type: string
         required: true
 
@@ -17,7 +17,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: release-${{ inputs.tag }}
+  group: release-app-assets-${{ inputs.tag }}
   cancel-in-progress: false
 
 jobs:
@@ -51,6 +51,7 @@ jobs:
           APKSIGNER: ${{ env.ANDROID_SDK_ROOT }}/build-tools/35.0.0/apksigner
           CERT_SHA256: ${{ vars.ANDROID_CERT_SHA256 }}
         run: |
+          [[ "$RELEASE_TAG" =~ ^app-v[0-9]+\.[0-9]+\.[0-9]+$ ]]
           test "$(gh release view "$RELEASE_TAG" --json isDraft --jq .isDraft)" = true
           node "$RUNNER_TEMP/check-release.mjs" --self-test
           node "$RUNNER_TEMP/check-release.mjs" --platform android --tag "$RELEASE_TAG"
@@ -75,7 +76,7 @@ jobs:
           (cd release-assets && sha256sum -c SHA256SUMS && sha256sum -c "$APK_NAME.sha256")
           node "$RUNNER_TEMP/check-release.mjs" --platform android --tag "$RELEASE_TAG" --apk "release-assets/$APK_NAME" --cert "$CERT_SHA256"
       - name: Publish App assets without changing desktop latest
-        run: gh release edit "$RELEASE_TAG" --draft=false --latest=false --title "$RELEASE_TAG"
+        run: gh release edit "$RELEASE_TAG" --draft=false --latest=false --title "${RELEASE_TAG#app-}"
 
   mirror-gitcode:
     needs: verify-and-publish

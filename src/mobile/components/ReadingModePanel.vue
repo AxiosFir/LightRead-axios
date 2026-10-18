@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { AUTO_SPEED_STEPS, speedPosition, secondsAtPosition, type AutoReadMotion } from '../../services/autoReadSpeed.ts'
 import { normalizeFocusLines, lyricHeight, anchorAtHeight } from '../../services/readingModes/lyric.ts'
+import AppModal from '../../components/AppModal.vue'
 import LevelSlider from '../../components/LevelSlider.vue'
 /**
  * 「阅读模式」面板 (docs/reader-panels.md §3.2): 场景与带读。桌面为顶栏下的浮层卡片, 手机为底部抽屉
@@ -99,6 +100,8 @@ function onLyricSliderKey(event: KeyboardEvent) {
 // ---- 场景卡片 ----
 type SceneId = 'night' | 'eyeCare' | 'eink' | 'largeText' | 'immersive'
 const detail = ref<SceneId | null>(null)
+const focused = ref<SceneId>('night')
+const focusedCard = computed(() => sceneCards.value.find(c => c.id === focused.value)!)
 
 interface SceneCard {
   id: SceneId
@@ -120,11 +123,7 @@ const detailCard = computed(() => sceneCards.value.find(c => c.id === detail.val
 
 function toggleCard(c: SceneCard) {
   c.toggle()
-  // 刚打开的卡片顺带展开它的详情; 关掉时收起
-  detail.value = c.on ? (detail.value === c.id ? null : detail.value) : c.id
-}
-function toggleDetail(id: SceneId) {
-  detail.value = detail.value === id ? null : id
+  focused.value = c.id
 }
 
 /** 场景会调整的东西 (只读说明; 数值在排版里调) */
@@ -353,21 +352,12 @@ function onAutoSpeedExact(e: Event) {
             <span class="rm-card-name">{{ t(c.key) }}</span>
             <span class="rm-card-state">{{ c.on ? t('readingMode.stateOn') : t('readingMode.stateOff') }}</span>
           </button>
-          <button
-            type="button"
-            class="rm-card-info"
-            :aria-expanded="detail === c.id"
-            :aria-label="t('readingMode.details', { name: t(c.key) })"
-            :title="t('readingMode.details', { name: t(c.key) })"
-            @click="toggleDetail(c.id)"
-          >
-            <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M12 2a10 10 0 1 1 0 20 10 10 0 0 1 0-20zm0 2a8 8 0 1 0 0 16 8 8 0 0 0 0-16zm0 6a1 1 0 0 1 1 1v5a1 1 0 1 1-2 0v-5a1 1 0 0 1 1-1zm0-4a1.25 1.25 0 1 1 0 2.5A1.25 1.25 0 0 1 12 6z"/></svg>
-          </button>
+
         </div>
       </div>
-      <p v-if="!detailCard" class="rm-hint">{{ t('readingMode.scenesHint') }}</p>
+      <div class="rm-scene-summary"><div><strong>{{ t(focusedCard.key) }}</strong><p>{{ t('v2.scene.' + focused) }}</p></div><button type="button" :aria-label="t('readingMode.details', { name: t(focusedCard.key) })" @click="detail = focused">{{ t('v2.sceneSettings') }} ›</button></div>
 
-      <div v-else class="rm-detail">
+      <AppModal v-if="detailCard" :title="t(detailCard.key)" @close="detail = null"><div class="rm-detail">
         <!-- 会调整什么 (只读) -->
         <div class="rm-changes">
           <span class="rm-changes-label">{{ t('readingMode.sceneChanges') }}</span>
@@ -453,9 +443,10 @@ function onAutoSpeedExact(e: Event) {
           {{ t('readingMode.tuneInTypography') }}
           <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M9.3 6.3a1 1 0 0 1 1.4 0l5 5a1 1 0 0 1 0 1.4l-5 5a1 1 0 1 1-1.4-1.4L13.58 12 9.3 7.7a1 1 0 0 1 0-1.4z"/></svg>
         </button>
-      </div>
+      </div></AppModal>
     </section>
 
+    <slot name="ambient" />
     <section class="rm-group" :aria-label="t('readingMode.groupGuide')">
       <h3 class="rm-group-title rm-guide-title">{{ t('readingMode.groupGuide') }}<small>{{ t('readingMode.oneGuide') }}</small></h3>
       <div class="rm-guides">
@@ -1428,6 +1419,9 @@ function onAutoSpeedExact(e: Event) {
 .rm-card-name { font-size: 12px; white-space: nowrap; }
 .rm-card-state { display: none; }
 .rm-card-info { position: static; display: flex; margin: 0 auto; min-width: 44px; min-height: 32px; justify-content: center; align-items: center; }
+/* The info button now has its own row and touch target. Its old absolute
+   hit area would cover the scene switch because .rm-card is positioned. */
+.rm-card-info::before { content: none; }
 @media (max-width: 720px) {
   .rm-panel { padding-inline: 20px; max-height: 88%; }
   .rm-group-title { font-size: 16px; }
@@ -1440,5 +1434,8 @@ function onAutoSpeedExact(e: Event) {
 .rm-group-title { color: var(--text); }
 .rm-guide-action.btn-primary { background: var(--surface-2); color: var(--text); border-color: transparent; }
 .rm-panel :slotted(.dj-toggle) { padding: 16px; background: var(--card); border-radius: var(--radius-lg); }
+
+
+.rm-cards { display: grid; grid-template-columns: repeat(5,minmax(0,1fr)); gap: 6px; }.rm-card { padding: 0; background: none; border: 0; }.rm-card-main { min-height: 94px; width: 100%; padding: 10px 2px; gap: 7px; border: 1px solid var(--border); border-radius: 12px; background: var(--card); color: var(--text-2); }.rm-card.on .rm-card-main { border-color: var(--brand); background: var(--brand-light); color: var(--brand); }.rm-card-main > svg { padding: 0; background: none; border-radius: 0; width: 22px; height: 22px; }.rm-card-state { display: block; font-size: 10px; line-height: 1.4; opacity: 1; }.rm-card-name { font-size: 12px; }.rm-card.on .rm-card-state::before { content: '✓ '; }.rm-scene-summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: 14px; }.rm-scene-summary strong { font-size: 13px; }.rm-scene-summary p { font-size: 12px; color: var(--text-3); line-height: 1.7; margin: 4px 0 0; }.rm-scene-summary button { flex-shrink: 0; min-height: 44px; border: 0; background: none; color: var(--brand); padding: 8px 0 8px 8px; }.rm-detail { padding: 20px; margin: 0; border: 0; border-radius: 0; background: var(--card); }.rm-detail .rm-toggle,.rm-detail .rm-tune,.rm-detail .segmented button { min-height: 44px; }
 
 </style>

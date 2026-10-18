@@ -1,0 +1,72 @@
+[
+  {
+    "file": "wenkai-v1.530.zip",
+    "url": "https://gitcode.com/langgpt/LightRead/releases/download/reader-fonts-20261018/wenkai-v1.530.zip",
+    "sha256": "06390cbd800879e646058c03c53f9db9097b3076c7accb678c7631245e39b690"
+  },
+  {
+    "file": "wenkai-screen-v1.522.zip",
+    "url": "https://gitcode.com/langgpt/LightRead/releases/download/reader-fonts-20261018/wenkai-screen-v1.522.zip",
+    "sha256": "cd102eda7c5c12151c2689b32446c9d35543056cf374b960a23ffeff0420e1e4"
+  },
+  {
+    "file": "zhenkai-v0.825.zip",
+    "url": "https://gitcode.com/langgpt/LightRead/releases/download/reader-fonts-20261018/zhenkai-v0.825.zip",
+    "sha256": "e1e164a2d582033ff7efa7d8baf13d046409f916c6b90554e78b47da2c9d4d31"
+  },
+  {
+    "file": "iansui-main.zip",
+    "url": "https://gitcode.com/langgpt/LightRead/releases/download/reader-fonts-20261018/iansui-main.zip",
+    "sha256": "434aa98bf69e2fece1569e9b72c512e84d19d9d5d7e3fa76ba10ed032df87340"
+  },
+  {
+    "file": "zhuque-v0.212.zip",
+    "url": "https://gitcode.com/langgpt/LightRead/releases/download/reader-fonts-20261018/zhuque-v0.212.zip",
+    "sha256": "9197165bdcc674f3c2101a82daeb5666c90b178ab5f59581994cc3dfae4df44c"
+  },
+  {
+    "file": "source-serif-2.003R.zip",
+    "url": "https://gitcode.com/langgpt/LightRead/releases/download/reader-fonts-20261018/source-serif-2.003R.zip",
+    "sha256": "8bb174cf3db06c117164f08ace5d046df5779cc9ef5aeb515538942178dbbb14"
+  },
+  {
+    "file": "source-sans-2.005R.zip",
+    "url": "https://gitcode.com/langgpt/LightRead/releases/download/reader-fonts-20261018/source-sans-2.005R.zip",
+    "sha256": "36c3646300f447b964d7f29e841b76690bb5383fd5d7f9ebada97bef91baae87"
+  },
+  {
+    "file": "yozai-v0.868.zip",
+    "url": "https://gitcode.com/langgpt/LightRead/releases/download/reader-fonts-20261018/yozai-v0.868.zip",
+    "sha256": "0b5d3a135346035ca4b61e999fbad451810330b376bb9053b8c477b0213d7db8"
+  },
+  {
+    "file": "mashanzheng-master.zip",
+    "url": "https://gitcode.com/langgpt/LightRead/releases/download/reader-fonts-20261018/mashanzheng-master.zip",
+    "sha256": "4a1885ce2cfa4299ebb5cf1ac0babfece05033459aea3176b79d786a9c797344"
+  },
+  {
+    "file": "smiley-v2.0.1.zip",
+    "url": "https://gitcode.com/langgpt/LightRead/releases/download/reader-fonts-20261018/smiley-v2.0.1.zip",
+    "sha256": "fc784bf73b748d70e7c047a37b16a3f41d4377076085af5090dabb79d030fda4"
+  },
+  {
+    "file": "catalog.json",
+    "url": "https://gitcode.com/langgpt/LightRead/releases/download/reader-fonts-20261018/catalog.json",
+    "sha256": "6b4e3d14f6566a73fa6e766ba2cb5e7e28e77ef3e8c459d0bf3db7dbc5d5150b"
+  },
+  {
+    "file": "README.md",
+    "url": "https://gitcode.com/langgpt/LightRead/releases/download/reader-fonts-20261018/README.md",
+    "sha256": "a2bec09e3e483d5a9dc8e0c8016bcf5513dc5194741b53a558d2a5ac06863c0a"
+  },
+  {
+    "file": "verification.json",
+    "url": "https://gitcode.com/langgpt/LightRead/releases/download/reader-fonts-20261018/verification.json",
+    "sha256": "bb3d5042f3dd981acd8463ffd501a5342e545341d17d534ce109beab3dbddc57"
+  },
+  {
+    "file": "SHA256SUMS",
+    "url": "https://gitcode.com/langgpt/LightRead/releases/download/reader-fonts-20261018/SHA256SUMS",
+    "sha256": "cf2cbcbf6b7e4abe650d5682c4ed5c11e045da5e6a4b80942d6977ad64fa7fcb"
+  }
+]

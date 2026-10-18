@@ -14,15 +14,18 @@ try {
  await page.locator('input[type=file][multiple]').setInputFiles({name:'横竖屏验收.txt',mimeType:'text/plain',buffer:Buffer.from('第一章 窗口排版\n\n'+'窗外是一片安静的树林，读者沿着文字慢慢往下读。\n\n'.repeat(200))})
  await page.locator('.book-card',{hasText:'横竖屏验收'}).click()
  await page.waitForFunction(()=>document.querySelector('foliate-view')?.renderer?.getContents?.().length)
- await waitLayout('scrolled',1);let s=await state();assert.equal(s.reader.fontSize,18)
+ const mobile = await page.locator('.listen-entry').count() > 0
+ await waitLayout('scrolled',1);let s=await state();assert.equal(s.reader.fontSize,mobile ? 19 : 18)
  const initial=s.raw
  await page.setViewportSize({width:1280,height:800});await waitLayout('paginated',2);s=await state();assert.equal(s.reader.fontSize,20);assert.deepEqual(s.raw,initial)
  await page.setViewportSize({width:872,height:392});await waitLayout('paginated',1)
  await page.setViewportSize({width:392,height:872});await waitLayout('scrolled',1)
  await page.locator('.dock button',{hasText:'排版'}).click()
  const font=page.locator('.settings-pop input[type=number]');await font.fill('18');await font.dispatchEvent('change')
+ if (mobile) await page.getByRole('tab',{name:'页面',exact:true}).click()
  await page.locator('.tp-flows button').first().click();await waitLayout('paginated',1)
  await page.getByRole('button',{name:'双栏',exact:true}).click();await waitLayout('paginated',2)
+ if (mobile) await page.getByRole('tab',{name:'文字',exact:true}).click()
  await page.locator('.settings-pop input[type=range][aria-label="边距"]').fill('10')
  await page.locator('.tp-close').click()
  await page.setViewportSize({width:1280,height:800});await waitLayout('paginated',2);s=await state();assert.equal(s.reader.fontSize,18);assert.equal(s.reader.gap,10)
@@ -41,6 +44,10 @@ try {
   for(const theme of ['light','dark']) {
    await page.evaluate(theme=>document.documentElement.dataset.theme=theme,theme)
    for(const selector of ['.rm-speed-input','.rm-lines-input','.rm-position-input','.rm-time']) {
+    if (mobile && selector !== '.rm-time') {
+     const gear=page.locator(`[data-guide=${selector === '.rm-speed-input' ? 'auto' : 'lyric'}] .rm-gear`)
+     if(await gear.getAttribute('aria-expanded') !== 'true') await gear.click()
+    }
     const el=page.locator(selector).first();await el.scrollIntoViewIfNeeded()
     const metrics=await el.evaluate(e=>{const r=e.getBoundingClientRect(),s=getComputedStyle(e);return {height:r.height,width:r.width,border:s.borderStyle,font:parseFloat(s.fontSize),right:r.right,left:r.left}})
     assert(metrics.height>=44,JSON.stringify({selector,width,metrics}));assert.equal(metrics.border,'solid');assert(metrics.font>=16);assert(metrics.left>=0&&metrics.right<=width)

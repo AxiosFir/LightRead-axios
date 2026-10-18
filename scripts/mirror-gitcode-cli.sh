@@ -43,6 +43,24 @@ for k,v in json.load(sys.stdin)["headers"].items(): print(f"-H\n{k}: {v}")')
 
 "$GC" auth status >/dev/null 2>&1 || { echo "GitCode CLI 未登录: 先运行 gitcode auth login" >&2; exit 1; }
 
+# App 的源码在 Dev，不能由 release create 在 main 上隐式生成同名 tag。
+# 只使用已经同步且与 GitHub 相同的 tag；不移动已有 tag。
+TARGET_REF=main
+if [[ $TAG =~ ^app-v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+  TARGET_REF=$(node --input-type=module - "$GH_REPO" "$GC_REPO" "$TAG" <<'JS'
+import assert from 'node:assert/strict';
+import { remoteTagCommit } from './scripts/mirror-gitcode.mjs';
+const [github, gitcode, tag] = process.argv.slice(2);
+const expected = remoteTagCommit(`https://github.com/${github}.git`, tag);
+const actual = remoteTagCommit(`https://gitcode.com/${gitcode}.git`, tag);
+assert.ok(expected, `GitHub tag ${tag} 不存在`);
+assert.ok(actual, `请先将 ${tag} 同步到 GitCode，不能从 main 创建 App tag`);
+assert.equal(actual, expected, 'GitCode App tag 与 GitHub 提交不一致');
+console.log(actual);
+JS
+  )
+fi
+
 echo "下载 GitHub Release $TAG …"
 gh release download "$TAG" -R "$GH_REPO" -D "$WORK/assets"
 (cd "$WORK/assets" && sha256sum -c --quiet SHA256SUMS)
@@ -61,7 +79,7 @@ open(f"{work}/notes.md", "w", encoding="utf-8").write(
     f"{body}\n\n<!-- lightread-mirror-sizes {json.dumps(sizes, separators=(',', ':'))} -->\n")
 open(f"{work}/title", "w", encoding="utf-8").write(rel.get("name") or "")
 EOF
-  "$GC" release create "$TAG" -R "$GC_REPO" --target main -t "$(cat "$WORK/title")" -F "$WORK/notes.md" --no-interactive >/dev/null
+  "$GC" release create "$TAG" -R "$GC_REPO" --target "$TARGET_REF" -t "$(cat "$WORK/title")" -F "$WORK/notes.md" --no-interactive >/dev/null
 fi
 
 existing=$("$GC" api "repos/$GC_REPO/releases/tags/$TAG" --no-interactive | python3 -c 'import sys,json
@@ -86,7 +104,7 @@ else
 fi
 # GitCode 上只留最新版 (2026-10-05 用户要求): 本版本完整镜像并校验后, 删除比它旧的 vX.Y.Z Release。
 # 离线语音包 tts-models 不是版本号, 保留。KEEP_OLD=1 时跳过。
-if [[ ${KEEP_OLD:-0} != 1 ]]; then
+if [[ ${KEEP_OLD:-0} != 1 && $TAG =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
   old=$("$GC" api "repos/$GC_REPO/releases?per_page=100" --no-interactive | python3 -c 'import sys,json,re
 for r in json.load(sys.stdin):
     t = r.get("tag_name", "")

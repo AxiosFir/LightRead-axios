@@ -92,8 +92,13 @@ await context.route('**/__upload_e2e/**', async route => {
 })
 const dialog = page.getByRole('dialog', { name: '添加到私人书库' })
 async function openUpload() {
-  await page.locator('.import-caret').click()
-  await page.getByRole('menuitem', { name: '加入私人书库' }).click()
+  if (await page.locator('.add-fab').isVisible()) {
+    await page.locator('.add-fab').click()
+    await page.getByRole('dialog').getByRole('button', { name: /^加入私人书库/ }).click()
+  } else {
+    await page.locator('.import-caret').click()
+    await page.getByRole('menuitem', { name: '加入私人书库' }).click()
+  }
   await dialog.waitFor()
 }
 async function closeUpload() { await dialog.getByRole('button', { name: '关闭', exact: true }).click() }
@@ -117,14 +122,33 @@ try {
   await page.setInputFiles('input[type=file][multiple]', files)
   await page.waitForFunction(() => document.querySelectorAll('.book-card').length === 4, null, { timeout: 45_000 })
   const seeded = await page.evaluate(async () => {
-    const storage = await (await import('/src/storage/index.ts')).getStorage()
-    const books = await storage.listBooks(), lists = await storage.listBooklists()
-    const list = lists.find(x => x.name === '上传实测书单')
-    const members = await storage.listBooklistBookIds(list.id)
-    const epub = books.find(x => x.format === 'epub')
-    await storage.updateBook(epub.id, { pinnedAt: Date.now() })
-    const addSource = (title, path) => storage.addSource({ title, url: `${location.origin}/__upload_e2e/${path}`, kind: 'opds', builtin: false, addedAt: Date.now(), username: 'e2e-user', password: 'e2e-password' })
-    return { books, members, listId: list.id, writableId: await addSource('实测私人书库', 'opds'), readonlyId: await addSource('只读测试书源', 'readonly') }
+    // Seed private sources through IndexedDB so this runs against production
+    // bundles too; no dependency on Vite exposing source modules.
+    const db = await new Promise((resolve, reject) => {
+      const request = indexedDB.open('lightread')
+      request.onsuccess = () => resolve(request.result)
+      request.onerror = () => reject(request.error)
+    })
+    const all = store => new Promise((resolve, reject) => {
+      const request = db.transaction(store).objectStore(store).getAll()
+      request.onsuccess = () => resolve(request.result)
+      request.onerror = () => reject(request.error)
+    })
+    try {
+      const [rows, lists, items] = await Promise.all([all('books'), all('booklists'), all('booklistItems')])
+      const list = lists.find(x => x.name === '上传实测书单')
+      const members = items.filter(x => x.booklistId === list.id).map(x => x.bookId)
+      const epub = rows.find(x => x.format === 'epub')
+      const sources = ['opds', 'readonly'].map((path, i) => ({ id: crypto.randomUUID(), title: i ? '只读测试书源' : '实测私人书库', url: `${location.origin}/__upload_e2e/${path}`, kind: 'opds', builtin: false, addedAt: Date.now(), username: 'e2e-user', password: 'e2e-password' }))
+      await new Promise((resolve, reject) => {
+        const tx = db.transaction(['books', 'sources'], 'readwrite')
+        tx.objectStore('books').put({ ...epub, pinnedAt: Date.now() })
+        for (const source of sources) tx.objectStore('sources').put(source)
+        tx.oncomplete = resolve
+        tx.onabort = tx.onerror = () => reject(tx.error)
+      })
+      return { books: rows.map(({file, cover, ...book}) => book), members, listId: list.id, writableId: sources[0].id, readonlyId: sources[1].id }
+    } finally { db.close() }
   })
   assert.deepEqual(seeded.books.map(b => b.format).sort(), ['azw', 'azw3', 'epub', 'pdf'])
   assert.equal(seeded.members.length, 4, 'Imports must be added to the active booklist')
@@ -205,6 +229,8 @@ try {
   await noOverflow('mobile-library')
   await page.getByPlaceholder('搜索书名 / 作者 / 标签').fill(title)
   await page.waitForFunction(() => document.querySelectorAll('.book-card').length === 1)
+  const listActions = page.getByRole('button', { name: '书单操作', exact: true })
+  if (await listActions.isVisible()) await listActions.click()
   await page.getByRole('button', { name: '上传此书单', exact: true }).click()
   await page.waitForFunction(() => document.querySelectorAll('.upload-pending li').length === 4)
   await closeUpload()

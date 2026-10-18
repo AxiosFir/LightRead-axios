@@ -1,0 +1,29 @@
+{
+  "date": "2026-10-18",
+  "scope": "App-wide message components",
+  "reference": "docs/prototypes/lightread-mobile-v3.html: sheet and toast rules",
+  "style": "existing font and semantic tokens",
+  "layout": "one bottom message; full-message and confirmation sheets",
+  "files": [
+    "src/mobile/components/AppModal.vue",
+    "src/mobile/components/ConfirmHost.vue",
+    "src/mobile/components/ToastHost.vue",
+    "src/mobile/services/toast.ts",
+    "src/mobile/styles/main.css",
+    "src/mobile/overrides.json"
+  ],
+  "deletedFiles": [],
+  "checks": {
+    "queueAndBoundary": 8,
+    "browserLayouts": 32,
+    "booklistRegressionLayouts": 24,
+    "pannedViewportRegression": true
+  },
+  "deviceStatus": "Targeted MSG-01 through MSG-06 passed on K30; viewport fix passed on latest APK",
+  "deviceApk": "6b547e0d4e61add19821b03642649049b0973085404bf877e94cc8c0a77b1378",
+  "deviceEvidence": [
+    "/tmp/lightread-k30-full-20261018/messages-native-results.json",
+    "/tmp/lightread-k30-full-20261018/keyboard-native-results.json",
+    "/tmp/lightread-k30-full-20261018/booklists-remaining-results.json"
+  ]
+}

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { askConfirm } from '../../services/confirm.ts'
-import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { getStorage, type CatalogSourceRec, isTauri } from '../../storage/index.ts'
 import {
   discoverSearchTemplate, downloadToLibrary, fillSearchTemplate, forgetSearchTemplate, loadOpdsPage,
@@ -12,6 +12,7 @@ import {
   userOpdsSources, withTimeout, type ConnectionInfo,
 } from '../../services/privateLibrary.ts'
 import { readerPath } from '../../services/readerRoute.ts'
+import { canPickFolder } from '../../services/folderSource.ts'
 import { arxivRootPage, arxivSearchUrl, isArxivUrl, loadArxivPage } from '../../services/arxiv.ts'
 import {
   calibreAvailable, importCalibreBook, listCalibreBooks, pickCalibreLibrary,
@@ -42,13 +43,11 @@ import { useRoute, useRouter } from 'vue-router'
 import { toast } from '../../services/toast.ts'
 import { t } from '../../i18n/index.ts'
 import LibraryUploadDialog from '../../components/LibraryUploadDialog.vue'
+import AppModal from '../../components/AppModal.vue'
 import { libraryUploadTask } from '../../services/libraryUploadTask.ts'
 import { syncState } from '../../services/sync/index.ts'
 import { sourceKey } from '../../services/sync/merge.ts'
-import {
-  doubanSearchUrl, findMatchingBook, findQuery, yearLabel, type CuratedBook, type CuratedList,
-} from '../../services/booklists.ts'
-import { BUNDLED_CURATED, CURATED_LIST_PAGE, fetchCuratedLists } from '../../services/curatedBooklists.ts'
+
 
 const library = useLibrary()
 const settings = useSettings()
@@ -257,6 +256,31 @@ function githubErrorText(errors: Array<{ repo: string; message: string }>): stri
     : `GitHub: ${t('catalog.githubReposFailed', { n: errors.length })} ${messages.slice(0, 2).join('; ')}`
 }
 
+function clearSearchResults() {
+  uniPhilosophy.value = []
+  uniWendian.value = []
+  uniTextbook.value = []
+  uniArchive.value = []
+  uniOpenLibrary.value = []
+  uniErrors.value = []
+  uniGithub.value = []
+  uniGutenberg.value = []
+  uniArxiv.value = []
+  expandedGroups.clear()
+  myResults.value = []
+}
+
+watch(uniQuery, query => {
+  if (query.trim()) return
+  // Invalidating the session also prevents a slow previous request from restoring stale results.
+  uniSession++
+  uniSearching.value = false
+  uniSearched.value = false
+  uniActiveQuery.value = ''
+  clearSearchResults()
+  for (const key of UNI_SOURCES) uniStatus[key] = 'idle'
+})
+
 async function uniSearch() {
   const raw = uniQuery.value.trim()
   // 书名号、全角标点等统一成空格: 「《思考，快与慢》」与「思考 快与慢」等价
@@ -268,16 +292,7 @@ async function uniSearch() {
   uniActiveQuery.value = query
   uniSearching.value = true
   uniSearched.value = true
-  uniPhilosophy.value = []
-  uniWendian.value = []
-  uniTextbook.value = []
-  uniArchive.value = []
-  uniOpenLibrary.value = []
-  uniErrors.value = []
-  uniGithub.value = []
-  uniGutenberg.value = []
-  uniArxiv.value = []
-  expandedGroups.clear()
+  clearSearchResults()
   for (const key of UNI_SOURCES) uniStatus[key] = uniScopes[key] ? 'loading' : 'idle'
   const jobs: Promise<void>[] = []
   // 我的书库 (用户添加的 OPDS 书源) 各自独立搜索: 一个慢/失败不影响其它; 用原始关键词, 交给书库自己的搜索
@@ -440,96 +455,34 @@ async function uniDownloadPub(pub: OpdsPublication, acq: OpdsPublication['acquis
   }
 }
 
-// ---- 书单推荐: 自带 + 远程更新的精选书单; 详情里「找书」复用统一搜书, 结果显示在这本书下面 ----
-const curatedLists = ref<CuratedList[]>(BUNDLED_CURATED.lists)
-const curatedUpdated = ref(BUNDLED_CURATED.updated)
-const curatedFromRemote = ref(false)
-const curatedOpen = ref<CuratedList | null>(null)
-/** 正在「找书」的那本 (书单内序号); 统一搜书的结果区传送到它下面 */
-const findIndex = ref(-1)
-const findSlot = ref<HTMLElement | null>(null)
-const findSlots = new Map<number, HTMLElement>()
-const curatedSectionEl = ref<HTMLElement | null>(null)
-
-async function refreshCurated(force = false) {
-  const result = await fetchCuratedLists(force)
-  curatedLists.value = result.lists
-  curatedUpdated.value = result.updated
-  curatedFromRemote.value = result.fromRemote
-  if (curatedOpen.value) curatedOpen.value = result.lists.find(list => list.id === curatedOpen.value!.id) ?? curatedOpen.value
-  if (!force) return
-  if (result.fromRemote) toast(t('booklist.listsRefreshed', { n: result.lists.length, date: result.updated }), 'success')
-  else toast(t('booklist.listsRefreshFailed', { date: result.updated }), 'error', 5000)
-}
-
-const curatedTitle = (list: CuratedList) => (settings.language === 'en' && list.en?.title) || list.title
-const curatedDesc = (list: CuratedList) => (settings.language === 'en' && list.en?.description) || list.description
-const ownedBook = (book: CuratedBook) => findMatchingBook(book, library.books)
-const ownedCount = (list: CuratedList) => list.books.filter(book => ownedBook(book)).length
-const bookYear = (book: CuratedBook) => yearLabel(book.year, settings.language === 'en' ? 'en' : 'zh')
-
-function setFindSlot(index: number, el: unknown) {
-  if (el instanceof HTMLElement) findSlots.set(index, el)
-  else findSlots.delete(index)
-}
-
-function openCurated(list: CuratedList) {
-  curatedOpen.value = list
-  findIndex.value = -1
-  findSlot.value = null
-  scrollToTop()
-}
-
-function closeCurated() {
-  // 先把搜索结果区收回统一搜书卡片, 再卸载详情
-  findSlot.value = null
-  findIndex.value = -1
-  curatedOpen.value = null
-  void nextTick(() => curatedSectionEl.value?.scrollIntoView({ block: 'start' }))
-}
-
-/** 「找书」: 用书名 + 作者 (或外文原名) 跑统一搜书, 结果显示在这本书下面 */
-async function findCuratedBook(index: number, book: CuratedBook, original = false) {
-  findIndex.value = index
-  await nextTick()
-  findSlot.value = findSlots.get(index) ?? null
-  uniQuery.value = original && book.originalTitle
-    ? findQuery(book.originalTitle, book.originalAuthor ?? '')
-    : findQuery(book.title, book.author)
-  await uniSearch()
-}
-
-function closeFind() {
-  findSlot.value = null
-  findIndex.value = -1
-}
-
-function openOwned(book: CuratedBook) {
-  const owned = ownedBook(book)
-  if (owned) openLibraryBook(owned)
-}
-
-const addingCurated = ref(false)
-async function addCuratedToMine(list: CuratedList) {
-  if (addingCurated.value) return
-  addingCurated.value = true
-  try {
-    const result = await library.saveEntriesAsBooklist(curatedTitle(list), list.books)
-    const msg = result.linked || result.wanted
-      ? t('booklist.addedAll', { name: result.name, linked: result.linked, wanted: result.wanted })
-      : t('booklist.addedAllNothing', { name: result.name })
-    toast(msg, 'success', 6000, {
-      label: t('booklist.viewInLibrary'),
-      run: () => router.push({ path: '/library', query: { booklist: result.id } }),
-    })
-  } catch (e: any) {
-    toast(e?.message ?? t('common.unknownError'), 'error', 6000)
-  } finally {
-    addingCurated.value = false
-  }
-}
-
 const sources = ref<CatalogSourceRec[]>([])
+const scopeOpen = ref(false)
+const publicBrowse = ref<UniSource | null>(null)
+const sourceGroups = computed(() => [
+  { id: 'public', title: t('v2.publicSources'), items: sources.value.filter(s => s.builtin) },
+  { id: 'private', title: t('v2.privateLibraries'), items: sources.value.filter(s => !s.builtin) },
+])
+const searchScopeSummary = computed(() => [
+  ...publicScopeChips.value.filter(chip => uniScopes[chip.key]).map(chip => chip.name),
+  ...myLibraries.value.filter(s => myScopeOn(s.id)).map(s => s.title),
+].join(settings.language === 'en' ? ', ' : '、'))
+const mainPublicSources: UniSource[] = ['gutenberg', 'archive', 'arxiv', 'github']
+const extraPublicSources = computed(() => publicScopeChips.value.filter(chip => !mainPublicSources.includes(chip.key)))
+function openPublicSource(key: UniSource) {
+  const source = sources.value.find(s => s.builtin && (key === 'arxiv' ? s.kind === 'arxiv' : key === 'gutenberg' && s.kind !== 'arxiv'))
+  if (source) void openSource(source)
+  else publicBrowse.value = key
+}
+const ownBooklistCount = (id: string) => library.books.filter(book => (book.kind ?? 'book') === 'book' && (library.booklistBookIds[id] ?? []).includes(book.id)).length
+function searchPublicSource() {
+  if (!publicBrowse.value || !uniQuery.value.trim() || uniSearching.value) return
+  for (const key of UNI_SOURCES) uniScopes[key] = key === publicBrowse.value
+  for (const source of myLibraries.value) myScopes[source.id] = false
+  publicBrowse.value = null
+  scrollToTop()
+  void uniSearch()
+}
+
 /** 卡片上只显示主机名, 完整地址放在悬停提示里 */
 function hostOf(url: string) {
   try { return new URL(url).host || url } catch { return url }
@@ -543,11 +496,31 @@ const searchQuery = ref('')
 const downloading = ref<Set<string>>(new Set())
 const appendLoading = ref(false)
 
+// OPDS navigation is local component state, so Android Back must traverse it before leaving the page.
+watch(activeSource, (source, _previous, cleanup) => {
+  if (!source || !isTauri() || !/Android/i.test(navigator.userAgent)) return
+  let disposed = false
+  let unregister: (() => void) | undefined
+  cleanup(() => { disposed = true; unregister?.() })
+  void import('@tauri-apps/api/app').then(async ({ onBackButtonPress }) => {
+    if (disposed) return
+    const listener = await onBackButtonPress(() => {
+      if (disposed || !activeSource.value || document.querySelector('[data-app-modal]')) return
+      if (breadcrumbs.value.length > 1) void gotoCrumb(breadcrumbs.value.length - 2)
+      else backToSources()
+    })
+    if (disposed) await listener.unregister()
+    else unregister = () => { void listener.unregister() }
+  }).catch(error => console.warn('Catalog Back listener unavailable', error))
+})
+
 // 添加 / 编辑书源 (editingSource 非空为编辑)
 const showAdd = ref(false)
 const editingSource = ref<CatalogSourceRec | null>(null)
 const newTitle = ref('')
 const newUrl = ref('')
+const sourceFormError = ref('')
+watch(newUrl, () => { sourceFormError.value = '' })
 const newUsername = ref('')
 const newPassword = ref('')
 
@@ -747,8 +720,6 @@ watch(() => syncState.running, running => {
 onMounted(() => {
   refreshSources()
   refreshCommunity()
-  // 书单推荐 (设置 → 功能, 默认关): 关闭时不显示也不联网拉取
-  if (settings.features.recommendedBooklists) void refreshCurated()
   library.refresh()
   // 藏书页待找条目的「找书」: /catalogs?q=书名 作者
   const q = typeof route.query.q === 'string' ? route.query.q.trim() : ''
@@ -756,7 +727,7 @@ onMounted(() => {
     uniQuery.value = q
     void uniSearch()
   }
-  if (settings.calibrePath) refreshCalibre()
+  if (calibreAvailable() && canPickFolder() && settings.calibrePath) refreshCalibre()
 })
 
 // ---- Calibre 书库直读 (桌面版) ----
@@ -974,6 +945,14 @@ async function saveSource() {
   const split = splitUrlCredentials(newUrl.value)
   const url = split.url
   if (!url) return
+  try {
+    const address = new URL(url)
+    if (!['http:', 'https:'].includes(address.protocol) || !address.hostname) throw new Error('Invalid source URL')
+  } catch {
+    sourceFormError.value = t('v2.sourceUrlInvalid')
+    return
+  }
+  sourceFormError.value = ''
   const storage = await getStorage()
   const now = Date.now()
   const fields = {
@@ -1025,10 +1004,10 @@ async function removeSource(s: CatalogSourceRec) {
   <div ref="catalogEl" class="catalog">
     <!-- 书源列表 -->
     <template v-if="!activeSource">
-      <header v-show="!curatedOpen" class="page-head">
+      <header class="page-head">
         <div class="page-title">
           <h1>{{ t('catalog.title') }}</h1>
-          <p>{{ t('catalog.subtitle') }}</p>
+          <p>{{ t('v2.sourceSubtitle') }}</p>
         </div>
         <button class="btn btn-primary add-source-btn" :aria-label="t('catalog.add')" :title="t('catalog.add')" @click="openAdd">
           <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M11 13H5a1 1 0 1 1 0-2h6V5a1 1 0 1 1 2 0v6h6a1 1 0 1 1 0 2h-6v6a1 1 0 1 1-2 0v-6z"/></svg>
@@ -1037,7 +1016,7 @@ async function removeSource(s: CatalogSourceRec) {
       </header>
 
       <!-- 统一搜书: 找书是这一页的主要任务, 放在书源列表之前 -->
-      <section v-show="!curatedOpen" class="uni-section card" :aria-label="t('catalog.uniTitle')">
+      <section class="uni-section card" :aria-label="t('catalog.uniTitle')">
         <form class="uni-search" role="search" @submit.prevent="uniSearch">
           <div class="uni-field">
             <svg class="uni-field-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
@@ -1046,7 +1025,7 @@ async function removeSource(s: CatalogSourceRec) {
               class="uni-input"
               type="search"
               enterkeyhint="search"
-              :placeholder="t('catalog.uniPlaceholder')"
+              :placeholder="t('v2.sourceSearchPlaceholder')"
               :aria-label="t('catalog.uniTitle')"
             />
           </div>
@@ -1056,38 +1035,10 @@ async function removeSource(s: CatalogSourceRec) {
           </button>
         </form>
 
-        <div class="uni-scope-row">
-          <span class="uni-scope-label">{{ t('catalog.scopeLabel') }}</span>
-          <div class="uni-scopes">
-            <label
-              v-for="s in myLibraries"
-              :key="s.id"
-              class="check-chip mine"
-              :class="{ on: myScopeOn(s.id), disabled: uniSearching }"
-              :title="t('catalog.myLibraryScope', { title: s.title })"
-            >
-              <input :checked="myScopeOn(s.id)" :disabled="uniSearching" type="checkbox" @change="toggleMyScope(s.id, $event)" />
-              <svg class="chip-mark" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V20h14V9.5"/><path d="M10 20v-5h4v5"/></svg>
-              {{ s.title }}
-            </label>
-            <label
-              v-for="chip in publicScopeChips"
-              :key="chip.key"
-              class="check-chip"
-              :class="{ on: uniScopes[chip.key], disabled: uniSearching }"
-              :title="chip.title"
-            >
-              <input v-model="uniScopes[chip.key]" :disabled="uniSearching" type="checkbox" />
-              <svg class="chip-mark chip-check" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>
-              {{ chip.name }}
-            </label>
-          </div>
-        </div>
+        <div class="scope-summary"><p><span>{{ t('catalog.scopeLabel') }}：</span>{{ searchScopeSummary || t('catalog.chooseSearchSource') }}</p><button type="button" class="scope-choose" @click="scopeOpen = true">{{ t('v2.chooseScope') }}</button></div>
         <p v-if="!hasSearchScope" class="uni-hint warn" role="status">{{ t('catalog.chooseSearchSource') }}</p>
-        <p v-else-if="!uniSearched" class="uni-hint">{{ t('catalog.freeSearchHint') }}<template v-if="myLibraries.length"> {{ t('catalog.privateSearchHint') }}</template></p>
+        <p v-else-if="!uniSearched" class="uni-hint source-search-hint">{{ t('catalog.freeSearchHint') }}<template v-if="myLibraries.length"> {{ t('catalog.privateSearchHint') }}</template></p>
 
-        <!-- 书单详情里「找书」时, 下面的提示与结果区传送到那本书下面 (同一份结果, 不复制代码) -->
-        <Teleport :to="findSlot" :disabled="!findSlot">
         <div v-if="uniErrors.length" class="gh-notice" role="alert">
           <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path fill="currentColor" d="M10.3 3.9a2 2 0 0 1 3.4 0l8 13.6A2 2 0 0 1 20 20.5H4a2 2 0 0 1-1.7-3l8-13.6zM12 9a1 1 0 0 0-1 1v4a1 1 0 1 0 2 0v-4a1 1 0 0 0-1-1zm0 9.2a1.2 1.2 0 1 0 0-2.4 1.2 1.2 0 0 0 0 2.4z"/></svg>
           <ul class="source-errors">
@@ -1293,61 +1244,31 @@ async function removeSource(s: CatalogSourceRec) {
           </template>
           <p v-if="uniEmptySources.length && uniVisibleGroups.length" class="uni-empty-sources" role="status">{{ t('catalog.notFoundIn', { sources: uniEmptySources.join(settings.language === 'en' ? ', ' : '、') }) }}</p>
         </div>
-        </Teleport>
-      </section>
-
-      <!-- 书单推荐: 精选书单 (自带 + 远程更新) -->
-      <section v-if="settings.features.recommendedBooklists" v-show="!curatedOpen" ref="curatedSectionEl" class="cat-section curated-section">
-        <div class="section-head">
-          <div>
-            <h2>{{ t('booklist.curatedTitle') }}</h2>
-            <p class="section-desc">{{ t('booklist.curatedDesc') }}</p>
-          </div>
-          <div class="section-actions">
-            <button class="btn btn-sm" @click="refreshCurated(true)">{{ t('booklist.updateLists') }}</button>
-            <button class="btn btn-sm" @click="openBookWebsite(CURATED_LIST_PAGE)">{{ t('booklist.suggestList') }}</button>
-          </div>
-        </div>
-        <div class="curated-grid">
-          <button
-            v-for="list in curatedLists"
-            :key="list.id"
-            class="curated-card card"
-            :aria-label="t('booklist.openList', { title: curatedTitle(list) })"
-            @click="openCurated(list)"
-          >
-            <span class="curated-top">
-              <span class="source-icon curated-icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h12M8 12h12M8 18h12"/><path d="M4 6h.01M4 12h.01M4 18h.01" stroke-width="2.6"/></svg>
-              </span>
-              <span class="source-body">
-                <span class="source-title">{{ curatedTitle(list) }}</span>
-                <span class="source-url">{{ t('booklist.curatedBy', { curator: list.curator }) }}</span>
-              </span>
-              <svg class="source-chevron" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M9.3 6.3a1 1 0 0 1 1.4 0l5 5a1 1 0 0 1 0 1.4l-5 5a1 1 0 0 1-1.4-1.4L13.58 12 9.3 7.7a1 1 0 0 1 0-1.4z"/></svg>
-            </span>
-            <span v-if="curatedDesc(list)" class="curated-desc">{{ curatedDesc(list) }}</span>
-            <span class="curated-foot">
-              <span class="tag tag-muted">{{ t('booklist.bookCount', { n: list.books.length }) }}</span>
-              <span v-if="ownedCount(list)" class="tag curated-owned">{{ t('booklist.ownedCount', { n: ownedCount(list) }) }}</span>
-              <span v-for="tag in list.tags.slice(0, 2)" :key="tag" class="curated-tag">#{{ tag }}</span>
-            </span>
-          </button>
-        </div>
-        <p class="curated-updated">{{ t('booklist.updatedOn', { date: curatedUpdated }) }}{{ curatedFromRemote ? '' : t('catalog.communityBundled') }}</p>
       </section>
 
       <!-- 书库与目录 (内置 + 用户添加的 OPDS) -->
-      <section v-show="!curatedOpen" class="cat-section">
+      <section v-for="group in sourceGroups" :key="group.id" class="cat-section source-group" :data-source-group="group.id">
         <div class="section-head">
           <div>
-            <h2>{{ t('catalog.sourcesTitle') }}</h2>
-            <p class="section-desc">{{ t('catalog.sourcesDesc') }}</p>
+            <h2>{{ group.title }}</h2>
           </div>
         </div>
         <div class="source-grid">
+          <template v-if="group.id === 'public'">
+            <button v-for="key in mainPublicSources" :key="key" class="public-source-row main-public-source" @click="openPublicSource(key)">
+              <span class="source-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 5h7l2 2 2-2h7v14h-7l-2 2-2-2H3zM12 7v14" /></svg></span>
+              <strong>{{ uniSourceName(key) }}</strong><small>{{ t(`v2.sourceKind.${key}`) }}</small>
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m9 5 7 7-7 7" /></svg>
+            </button>
+            <details class="extra-public-sources"><summary>{{ t('v2.morePublicSources') }}</summary>
+              <button v-for="entry in extraPublicSources" :key="entry.key" class="public-source-row" @click="publicBrowse = entry.key">
+                <span class="source-body"><strong>{{ entry.name }}</strong><small>{{ entry.title || t('v2.searchThisPublicSource') }}</small></span>
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m9 5 7 7-7 7" /></svg>
+              </button>
+            </details>
+          </template>
           <div
-            v-for="s in sources"
+            v-for="s in group.id === 'private' ? group.items : []"
             :key="s.id"
             class="source-card card"
             :class="{ custom: !s.builtin }"
@@ -1391,7 +1312,7 @@ async function removeSource(s: CatalogSourceRec) {
               </span>
             </div>
           </div>
-          <button class="add-source-card" @click="openAdd">
+          <button v-if="group.id === 'private'" class="add-source-card" @click="openAdd">
             <span class="add-icon" aria-hidden="true">
               <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M11 13H5a1 1 0 1 1 0-2h6V5a1 1 0 1 1 2 0v6h6a1 1 0 1 1 0 2h-6v6a1 1 0 1 1-2 0v-6z"/></svg>
             </span>
@@ -1403,8 +1324,20 @@ async function removeSource(s: CatalogSourceRec) {
         </div>
       </section>
 
+      <section class="cat-section personal-booklists">
+        <div class="section-head"><h2>{{ t('v2.personalBooklists') }}</h2><router-link class="scope-choose" to="/library?view=booklists">{{ t('library.manage') }}</router-link></div>
+        <div v-if="library.booklists.length" class="personal-booklist-rows">
+          <router-link v-for="list in library.booklists" :key="list.id" class="personal-booklist-row" :to="{ path: '/library', query: { booklist: list.id } }">
+            <span class="source-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 5h5v15H4zM10 4h5v16h-5zM17 5l4 1-3 14-4-1" /></svg></span>
+            <span><strong>{{ list.name }}</strong><small>{{ t('library.bookCount', { count: ownBooklistCount(list.id) }) }}</small></span>
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m9 5 7 7-7 7" /></svg>
+          </router-link>
+        </div>
+        <div v-else class="personal-booklist-empty"><p>{{ t('v2.booklistsEmptyHint') }}</p><router-link class="btn" to="/library?view=booklists">{{ t('v2.organizeBooklists') }}</router-link></div>
+      </section>
+
       <!-- Calibre 书库直读 (桌面版) -->
-      <section v-if="calibreAvailable()" v-show="!curatedOpen" class="cat-section calibre-section">
+      <section v-if="calibreAvailable() && canPickFolder()" class="cat-section calibre-section">
         <div class="section-head">
           <div>
             <h2>{{ t('catalog.calibreTitle') }}</h2>
@@ -1453,8 +1386,9 @@ async function removeSource(s: CatalogSourceRec) {
         <div v-else-if="settings.calibrePath" class="empty"><p>{{ t('catalog.libraryEmpty') }}</p></div>
       </section>
 
+      <details class="catalog-secondary catalog-more"><summary>{{ t('v2.moreSourceTools') }}<span>{{ t('v2.moreSourceToolsHint') }}</span></summary>
       <!-- 更多下载网站 (外部浏览器) -->
-      <section v-show="!curatedOpen" class="cat-section web-sources">
+      <section class="cat-section web-sources">
         <div class="section-head">
           <div>
             <h2>{{ t('catalog.webSourcesTitle') }}</h2>
@@ -1474,7 +1408,7 @@ async function removeSource(s: CatalogSourceRec) {
       </section>
 
       <!-- GitHub 书库 (社区共建) -->
-      <section v-show="!curatedOpen" class="cat-section gh-section">
+      <section class="cat-section gh-section">
         <div class="section-head">
           <div>
             <h2>{{ t('catalog.ghListTitle') }}</h2>
@@ -1519,78 +1453,9 @@ async function removeSource(s: CatalogSourceRec) {
         </div>
       </section>
 
-      <!-- 推荐书单详情 -->
-      <template v-if="curatedOpen && settings.features.recommendedBooklists">
-        <header class="toolbar dir-toolbar">
-          <button class="btn btn-sm" @click="closeCurated">
-            <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M14.7 6.3a1 1 0 0 1 0 1.4L10.42 12l4.3 4.3a1 1 0 0 1-1.42 1.4l-5-5a1 1 0 0 1 0-1.4l5-5a1 1 0 0 1 1.42 0z"/></svg>
-            {{ t('common.back') }}
-          </button>
-          <nav class="crumbs" aria-label="Breadcrumb">
-            <button class="crumb" @click="closeCurated">{{ t('catalog.title') }}</button>
-            <span class="crumb-sep" aria-hidden="true">/</span>
-            <button class="crumb" @click="closeCurated">{{ t('booklist.curatedTitle') }}</button>
-            <span class="crumb-sep" aria-hidden="true">/</span>
-            <span class="crumb current" aria-current="page">{{ curatedTitle(curatedOpen) }}</span>
-          </nav>
-        </header>
+      </details>
 
-        <section class="curated-hero card">
-          <div class="curated-hero-main">
-            <h1>{{ curatedTitle(curatedOpen) }}</h1>
-            <p v-if="curatedDesc(curatedOpen)" class="curated-hero-desc">{{ curatedDesc(curatedOpen) }}</p>
-            <p class="curated-meta">
-              <span>{{ t('booklist.curatedBy', { curator: curatedOpen.curator }) }}</span>
-              <span aria-hidden="true">·</span>
-              <span>{{ t('booklist.bookCount', { n: curatedOpen.books.length }) }}</span>
-              <template v-if="ownedCount(curatedOpen)">
-                <span aria-hidden="true">·</span>
-                <span class="curated-owned-text">{{ t('booklist.ownedCount', { n: ownedCount(curatedOpen) }) }}</span>
-              </template>
-              <span aria-hidden="true">·</span>
-              <span>{{ t('booklist.updatedOn', { date: curatedOpen.updated }) }}</span>
-            </p>
-            <p class="curated-meta">
-              {{ t('booklist.source') }}
-              <button class="curated-link" @click="openBookWebsite(curatedOpen.source.url)">{{ curatedOpen.source.name }}</button>
-              <span aria-hidden="true">·</span>
-              <span>{{ curatedOpen.source.license }}</span>
-            </p>
-          </div>
-          <button class="btn btn-primary curated-add" :disabled="addingCurated" @click="addCuratedToMine(curatedOpen)">
-            <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M11 13H5a1 1 0 1 1 0-2h6V5a1 1 0 1 1 2 0v6h6a1 1 0 1 1 0 2h-6v6a1 1 0 1 1-2 0v-6z"/></svg>
-            {{ t('booklist.addAll') }}
-          </button>
-        </section>
 
-        <ol class="curated-books card">
-          <li v-for="(book, i) in curatedOpen.books" :key="`${curatedOpen.id}-${i}`" class="curated-book" :class="{ owned: !!ownedBook(book), finding: findIndex === i }">
-            <div class="curated-row">
-              <span class="curated-num" aria-hidden="true">{{ i + 1 }}</span>
-              <div class="uni-pub-main">
-                <span class="gh-name">{{ book.title }}<span v-if="book.originalTitle" class="curated-orig"> {{ book.originalTitle }}</span></span>
-                <span class="gh-meta">{{ book.author }}<template v-if="bookYear(book)"> · {{ bookYear(book) }}</template></span>
-                <span v-if="book.note" class="curated-note">{{ book.note }}</span>
-              </div>
-              <span class="uni-acts">
-                <template v-if="ownedBook(book)">
-                  <span class="tag curated-owned">{{ t('booklist.inLibrary') }}</span>
-                  <button class="btn btn-sm btn-primary" @click="openOwned(book)">{{ t('booklist.open') }}</button>
-                </template>
-                <template v-else>
-                  <button class="btn btn-sm btn-accent" :disabled="uniSearching && findIndex === i" :aria-expanded="findIndex === i" @click="findCuratedBook(i, book)">{{ t('booklist.find') }}</button>
-                  <button v-if="book.originalTitle" class="btn btn-sm" :disabled="uniSearching && findIndex === i" @click="findCuratedBook(i, book, true)">{{ t('booklist.findOriginal') }}</button>
-                </template>
-                <button class="btn btn-sm btn-ghost" :title="t('booklist.doubanTitle')" @click="openBookWebsite(doubanSearchUrl(book.title, book.author))">{{ t('booklist.douban') }}</button>
-              </span>
-            </div>
-            <div :ref="el => setFindSlot(i, el)" class="curated-find" />
-            <div v-if="findIndex === i" class="curated-find-foot">
-              <button class="btn btn-sm btn-ghost" @click="closeFind">{{ t('booklist.closeFind') }}</button>
-            </div>
-          </li>
-        </ol>
-      </template>
     </template>
 
     <!-- 目录浏览 -->
@@ -1690,10 +1555,42 @@ async function removeSource(s: CatalogSourceRec) {
       </template>
     </template>
 
+    <AppModal v-if="scopeOpen" :title="t('catalog.scopeLabel')" @close="scopeOpen = false">
+      <div class="source-scope-options">
+          <div class="uni-scopes">
+            <label
+              v-for="s in myLibraries"
+              :key="s.id"
+              class="check-chip mine"
+              :class="{ on: myScopeOn(s.id), disabled: uniSearching }"
+              :title="t('catalog.myLibraryScope', { title: s.title })"
+            >
+              <input :checked="myScopeOn(s.id)" :disabled="uniSearching" type="checkbox" @change="toggleMyScope(s.id, $event)" />
+              <svg class="chip-mark" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V20h14V9.5"/><path d="M10 20v-5h4v5"/></svg>
+              {{ s.title }}
+            </label>
+            <label
+              v-for="chip in publicScopeChips"
+              :key="chip.key"
+              class="check-chip"
+              :class="{ on: uniScopes[chip.key], disabled: uniSearching }"
+              :title="chip.title"
+            >
+              <input v-model="uniScopes[chip.key]" :disabled="uniSearching" type="checkbox" />
+              <svg class="chip-mark chip-check" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>
+              {{ chip.name }}
+            </label>
+          </div>
+      </div>
+      <template #footer><button class="btn btn-primary scope-done" @click="scopeOpen = false">{{ t('common.done') }}</button></template>
+    </AppModal>
+    <AppModal v-if="publicBrowse" :title="uniSourceName(publicBrowse)" :description="t('v2.searchThisPublicSource')" @close="publicBrowse = null">
+      <form class="public-source-search" @submit.prevent="searchPublicSource"><label for="public-source-query">{{ t('catalog.uniTitle') }}</label><input id="public-source-query" v-model="uniQuery" type="search" class="input" :placeholder="t('v2.sourceSearchPlaceholder')" /><button class="btn btn-primary" :disabled="!uniQuery.trim() || uniSearching">{{ t('library.ghSearch') }}</button></form>
+    </AppModal>
+
     <!-- 添加书源弹窗 -->
-    <div v-if="showAdd" class="modal-mask" @click.self="closeAdd" @keydown.esc="closeAdd">
-      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="add-source-title">
-        <h3 id="add-source-title">{{ editingSource ? t('catalog.editModalTitle') : t('catalog.addModalTitle') }}</h3>
+    <AppModal v-if="showAdd" :title="editingSource ? t('catalog.editModalTitle') : t('catalog.addModalTitle')" @close="closeAdd">
+      <div class="source-dialog-content">
         <div class="form-row">
           <label for="src-conn">{{ t('catalog.pasteConnection') }}</label>
           <textarea
@@ -1715,7 +1612,8 @@ async function removeSource(s: CatalogSourceRec) {
         </div>
         <div class="form-row">
           <label for="src-url">{{ t('catalog.opdsUrl') }}</label>
-          <input id="src-url" v-model="newUrl" class="input" type="url" inputmode="url" placeholder="https://example.com/opds" @paste="onConnectionPaste($event, true)" />
+          <input id="src-url" v-model="newUrl" class="input" type="url" inputmode="url" placeholder="https://example.com/opds" :aria-invalid="!!sourceFormError" :aria-describedby="sourceFormError ? 'src-url-error' : undefined" @paste="onConnectionPaste($event, true)" />
+          <p v-if="sourceFormError" id="src-url-error" class="conn-status error" role="alert">{{ sourceFormError }}</p>
         </div>
         <div class="form-row-pair">
           <div class="form-row">
@@ -1736,12 +1634,14 @@ async function removeSource(s: CatalogSourceRec) {
           <button class="btn btn-primary" :disabled="!newUrl.trim()" @click="saveSource">{{ editingSource ? t('common.save') : t('common.add') }}</button>
         </div>
       </div>
-    </div>
+    </AppModal>
     <LibraryUploadDialog v-if="uploadTarget" :source="uploadTarget" @close="uploadTarget = null" />
   </div>
 </template>
 
 <style scoped>
+.source-dialog-content { padding: 20px; }
+.source-dialog-content .btn { min-height: 44px; }
 .catalog {
   min-width: 0;
   overflow-wrap: anywhere;
@@ -2553,218 +2453,6 @@ async function removeSource(s: CatalogSourceRec) {
   margin-top: auto;
 }
 
-/* ---- 书单推荐 ---- */
-.curated-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 12px;
-}
-.curated-card {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 14px 14px 12px 16px;
-  font: inherit;
-  color: inherit;
-  text-align: left;
-  cursor: pointer;
-  transition:
-    box-shadow var(--dur) var(--ease),
-    border-color var(--dur) var(--ease),
-    transform var(--dur) var(--ease);
-}
-.curated-card:hover {
-  box-shadow: var(--shadow-md);
-  border-color: color-mix(in srgb, var(--brand) 30%, var(--border));
-  transform: translateY(-1px);
-}
-.curated-card:focus-visible {
-  outline: none;
-  box-shadow: var(--ring), var(--shadow-md);
-}
-.curated-card:hover .source-chevron {
-  color: var(--brand);
-  transform: translateX(2px);
-}
-.curated-top {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  min-width: 0;
-}
-.curated-icon {
-  background: var(--brand-soft);
-  color: var(--brand);
-}
-.curated-card .source-title {
-  display: block;
-}
-.curated-desc {
-  font-size: 13px;
-  line-height: 1.6;
-  color: var(--text-2);
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-.curated-foot {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 6px;
-  min-height: 22px;
-}
-.curated-foot .tag {
-  height: 20px;
-  font-size: 11px;
-}
-.curated-owned {
-  background: color-mix(in srgb, var(--success) 14%, transparent);
-  color: var(--success);
-}
-.curated-tag {
-  font-size: 12px;
-  color: var(--text-3);
-}
-.curated-updated {
-  margin-top: 10px;
-  font-size: 12px;
-  color: var(--text-3);
-}
-
-/* 书单详情 */
-.curated-hero {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px 24px;
-  flex-wrap: wrap;
-  padding: 18px 20px;
-  margin-bottom: 16px;
-}
-.curated-hero-main {
-  flex: 1 1 360px;
-  min-width: 0;
-}
-.curated-hero h1 {
-  font-size: 22px;
-  font-weight: 650;
-  letter-spacing: -0.01em;
-  line-height: 1.3;
-}
-.curated-hero-desc {
-  margin-top: 6px;
-  font-size: 14px;
-  line-height: 1.7;
-  color: var(--text-2);
-  max-width: 720px;
-}
-.curated-meta {
-  margin-top: 8px;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 4px 6px;
-  font-size: 12px;
-  color: var(--text-3);
-}
-.curated-owned-text {
-  color: var(--success);
-}
-.curated-link {
-  border: none;
-  background: none;
-  padding: 0;
-  font: inherit;
-  color: var(--brand);
-  cursor: pointer;
-}
-.curated-link:hover {
-  text-decoration: underline;
-}
-.curated-add {
-  flex-shrink: 0;
-}
-.curated-books {
-  list-style: none;
-  margin: 0;
-  padding: 6px;
-}
-.curated-book {
-  position: relative;
-  border-radius: var(--radius);
-}
-.curated-book + .curated-book::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 10px;
-  right: 10px;
-  border-top: 1px solid var(--border);
-}
-.curated-book.finding {
-  background: var(--surface-2);
-}
-.curated-book.finding::before,
-.curated-book.finding + .curated-book::before {
-  border-color: transparent;
-}
-.curated-row {
-  display: flex;
-  align-items: flex-start;
-  flex-wrap: wrap;
-  gap: 6px 14px;
-  padding: 11px 10px;
-}
-.curated-num {
-  flex-shrink: 0;
-  width: 24px;
-  padding-top: 1px;
-  font-size: 13px;
-  font-variant-numeric: tabular-nums;
-  color: var(--text-3);
-  text-align: right;
-}
-.curated-row .uni-pub-main {
-  flex: 1 1 240px;
-}
-.curated-row .uni-acts {
-  align-items: center;
-}
-.curated-orig {
-  margin-left: 6px;
-  font-size: 12px;
-  font-weight: 400;
-  color: var(--text-3);
-}
-.curated-note {
-  margin-top: 2px;
-  font-size: 13px;
-  line-height: 1.6;
-  color: var(--text-2);
-}
-.curated-book.owned .gh-name {
-  color: var(--text);
-}
-.curated-find:empty {
-  display: none;
-}
-.curated-find {
-  padding: 0 10px 4px 48px;
-}
-.curated-find .uni-results {
-  margin-top: 4px;
-}
-.curated-find .uni-group {
-  background: var(--card);
-}
-.curated-find-foot {
-  display: flex;
-  justify-content: flex-end;
-  padding: 0 10px 8px;
-}
-
 /* ---- 目录浏览 ---- */
 .toolbar {
   display: flex;
@@ -3019,8 +2707,7 @@ async function removeSource(s: CatalogSourceRec) {
   .empty-icon.spinner svg {
     animation-duration: 2.4s;
   }
-  .source-card:hover,
-  .curated-card:hover {
+  .source-card:hover {
     transform: none;
   }
 }
@@ -3087,31 +2774,8 @@ async function removeSource(s: CatalogSourceRec) {
     margin-top: 28px;
   }
   .source-grid,
-  .web-grid,
-  .curated-grid {
+  .web-grid {
     grid-template-columns: minmax(0, 1fr);
-  }
-  .curated-hero {
-    padding: 14px;
-  }
-  .curated-hero h1 {
-    font-size: 19px;
-  }
-  .curated-add {
-    width: 100%;
-    justify-content: center;
-  }
-  .curated-row {
-    padding: 10px 6px;
-  }
-  .curated-num {
-    width: 18px;
-  }
-  .curated-row .uni-acts {
-    margin-left: 32px;
-  }
-  .curated-find {
-    padding: 0 4px 4px;
   }
   .gh-row {
     flex-direction: column;
@@ -3302,36 +2966,6 @@ async function removeSource(s: CatalogSourceRec) {
     font-size: 13px;
   }
 
-  /* 书单推荐: 一行横滑 */
-  .curated-grid {
-    display: flex;
-    gap: 12px;
-    margin: 0 calc(-1 * var(--page-x));
-    padding: 2px var(--page-x) 6px;
-    overflow-x: auto;
-    scroll-snap-type: x mandatory;
-    scroll-padding-inline: var(--page-x);
-    scrollbar-width: none;
-  }
-  .curated-grid::-webkit-scrollbar {
-    display: none;
-  }
-  .curated-card {
-    flex: none;
-    width: 228px;
-    scroll-snap-align: start;
-    border: none;
-    box-shadow: var(--shadow-sm);
-  }
-  .curated-card .curated-desc {
-    -webkit-line-clamp: 2;
-  }
-  .curated-card .source-chevron {
-    display: none;
-  }
-  .curated-updated {
-    display: none;
-  }
 
   /* 书源 / 下载网站: 一张卡片里的分组列表 */
   .source-grid,
@@ -3444,4 +3078,70 @@ async function removeSource(s: CatalogSourceRec) {
   .source-card { box-shadow: none; border-color: transparent; border-radius: var(--radius-lg); }
 }
 
+
+/* Hallmark · approved v3 sources and personal lists · pre-emit critique: P4 H5 E4 S5 R5 V4 */
+.scope-summary { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-3); margin-top: var(--space-3); }
+.scope-summary p { min-width: 0; margin: 0; color: var(--text-3); font-size: 12px; line-height: 1.7; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.scope-choose { display: inline-flex; align-items: center; justify-content: center; flex: none; min-height: 44px; padding: 0 var(--space-2); border: 0; background: transparent; color: var(--brand); font-size: 14px; text-decoration: none; white-space: nowrap; cursor: pointer; }
+.source-scope-options { padding: var(--space-3); }
+.source-scope-options .uni-scopes { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-2); overflow: visible; }
+.source-scope-options .check-chip { justify-content: flex-start; min-height: 48px; border-radius: var(--radius); padding: var(--space-3); white-space: normal; }
+.scope-done { width: 100%; min-height: 44px; }
+.source-group .section-head { margin-bottom: var(--space-3); }
+.public-source-row { display: flex; align-items: center; gap: var(--space-3); width: 100%; min-height: 76px; padding: var(--space-3) var(--space-4); border: 0; border-top: 1px solid var(--border); background: transparent; color: var(--text); text-align: left; cursor: pointer; }
+.public-source-row > svg { flex: none; color: var(--text-3); }
+.public-source-row strong, .public-source-row small { display: block; }
+.public-source-row strong { font-size: 15px; font-weight: 600; }
+.public-source-row small { font-size: 12px; line-height: 1.5; margin-top: var(--space-1); color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.public-source-search { display: grid; gap: var(--space-3); padding: var(--space-4); }
+.public-source-search label { color: var(--text-2); font-size: 13px; }
+.public-source-search :is(input,button) { min-height: 44px; width: 100%; }
+.personal-booklist-rows { display: grid; gap: var(--space-3); }
+.personal-booklist-row { display: flex; align-items: center; gap: var(--space-4); padding: var(--space-4); border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--card); color: var(--text); text-decoration: none; }
+.personal-booklist-row > span:nth-child(2) { min-width: 0; flex: 1; }
+.personal-booklist-row strong { display: block; font-weight: 600; font-size: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.personal-booklist-row small { display: block; margin-top: var(--space-1); color: var(--text-3); }
+.personal-booklist-row > svg { flex: none; color: var(--text-3); }
+.personal-booklist-empty { padding: var(--space-4); border-radius: var(--radius-lg); background: var(--card); }
+.personal-booklist-empty p { margin: 0 0 var(--space-3); font-size: 14px; line-height: 1.7; color: var(--text-3); }
+.catalog-secondary { margin-top: var(--space-6); padding: var(--space-4); border: 1px solid var(--border); border-radius: var(--radius-lg); }
+.catalog-secondary > summary { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); min-height: 44px; color: var(--text); font-size: 16px; font-weight: 600; cursor: pointer; }
+.catalog-secondary > summary span { color: var(--text-3); font-size: 12px; font-weight: 400; }
+.catalog-secondary[open] > summary { margin-bottom: var(--space-4); }
+.catalog-secondary .section-head { flex-wrap: wrap; gap: var(--space-3); }
+.catalog-secondary .section-actions { flex-wrap: wrap; }
+.catalog-secondary button { white-space: nowrap; }
+.public-source-row:active, .personal-booklist-row:active { background: var(--surface-2); }
+.scope-choose:focus-visible, .public-source-row:focus-visible, .personal-booklist-row:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+@media (min-width: 721px) { .source-group .source-grid { display: block; overflow: clip; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--card); }.source-group .source-card { border: 0; border-radius: 0; box-shadow: none; }.source-group .add-source-card { width: 100%; } }
+
+
+/* Compact rows follow the approved prototype; every provider remains reachable. */
+.source-group .source-grid { border: 0; border-radius: var(--radius-lg); box-shadow: none; }
+.source-group .section-head h2, .personal-booklists .section-head h2 { font-size: 20px; }
+.public-source-row { min-height: 60px; padding: var(--space-3) var(--space-4); }
+.public-source-row:first-child { border-top: 0; }
+.main-public-source .source-icon { width: 20px; height: 24px; background: transparent; color: var(--text); }
+.main-public-source strong { min-width: 0; flex: 1; font-weight: 500; overflow-wrap: anywhere; }
+.main-public-source small { flex: none; margin: 0; font-size: 13px; }
+.extra-public-sources { border-top: 1px solid var(--border); }
+.extra-public-sources summary { min-height: 44px; padding: var(--space-3) var(--space-4); color: var(--text-3); font-size: 13px; cursor: pointer; }
+.personal-booklist-row { border-color: transparent; }
+.personal-booklist-row .source-icon { background: transparent; color: var(--text-2); }
+@media (max-width: 720px) {
+  .page-title p { display: block; margin-top: var(--space-2); color: var(--text-3); font-size: 13px; }
+  .add-source-btn { width: 44px; height: 44px; background: transparent; color: var(--text-2); box-shadow: none; border: 0; }
+  .uni-input { background: var(--surface-2); border-radius: var(--radius-pill); box-shadow: none; font-size: 14px; }
+  .uni-submit { background: transparent; color: var(--brand); }
+  .source-search-hint { display: none; }
+  .source-group { margin-top: var(--space-6); }
+  .source-group .add-source-card { min-height: 88px; justify-content: flex-start; padding: var(--space-4); color: var(--text); }
+  .add-source-card .add-text strong { color: var(--text); font-weight: 500; }
+  .add-source-card .add-text span { display: block; margin-top: var(--space-1); font-size: 12px; color: var(--text-3); }
+}
+@media (pointer: coarse) {
+  .btn, .btn-sm { min-height: 44px; }
+  .uni-input { min-height: 52px; }
+  .uni-submit { min-height: 44px; }
+}
 </style>

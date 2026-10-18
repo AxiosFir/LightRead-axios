@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { engineDensity } from '../services/dianjingDensity.ts'
 import AppSelect from '../../components/AppSelect.vue'
 import AppModal from '../../components/AppModal.vue'
 import BookCover from '../components/BookCover.vue'
@@ -26,13 +27,14 @@ import { EDGE_VOICES, edgeAvailable, playAudio } from '../../services/edgeTts.ts
 import { KOKORO_VOICES, DEFAULT_KOKORO_SID, kokoroVoiceLabel } from '../../services/kokoroVoices.ts'
 import { localPack, localTtsSynthesize, refreshLocalPack, localTtsAvailable } from '../services/localTts.ts'
 import LocalTtsPack from '../../components/LocalTtsPack.vue'
-import LevelSlider from '../../components/LevelSlider.vue'
+import TtsRateControl from '../components/TtsRateControl.vue'
+import AmbientEntry from '../components/AmbientEntry.vue'
 import { useReadingTimer } from '../../composables/useReadingTimer.ts'
 import { usePortraitView } from '../../composables/usePortraitView.ts'
 import { effectiveReaderLayout } from '../../services/portraitLayout.ts'
 import { autoReadMotion, autoSpeedKey, stepAutoSpeed } from '../../services/autoReadSpeed.ts'
 import { AutoScrollClock } from '../../services/autoScroll.ts'
-import { TTS_RATE_MAX, TTS_RATE_MIN, TTS_RATE_STOPS, rateText } from '../../services/ttsRate.ts'
+import { rateText } from '../../services/ttsRate.ts'
 import { toast } from '../../services/toast.ts'
 import { t } from '../../i18n/index.ts'
 import { matchesMQ, MQ } from '../../composables/useMediaQuery.ts'
@@ -153,7 +155,7 @@ function openModes() {
 }
 
 /** 手机端抽屉打开时显示遮罩 (桌面端遮罩由 CSS 隐藏) */
-const sheetOpen = computed(() => panel.value !== 'none' || settingsOpen.value || ttsPanel.value || modes.panelOpen.value || ambientPanel.value)
+const sheetOpen = computed(() => panel.value !== 'none' || settingsOpen.value || ttsPanel.value || modes.panelOpen.value || ambientPanel.value || dj.overlayOpen.value)
 
 // ---- 一键全屏沉浸 ----
 const isFullscreen = ref(false)
@@ -210,10 +212,22 @@ const ttsFailure = ref(false)
 const ttsEnded = ref(false)
 const listenToc = ref(false)
 const listenQuote = computed(() => currentListenKey.value ? listenTexts.get(currentListenKey.value) || '' : listenBookmark.value?.snippet || '')
-const listenChapter = computed(() => listenDetached.value ? listenBookmark.value?.chapter || chapterLabel.value : chapterLabel.value)
+const listenPosition = shallowRef<{ index: number; fraction: number } | null>(null)
+const listenFraction = computed(() => ttsState.value !== 'stopped' && listenPosition.value ? listenPosition.value.fraction : fraction.value)
+const listenPercent = computed(() => `${(listenFraction.value * 100).toFixed(1)}%`)
+const listenChapter = computed(() => {
+  void tocFractionsReady.value
+  const pos = listenPosition.value
+  return ttsState.value !== 'stopped' && pos ? chapterAtFraction(pos.fraction, pos.index) || chapterLabel.value : chapterLabel.value
+})
 const ttsStatus = computed(() => unavailableVoice.value || (ttsFailure.value ? t('tts.error') : ttsBuffering.value ? t('tts.buffering') : ttsState.value === 'playing' ? t('tts.reading') : ttsState.value === 'paused' ? t('tts.paused') : ttsEnded.value ? t('tts.bookFinished') : t('v2.listenReady')))
 const unavailableVoice = computed(() => settings.ttsEngine === 'local' && !localTtsAvailable() ? t('tts.localUnsupported') : (settings.ttsEngine === 'system' || !edgeAvailable()) && !systemSpeechAvailable() ? t('tts.systemUnsupported') : '')
-const voiceSummary = computed(() => !edgeAvailable() || settings.ttsEngine === 'system' ? t('tts.engineSystem') : settings.ttsEngine === 'local' ? t('tts.engineLocal') : t('tts.engineEdge'))
+const voiceSummary = computed(() => {
+  if (!edgeAvailable() || settings.ttsEngine === 'system') return settings.ttsVoice || t('tts.engineSystem')
+  if (settings.ttsEngine === 'edge') return EDGE_VOICES.find(v => v.id === settings.edgeVoice)?.label.split(' · ')[0] || t('tts.engineEdge')
+  const voice = KOKORO_VOICES.find(v => v.sid === settings.localVoiceId)
+  return voice ? kokoroVoiceLabel(voice, settings.language === 'en' ? 'en' : 'zh').split(' · ')[0] : t('tts.engineLocal')
+})
 function openListenToc() { closeOverlays(); listenToc.value = true; panel.value = 'toc' }
 function openListenLyrics() { ttsPanel.value = false; void modes.startLyric('tts') }
 
@@ -222,9 +236,7 @@ const ambientPanel = ref(false)
 const ambient = useAmbient()
 
 function toggleAmbientPanel() {
-  const next = !ambientPanel.value
-  closeOverlays()
-  ambientPanel.value = next
+  ambientPanel.value = !ambientPanel.value
 }
 
 async function showAmbientSources() {
@@ -1123,6 +1135,15 @@ const listenEta = computed(() => {
   const p = pageInfo.value
   if (!p || fixedLayout.value || !charsPerPage.value) return null
   const cps = paceCps(pace.value, settings.ttsRate, bookCjk.value)
+  if (ttsState.value !== 'stopped' && listenPosition.value) {
+    void tocFractionsReady.value
+    const f = listenFraction.value
+    const end = tocFractions.find(item => item.fraction > f + 1e-6)?.fraction ?? 1
+    return {
+      chapter: Math.max(0, end - f) * p.total * charsPerPage.value / cps,
+      book: Math.max(0, 1 - f) * p.total * charsPerPage.value / cps,
+    }
+  }
   // 当前这一屏按读了一半算
   const chapterPages = (chapterLeft.value ?? p.sectionLeft) + (p.last - p.current + 1) / 2
   const bookPages = p.total - p.last + (p.last - p.current + 1) / 2
@@ -1163,6 +1184,17 @@ const chapterProgress = computed(() => {
     else { end = item.fraction; break }
   }
   return end > start ? Math.min(1, Math.max(0, (f - start) / (end - start))) : null
+})
+
+const listenChapterProgress = computed(() => {
+  void tocFractionsReady.value
+  const f = listenFraction.value
+  let start = 0, end = 1
+  for (const item of tocFractions) {
+    if (item.fraction <= f + 1e-6) start = item.fraction
+    else { end = item.fraction; break }
+  }
+  return end > start ? Math.min(1, Math.max(0, (f - start) / (end - start))) : 0
 })
 
 watch(() => ttsState.value !== 'stopped' || ttsPanel.value, on => {
@@ -1210,7 +1242,32 @@ const currentListenKey = ref('')
 /** 每个已渲染分节文档一个句子游标 (跨章连续滚动时同时有多个文档) */
 const slotCursors = new WeakMap<Document, SentenceCursor>()
 const offscreenDocs = new Map<number, Document>()
-const listenTexts = new Map<string, string>()
+const listenTexts = reactive(new Map<string, string>())
+const listenPositions = new Map<string, { index: number; fraction: number }>()
+// Text-node offsets are indexed once per document. Progress must follow the
+// spoken sentence even while the reader browses a different page or chapter.
+const listenOffsets = new WeakMap<Document, { offsets: WeakMap<Node, number>; length: number }>()
+function rememberListenPosition(key: string, index: number, range: Range | null) {
+  const doc = range?.startContainer.ownerDocument
+  if (!range || !doc?.body) return
+  let entry = listenOffsets.get(doc)
+  if (!entry) {
+    entry = { offsets: new WeakMap(), length: 0 }
+    const walker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT)
+    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+      entry.offsets.set(node, entry.length)
+      entry.length += node.textContent?.length ?? 0
+    }
+    listenOffsets.set(doc, entry)
+  }
+  const offset = entry.offsets.get(range.startContainer)
+  const total = secSizes.reduce((a, b) => a + b, 0)
+  if (offset == null || !entry.length || !total) return
+  const ratio = Math.min(1, (offset + range.startOffset) / entry.length)
+  const before = secSizes.slice(0, index).reduce((a, b) => a + b, 0)
+  listenPositions.set(key, { index, fraction: (before + ratio * secSizes[index]!) / total })
+  if (listenPositions.size > 400) listenPositions.delete(listenPositions.keys().next().value!)
+}
 /** 本次会话离线合成跟不上的次数; 达到 2 次在面板上给出「改用在线模型」 */
 let localStutters = 0
 const localTooSlow = ref(false)
@@ -1225,7 +1282,9 @@ let listenChain: Promise<void> = Promise.resolve()
 let lastSentenceStart: { key: string; at: number; pausedBefore: number } | null = null
 
 const listenPlayer = new ListenPlayer({
+  canUseSystemSpeech: systemSpeechAvailable,
   onSentenceStart: key => {
+    listenPosition.value = listenPositions.get(key) ?? null
     // 定时到了句子边界 (听完本章 / 系统语音读完这句): 下一句一开口就停, 不读半句
     if (sleepStopsBefore(key)) sleepPause()
     // 定时器在后台 / 熄屏时可能被节流: 每句开头也对一下表
@@ -1337,6 +1396,7 @@ function makeFeed(startIndex: number, startPos: CursorPos | null): ListenFeed {
         const sectionEnd = paragraphEnd && cur.peek(1).length === 0
         const key = `${index}:${block}:${sentence}`
         rememberText(key, text)
+        rememberListenPosition(key, index, cur.current())
         return { key, text, paragraphEnd, sectionEnd }
       }
       return null
@@ -1563,8 +1623,9 @@ function saveBookmarkFor(key: string) {
     if (!range) return
     let cfi = ''
     try { cfi = view.getCFI(index, range) } catch { return }
-    // 翻到别处时页面上的章名不是朗读处的, 沿用上一次的
-    const chapter = listenDetached.value ? (listenBookmark.value?.chapter ?? chapterLabel.value) : chapterLabel.value
+    // 用该句对应的章名保存断点，独立浏览不会改写听书书签的章节。
+    const position = listenPositions.get(key)
+    const chapter = position ? chapterAtFraction(position.fraction, position.index) : listenChapter.value
     const mark: ListenBookmark = { cfi, chapter, snippet: c.text(range).slice(0, 28), at: Date.now() }
     listenBookmark.value = mark
     saveListenBookmark(bookId, mark)
@@ -1711,6 +1772,9 @@ function restartCurrentSentence() {
 let restartOnResume = false
 
 function finishListenSession() {
+  clearTimeout(skipTimer)
+  skipTarget = null
+  listenPosition.value = null
   restartOnResume = false
   ttsState.value = 'stopped'
   ttsBuffering.value = false
@@ -1750,6 +1814,9 @@ async function skipListen(kind: 'sentence' | 'paragraph', dir: 1 | -1) {
   restartOnResume = false
   reanchorSleep()
   const nextKey = `${index}:${c.pos.block}:${c.pos.sentence}`
+  rememberText(nextKey, c.text())
+  rememberListenPosition(nextKey, index, c.current())
+  listenPosition.value = listenPositions.get(nextKey) ?? null
   currentListenKey.value = nextKey
   listenSteerAt = -Infinity
   if (!loadedContent(index)) await goToListenSection(index, c.pos)
@@ -1760,6 +1827,13 @@ async function skipListen(kind: 'sentence' | 'paragraph', dir: 1 | -1) {
     const target = skipTarget
     skipTarget = null
     if (!target || ttsState.value === 'stopped') return
+    // Seeking while paused only moves the cursor. Resume must synthesize the
+    // newly selected sentence instead of continuing the old buffered audio.
+    if (ttsState.value === 'paused') {
+      restartOnResume = true
+      updateMediaSession()
+      return
+    }
     ttsState.value = 'playing'
     lastSentenceStart = null
     listenPlayer.play(makeFeed(target.index, target.pos))
@@ -1831,7 +1905,6 @@ watch(() => [settings.ttsEngine, settings.ttsRate, settings.edgeVoice, settings.
 
 /** 语速显示: 1.0× / 1.25× / 0.75× (用乘号, 不用字母 x) */
 /** 语速档位: 1.0× 标「正常」; 其余两档之间可以拖 (步长 0.05) */
-const rateStops = computed(() => TTS_RATE_STOPS.map(v => ({ value: v, label: v === 1 ? t('tts.rateNormal') : rateText(v) })))
 
 // ---- 定时关闭: 15 / 30 分钟、1 小时, 或听完本章 ----
 // 到点前 3 秒开始淡出, 到点停在暂停 (不是停止, 进度和断点都在), Toast 可一键「再听 15 分钟」。
@@ -1869,7 +1942,7 @@ function setSleep(mode: SleepMode) {
     sleepAt.value = Date.now() + mode * 60000
     sleepTimer = setTimeout(() => void sleepNow(), mode * 60000 - SLEEP_FADE_SECONDS * 1000)
   } else if (mode === 'chapter' && currentListenKey.value && ttsState.value !== 'stopped') {
-    sleepChapter = currentTocHref.value ?? chapterLabel.value
+    sleepChapter = listenChapter.value
     sleepSection = parseKey(currentListenKey.value).index
   }
   // 还没开始听: 从听到的第一句所在的章算起 (sleepStopsBefore 里补上)
@@ -1935,9 +2008,12 @@ function sleepStopsBefore(key: string): boolean {
   const { index } = parseKey(key)
   if (sleepSection == null) {
     sleepSection = index
-    sleepChapter = currentTocHref.value ?? chapterLabel.value
+    sleepChapter = listenChapter.value
     return false
   }
+  // TXT/HTML can contain several chapters in one spine section. Compare the
+  // spoken chapter as well, including when following the text is detached.
+  if (sleepChapter && listenChapter.value && listenChapter.value !== sleepChapter) return true
   if (index === sleepSection) return false
   if (isChapterStart(index)) return true
   sleepSection = index
@@ -1962,11 +2038,8 @@ function sleepPause() {
   })
 }
 
-// 同一分节里换了章 (一个文件里有好几章): 视图跟着朗读进入新章时停下, 继续时从新章这句开头读
-watch([currentTocHref, chapterLabel], () => {
-  if (sleepMode.value !== 'chapter' || ttsState.value !== 'playing' || listenDetached.value || sleepChapter === undefined) return
-  if ((currentTocHref.value ?? chapterLabel.value) !== sleepChapter) sleepPause()
-})
+// Chapter sleep is checked against spoken positions in sleepStopsBefore;
+// browsing another chapter must neither stop playback nor move the timer.
 
 /** 定时徽标: 「23:40 停止」/「听完本章停止」 */
 const sleepText = computed(() => {
@@ -2370,7 +2443,8 @@ async function addHighlight(color: string, withNote = false) {
 async function saveNote() {
   if (!activeAnnotation.value) return
   const storage = await getStorage()
-  const note = noteDraft.value.trim() || undefined
+  // Persist an empty string when clearing a saved note; undefined means no update.
+  const note = noteDraft.value.trim()
   await storage.updateAnnotation(activeAnnotation.value.id, { note })
   activeAnnotation.value.note = note
   const item = annotations.value.find(a => a.id === activeAnnotation.value!.id)
@@ -2564,7 +2638,12 @@ const jumpOpen = ref(false)
 const jumpText = ref('')
 const jumpError = ref('')
 const jumpInputEl = ref<HTMLInputElement>()
-const jumpPopEl = ref<HTMLElement>()
+const jumpMode = ref<'page' | 'percent'>('page')
+function setJumpMode(mode: 'page' | 'percent') {
+  jumpMode.value = mode
+  jumpText.value = String(mode === 'page' ? pageInfo.value?.current ?? 1 : Number((fraction.value * 100).toFixed(1)))
+  jumpError.value = ''
+}
 /** 跳转前的位置; 有值时底栏上方出现「回到第 N 页」 */
 const jumpBack = ref<{ cfi: string; label: string } | null>(null)
 let jumpBackTimer: ReturnType<typeof setTimeout> | undefined
@@ -2582,22 +2661,10 @@ function toggleJump() {
   closeOverlays()
   jumpOpen.value = next
   if (!next) return
-  jumpText.value = ''
-  jumpError.value = ''
+  setJumpMode('page')
   showBars()
   void nextTick(() => jumpInputEl.value?.focus())
 }
-
-/** 点浮层以外的地方收起 (桌面端没有遮罩) */
-function onJumpOutside(e: PointerEvent) {
-  const el = e.target as Node
-  if (jumpPopEl.value?.contains(el) || (el as HTMLElement).closest?.('.progress-label')) return
-  jumpOpen.value = false
-}
-watch(jumpOpen, open => {
-  if (open) document.addEventListener('pointerdown', onJumpOutside, true)
-  else document.removeEventListener('pointerdown', onJumpOutside, true)
-})
 
 async function jumpTo(target: { fraction: number } | number) {
   if (!view) return
@@ -2621,7 +2688,7 @@ async function jumpTo(target: { fraction: number } | number) {
 
 async function confirmJump() {
   const total = pageInfo.value?.total ?? 0
-  const parsed = parseJumpInput(jumpText.value, total)
+  const parsed = parseJumpInput(jumpMode.value === 'percent' && !jumpText.value.includes('%') ? jumpText.value + '%' : jumpText.value, total)
   if (!parsed) {
     jumpError.value = t('reader.jumpInvalid', { total: total || 1 })
     return
@@ -2637,7 +2704,7 @@ async function confirmJump() {
     target = f == null ? null : { fraction: f }
   }
   if (target == null) return
-  jumpOpen.value = false
+  jumpError.value = ''
   await jumpTo(target)
 }
 
@@ -2682,6 +2749,7 @@ lateModes.value = modes
 
 // ---- 点睛阅读 (docs/dianjing-reading.md) ----
 const dj = useDianjing({
+  densityAmount: () => engineDensity(settings.dianjing),
   getView: () => view,
   goToText: cfi => goToText(cfi),
   bookId,
@@ -2800,8 +2868,8 @@ watch(() => modes.progressActive.value, on => {
 
 function resetAutoScrollClock() { autoClock.reset() }
 
-watch(() => [panel.value, settingsOpen.value, ttsPanel.value, modes.panelOpen.value, ambientPanel.value], async (_state, _old, cleanup) => {
-  if (!sheetOpen.value || !matchesMQ(MQ.phone)) return
+watch(() => [panel.value, settingsOpen.value, ttsPanel.value, modes.panelOpen.value, ambientPanel.value, dj.consentOpen.value, dj.card.value, dj.outlineOpen.value, dj.skimOpen.value], async (_state, _old, cleanup) => {
+  if (!sheetOpen.value) return
   let disposed = false
   const previous = document.activeElement as HTMLElement | null
   const held: Array<[HTMLElement, boolean]> = []
@@ -2823,7 +2891,7 @@ watch(() => [panel.value, settingsOpen.value, ttsPanel.value, modes.panelOpen.va
   await nextTick()
   if (disposed) return
   const root = document.querySelector('.reader')
-  dialog = root?.querySelector<HTMLElement>('.settings-pop, .rm-panel, .tts-panel, .panel, .ambient-panel') ?? null
+  dialog = root?.querySelector<HTMLElement>('.dj-consent, .dj-card, .dj-outline, .dj-skim, .settings-pop, .rm-panel, .tts-panel, .panel, .ambient-panel') ?? null
   if (!dialog) return
   dialog.setAttribute('role', 'dialog'); dialog.setAttribute('aria-modal', 'true'); dialog.tabIndex = -1
   root?.querySelectorAll<HTMLElement>(':scope > .content, :scope > .bar, :scope > .listen-entry').forEach(el => { held.push([el, el.inert]); el.inert = true })
@@ -2975,7 +3043,6 @@ onBeforeUnmount(() => {
   clearTimeout(tocFractionTimer)
   clearInterval(nowTimer)
   clearInterval(twClockTimer)
-  document.removeEventListener('pointerdown', onJumpOutside, true)
   if (pageMeasure.key) {
     try { localStorage.setItem(PAGE_MEASURE_KEY, JSON.stringify(pageMeasure)) } catch { /* 忽略 */ }
   }
@@ -3110,6 +3177,20 @@ onBeforeUnmount(() => {
 
     <!-- 底栏: 章节跳转 + 进度; 手机端下方再加一排常用入口 (目录 / 笔记 / 听书 / 自动 / 排版) -->
     <footer class="bar bottom" :class="{ hidden: !barsVisible }" @mouseenter="cancelBarsTimer">
+      <div class="progress-meta"><span class="progress-chapter">{{ chapterLabel || meta?.title }}</span>        <button
+          class="percent progress-label"
+          :class="{ active: jumpOpen }"
+          :title="t('reader.jumpTo')"
+          :aria-label="`${t('reader.jumpTo')} · ${progressText}`"
+          :aria-expanded="jumpOpen"
+          @click="toggleJump"
+        >
+          <span v-if="showPage" class="page-number">
+            <b>{{ pageRangeText }}</b><span class="of">/{{ pageInfo!.total }}</span>
+          </span>
+          <span v-if="showPage && showPercent" class="sep" aria-hidden="true">·</span>
+          <span v-if="showPercent" class="pct">{{ percentText }}</span>
+        </button></div>
       <div class="progress-row">
         <button class="icon-btn chapter-btn" :title="t('reader.prevChapter')" :aria-label="t('reader.prevChapter')" @click="gotoChapter(-1)">
           <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M18.7 5.3a1 1 0 0 1 0 1.4L13.42 12l5.3 5.3a1 1 0 0 1-1.42 1.4l-6-6a1 1 0 0 1 0-1.4l6-6a1 1 0 0 1 1.42 0zM7 5a1 1 0 0 1 1 1v12a1 1 0 1 1-2 0V6a1 1 0 0 1 1-1z"/></svg>
@@ -3141,20 +3222,7 @@ onBeforeUnmount(() => {
         <button class="icon-btn chapter-btn" :title="t('reader.nextChapter')" :aria-label="t('reader.nextChapter')" @click="gotoChapter(1)">
           <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M5.3 5.3a1 1 0 0 1 1.4 0l6 6a1 1 0 0 1 0 1.4l-6 6a1 1 0 0 1-1.4-1.4l5.29-5.3-5.3-5.3a1 1 0 0 1 0-1.4zM17 5a1 1 0 0 1 1 1v12a1 1 0 1 1-2 0V6a1 1 0 0 1 1-1z"/></svg>
         </button>
-        <button
-          class="percent progress-label"
-          :class="{ active: jumpOpen }"
-          :title="t('reader.jumpTo')"
-          :aria-label="`${t('reader.jumpTo')} · ${progressText}`"
-          :aria-expanded="jumpOpen"
-          @click="toggleJump"
-        >
-          <template v-if="showPage">
-            <b>{{ pageRangeText }}</b><span class="of">/{{ pageInfo!.total }}</span>
-          </template>
-          <span v-if="showPage && showPercent" class="sep" aria-hidden="true">·</span>
-          <span v-if="showPercent" class="pct">{{ percentText }}</span>
-        </button>
+
       </div>
       <nav class="dock" :aria-label="t('reader.readerTools')">
         <button :class="{ active: panel === 'toc' }" @click="togglePanel('toc')">
@@ -3188,40 +3256,27 @@ onBeforeUnmount(() => {
     <!-- 手机端面板为底部抽屉, 点遮罩收起 -->
     <div v-if="sheetOpen" class="sheet-scrim" aria-hidden="true" @click="closeOverlays" />
 
-    <!-- 跳页: 输入页码或百分比 -->
-    <div
-      v-if="jumpOpen"
-      ref="jumpPopEl"
-      class="jump-pop card"
-      role="dialog"
-      :aria-label="t('reader.jumpTo')"
-    >
-      <form class="jump-form" @submit.prevent="confirmJump">
-        <input
-          ref="jumpInputEl"
-          v-model="jumpText"
-          class="input jump-input"
-          inputmode="decimal"
-          enterkeyhint="go"
-          autocomplete="off"
-          :placeholder="t('reader.jumpPlaceholder')"
-          :aria-label="t('reader.jumpPlaceholder')"
-          :aria-invalid="!!jumpError"
-          @input="jumpError = ''"
-          @keydown.esc.prevent="jumpOpen = false"
-        />
-        <span v-if="pageInfo" class="jump-total">/ {{ pageInfo.total }}</span>
-        <button class="btn btn-primary btn-sm" type="submit">{{ t('reader.jumpGo') }}</button>
-      </form>
-      <p v-if="jumpError" class="jump-meta error" role="alert">{{ jumpError }}</p>
-      <template v-else>
-        <p v-if="jumpMeta" class="jump-meta">{{ jumpMeta }}</p>
+    <AppModal v-if="jumpOpen" :title="t('reader.progress')" @close="jumpOpen = false">
+      <section class="jump-pop progress-settings">
+        <div class="jump-overview"><div><small>{{ t('v2.allBookProgress') }}</small><strong>{{ percentText }}</strong></div><span>{{ jumpMeta }}</span></div>
+        <p class="jump-chapter">{{ chapterLabel || meta?.title }}</p>
+        <input class="jump-slider" type="range" min="0" max="1" step="0.0005" :value="slidePreview ? slidePreview.fraction : fraction" :aria-label="t('reader.progress')" :aria-valuetext="progressText" @input="onSlideInput" @change="onSlide" @blur="slidePreview = null" />
+        <p v-if="slidePreview" class="jump-hint" aria-live="polite">{{ slidePreview.text }}</p>
+        <div class="segmented jump-tabs"><button type="button" :class="{ active: jumpMode === 'page' }" :aria-pressed="jumpMode === 'page'" @click="setJumpMode('page')">{{ t('v2.progressPage') }}</button><button type="button" :class="{ active: jumpMode === 'percent' }" :aria-pressed="jumpMode === 'percent'" @click="setJumpMode('percent')">{{ t('v2.progressPercent') }}</button></div>
+        <label class="jump-field-label" for="reader-jump-input">{{ t(jumpMode === 'page' ? 'v2.jumpPageLabel' : 'v2.jumpPercentLabel') }}</label>
+        <form class="jump-form" @submit.prevent="confirmJump">
+          <input id="reader-jump-input" ref="jumpInputEl" v-model="jumpText" class="input jump-input" inputmode="decimal" enterkeyhint="go" autocomplete="off" :aria-invalid="!!jumpError" aria-describedby="reader-jump-hint" @input="jumpError = ''" />
+          <span class="jump-total">{{ jumpMode === 'page' ? '/ ' + (pageInfo?.total ?? 1) : '%' }}</span><button class="btn btn-primary" type="submit">{{ t('reader.jumpGo') }}</button>
+        </form>
+        <p v-if="jumpError" class="jump-meta error" role="alert">{{ jumpError }}</p>
+        <p id="reader-jump-hint" class="jump-hint">{{ jumpMode === 'page' ? t('v2.jumpPageHint', { total: pageInfo?.total ?? 1 }) : t('v2.jumpPercentHint') }}</p>
         <p v-if="pageInfo && !fixedLayout" class="jump-hint">{{ t('reader.pageHint') }}</p>
-      </template>
-    </div>
+        <button v-if="jumpBack" class="btn jump-undo" type="button" @click="goJumpBack">↶ {{ jumpBack.label }}</button>
+      </section>
+    </AppModal>
 
     <!-- 跳转后一键回到原处 -->
-    <button v-if="jumpBack && barsVisible && !slidePreview" class="jump-back" @click="goJumpBack">
+    <button v-if="jumpBack && barsVisible && !slidePreview && !jumpOpen" class="jump-back" @click="goJumpBack">
       <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M9.7 5.3a1 1 0 0 1 0 1.4L7.42 9H14a6 6 0 1 1 0 12h-3a1 1 0 1 1 0-2h3a4 4 0 0 0 0-8H7.41l2.3 2.3a1 1 0 0 1-1.42 1.4l-4-4a1 1 0 0 1 0-1.4l4-4a1 1 0 0 1 1.42 0z"/></svg>
       {{ jumpBack.label }}
     </button>
@@ -3248,6 +3303,7 @@ onBeforeUnmount(() => {
       <template #top>
         <DianjingToggle :dj="dj" @open-settings="router.push('/settings')" @open-outline="dj.openOutline()" @open-skim="dj.openSkim()" />
       </template>
+      <template #ambient><AmbientEntry @open="toggleAmbientPanel" /></template>
     </ReadingModePanel>
     <ReadingModeMini
       :modes="modes"
@@ -3277,7 +3333,9 @@ onBeforeUnmount(() => {
         v-for="(hex, name) in HIGHLIGHT_COLORS"
         :key="name"
         class="hl-color"
-        :style="{ background: hex }"
+        :aria-label="t(`reader.highlightColor.${name}`)"
+        :title="t(`reader.highlightColor.${name}`)"
+        :style="{ '--highlight-color': hex }"
         @click="addHighlight(name as string)"
       />
       <button class="btn btn-sm" @click="addHighlight('yellow', true)"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M5 4h14a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H10l-4.3 3.4A1 1 0 0 1 4 19.6V6a2 2 0 0 1 1-2zm1 2v11.5L9.3 15H19V6H6zm2 2.5h8a1 1 0 1 1 0 2H8a1 1 0 1 1 0-2zm0 3h5a1 1 0 1 1 0 2H8a1 1 0 1 1 0-2z"/></svg>{{ t('reader.writeNote') }}</button>
@@ -3290,21 +3348,24 @@ onBeforeUnmount(() => {
     </div>
 
     <!-- 标注详情 / 想法编辑浮层 -->
-    <div v-if="activeAnnotation" class="annotation-pop card">
-      <p class="quote">{{ activeAnnotation.text }}</p>
-      <textarea
-        v-model="noteDraft"
-        class="note-input"
-        rows="3"
-        :placeholder="t('reader.notePlaceholder')"
-      />
-      <div class="pop-actions">
-        <button class="btn btn-sm btn-danger" @click="removeAnnotation(activeAnnotation)">{{ t('reader.deleteHighlight') }}</button>
-        <span style="flex: 1" />
-        <button class="btn btn-sm" @click="activeAnnotation = null">{{ t('common.cancel') }}</button>
-        <button class="btn btn-sm btn-primary" @click="saveNote">{{ t('reader.saveNote') }}</button>
+    <AppModal v-if="activeAnnotation" :title="t('reader.writeNote')" @close="activeAnnotation = null">
+      <div class="annotation-pop">
+        <p class="quote">{{ activeAnnotation.text }}</p>
+        <textarea
+          v-model="noteDraft"
+          class="note-input"
+          rows="3"
+          :placeholder="t('reader.notePlaceholder')"
+          :aria-label="t('reader.notePlaceholder')"
+        />
+        <div class="pop-actions">
+          <button class="btn btn-sm btn-danger" @click="removeAnnotation(activeAnnotation)">{{ t('reader.deleteHighlight') }}</button>
+          <span style="flex: 1" />
+          <button class="btn btn-sm" @click="activeAnnotation = null">{{ t('common.cancel') }}</button>
+          <button class="btn btn-sm btn-primary" @click="saveNote">{{ t('reader.saveNote') }}</button>
+        </div>
       </div>
-    </div>
+    </AppModal>
 
     <!-- 听书迷你胶囊: 面板收起但会话未停止时显示 -->
     <div
@@ -3381,15 +3442,16 @@ onBeforeUnmount(() => {
         <button v-if="ttsState !== 'stopped'" class="btn btn-sm" @click="stopTTS"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><rect x="6.5" y="6.5" width="11" height="11" rx="2" fill="currentColor"/></svg>{{ t('common.stop') }}</button>
         <button class="icon-btn" :title="t('tts.collapseHint')" :aria-label="t('tts.collapse')" @click="ttsPanel = false"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M5.3 8.3a1 1 0 0 1 1.4 0L12 13.6l5.3-5.3a1 1 0 1 1 1.4 1.4l-6 6a1 1 0 0 1-1.4 0l-6-6a1 1 0 0 1 0-1.4z"/></svg></button>
       </div>
+      <div class="tts-message-slot" data-message-slot />
       <div class="listen-hero">
         <div class="listen-cover"><BookCover :title="meta?.title || ''" :author="meta?.author" :src="library.coverUrls[bookId]" /></div>
         <h2>{{ meta?.title }}</h2>
         <p>{{ listenChapter || meta?.author }}</p>
       </div>
       <div class="listen-options">
-        <button @click="ttsOptions = 'sleep'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 6v6l4 2"/></svg><span>{{ sleepShort || t('tts.sleep') }}</span></button>
-        <button @click="ttsOptions = 'voice'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><rect x="9" y="3" width="6" height="12" rx="3"/><path d="M6 11a6 6 0 0 0 12 0M12 17v4m-4 0h8"/></svg><span>{{ voiceSummary }}</span></button>
-        <button @click="ttsOptions = 'rate'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M4 19a9 9 0 1 1 16 0M12 13l5-6"/></svg><span>{{ t('tts.rate') }} {{ rateText(settings.ttsRate) }}</span></button>
+        <button @click="ttsOptions = 'sleep'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 6v6l4 2"/></svg><small>{{ t('tts.sleep') }}</small><strong>{{ sleepShort || t('v2.notEnabled') }}</strong></button>
+        <button @click="ttsOptions = 'voice'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><rect x="9" y="3" width="6" height="12" rx="3"/><path d="M6 11a6 6 0 0 0 12 0M12 17v4m-4 0h8"/></svg><small>{{ t('tts.voice') }}</small><strong :title="voiceSummary">{{ voiceSummary }}</strong></button>
+        <button @click="ttsOptions = 'rate'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M4 19a9 9 0 1 1 16 0M12 13l5-6"/></svg><small>{{ t('tts.rate') }}</small><strong>{{ rateText(settings.ttsRate) }}</strong></button>
       </div>
       <p class="listen-state" :class="{ error: ttsFailure }" role="status">{{ ttsStatus }}</p>
       <div v-if="unavailableVoice && edgeAvailable()" class="tts-notice">
@@ -3398,7 +3460,7 @@ onBeforeUnmount(() => {
       <!-- 听到哪了、还要多久 -->
       <div v-if="listenEta" class="tts-progress">
         <div class="tts-progress-head">
-          <span class="tts-progress-chapter">{{ chapterLabel || meta?.title }}</span>
+          <span class="tts-progress-chapter">{{ listenChapter || meta?.title }}</span>
           <span class="tts-progress-eta">{{ chapterEtaText }}</span>
         </div>
         <div
@@ -3406,14 +3468,14 @@ onBeforeUnmount(() => {
           role="progressbar"
           aria-valuemin="0"
           aria-valuemax="100"
-          :aria-valuenow="Math.round((chapterProgress ?? fraction) * 100)"
+          :aria-valuenow="Math.round(listenChapterProgress * 100)"
           :aria-label="chapterProgress != null ? t('tts.chapterProgress') : t('reader.progress')"
         >
-          <span :style="{ transform: `scaleX(${(chapterProgress ?? fraction)})` }" />
+          <span :style="{ transform: `scaleX(${listenChapterProgress})` }" />
         </div>
         <div class="tts-progress-sub">
           <span>{{ chapterFinishText }}</span>
-          <span :title="bookFinishText">{{ t('tts.bookSummary', { pct: percentText, time: listenEta ? humanTime(listenEta.book) : '' }) }}</span>
+          <span :title="bookFinishText">{{ t('tts.bookSummary', { pct: listenPercent, time: listenEta ? humanTime(listenEta.book) : '' }) }}</span>
         </div>
         <p v-if="!pace.samples" class="tts-progress-hint">{{ t('tts.etaLearning') }}</p>
       </div>
@@ -3463,15 +3525,11 @@ onBeforeUnmount(() => {
         <button :aria-pressed="modes.lyricFollowing.value" @click="openListenLyrics">{{ t('readingMode.tabLyric') }}</button>
         <button @click="openListenToc">{{ t('reader.toc') }}</button>
       </nav>
-      <button class="listen-ambient" @click="toggleAmbientPanel">{{ t('ambient.title') }}</button>
+      <AmbientEntry @open="toggleAmbientPanel" />
       <blockquote v-if="listenQuote" class="listen-quote">{{ listenQuote }}</blockquote>
       <AppModal v-if="ttsOptions" :title="t(ttsOptions === 'rate' ? 'tts.rate' : ttsOptions === 'sleep' ? 'tts.sleep' : 'tts.voice')" @close="ttsOptions = null">
         <div class="listen-setting-body">
-      <div v-show="ttsOptions === 'rate'" class="tts-row tts-rate-row">
-        <label>{{ t('tts.rate') }}</label>
-        <LevelSlider v-model="settings.ttsRate" :min="TTS_RATE_MIN" :max="TTS_RATE_MAX" :step="0.05" :stops="rateStops" :label="t('tts.rate')" />
-        <span class="tts-value">{{ rateText(settings.ttsRate) }}</span>
-      </div>
+      <TtsRateControl v-if="ttsOptions === 'rate'" v-model="settings.ttsRate" />
       <div v-show="ttsOptions === 'sleep'" class="tts-row tts-row-stacked">
         <label>{{ t('tts.sleep') }}</label>
         <div class="seg">
@@ -3511,7 +3569,7 @@ onBeforeUnmount(() => {
         </AppSelect>
       </div>
       <p v-show="ttsOptions === 'voice'" class="tts-hint">
-        {{ !edgeAvailable() ? t('tts.hintSystem') : settings.ttsEngine === 'edge' ? t('tts.hintEdge') : settings.ttsEngine === 'local' ? t('tts.hintLocal') : t('tts.hintSystem') }}
+        {{ !edgeAvailable() ? t('tts.hintSystem') : settings.ttsEngine === 'edge' ? t(systemSpeechAvailable() ? 'tts.hintEdge' : 'tts.hintEdgeNoSystem') : settings.ttsEngine === 'local' ? t('tts.hintLocal') : t('tts.hintSystem') }}
       </p>
         </div>
       </AppModal>
@@ -3984,21 +4042,33 @@ onBeforeUnmount(() => {
   color: var(--text-2);
 }
 .hl-color {
-  width: 22px;
-  height: 22px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 44px;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius);
+  background: transparent;
+}
+.hl-color::before {
+  content: '';
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
-  border: 2px solid #fff;
+  background: var(--highlight-color);
+  border: 2px solid var(--card);
   box-shadow: 0 0 0 1px var(--border);
 }
-.annotation-pop {
-  position: absolute;
-  bottom: calc(60px + var(--safe-bottom));
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 20;
-  width: min(420px, calc(100% - 40px));
-  padding: 14px 16px;
+.hl-color:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: -2px;
 }
+.annotation-pop {
+  padding: 20px;
+}
+.annotation-pop .btn { min-height: 44px; }
 .quote {
   font-size: 13px;
   color: var(--text-2);
@@ -4851,8 +4921,8 @@ onBeforeUnmount(() => {
     justify-content: center;
   }
   .hl-color {
-    width: 28px;
-    height: 28px;
+    width: 44px;
+    height: 44px;
   }
   .nav {
     display: none;
@@ -4913,7 +4983,7 @@ onBeforeUnmount(() => {
 @media (max-width: 720px) {
   .bar.top { background: var(--card); }
   .bar-actions { gap: 0; }
-  .bar-actions .ambient-btn { display: none; }
+  .bar-actions .ambient-btn { display: inline-flex; }
   .icon-btn { width: 44px; height: 44px; }
   .tts-panel { inset: 0; width: 100%; height: 100%; max-height: none; border-radius: 0; padding: calc(var(--safe-top) + 8px) max(24px, var(--lr-safe-right)) calc(var(--safe-bottom) + 24px) max(24px, var(--lr-safe-left)); gap: 20px; box-shadow: none; }
   .tts-panel::before { display: none; }
@@ -4931,10 +5001,19 @@ onBeforeUnmount(() => {
 
 .listen-cover :deep(.art-title) { font-size: 32px; }
 .tts-panel { gap: 16px; }
-.tts-head { position: relative; justify-content: center; }
+.tts-message-slot { display: contents; }
+.tts-head { position: relative; top: auto; display: grid; grid-template-columns: minmax(44px, 1fr) auto minmax(44px, 1fr); gap: 8px; }
 .tts-head > span[style] { display: none; }
-.tts-head > .icon-btn { order: -1; margin-right: auto; }
-.tts-head > strong { position: absolute; left: 50%; transform: translateX(-50%); pointer-events: none; }
-.tts-head > .btn { margin-left: auto; }
+.tts-head > .icon-btn { grid-area: 1 / 1; justify-self: start; }
+.tts-head > strong { grid-area: 1 / 2; justify-self: center; }
+.tts-head > .btn { grid-area: 1 / 3; justify-self: end; }
+.tts-head > .tts-sleep-badge, .tts-head > .tts-buffering { grid-column: 1 / -1; justify-self: center; }
+
+
+.reader { --footer-h: 144px; }
+.progress-meta { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-width: 0; min-height: 32px; width: 100%; }.progress-chapter { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-3); font-size: 11px; }.progress-meta .progress-label { flex: 0 0 auto; min-width: 0; max-width: none; width: auto; white-space: nowrap; font-variant-numeric: tabular-nums; font-size: 12px; padding: 4px 0 4px 8px; height: 32px; }.page-number { white-space: nowrap; }.progress-row { display: grid; grid-template-columns: 44px minmax(0,1fr) 44px; gap: 4px; width: 100%; }.slider-wrap { width: 100%; min-width: 0; }.slider { width: 100%; height: 44px; }.bar.bottom { gap: 0; }
+.jump-pop.progress-settings { position: static; inset: auto; width: auto; max-width: none; padding: 20px; box-shadow: none; border: 0; border-radius: 0; display: grid; gap: 14px; }.jump-overview { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-variant-numeric: tabular-nums; }.jump-overview > div { display: grid; gap: 6px; }.jump-overview small { font-size: 12px; color: var(--text-3); }.jump-overview strong { font-size: 32px; font-weight: 600; }.jump-overview > span { font-size: 12px; color: var(--text-2); text-align: end; }.jump-chapter { margin: 0; font-size: 13px; color: var(--text-2); line-height: 1.6; overflow-wrap: anywhere; }.jump-slider { width: 100%; height: 44px; margin: 0; accent-color: var(--brand); }.jump-tabs { display: flex; }.jump-tabs button { flex: 1; min-height: 44px; }.jump-field-label { font-size: 13px; }.jump-form { min-width: 0; }.jump-input { min-height: 44px; min-width: 0; }.jump-total { white-space: nowrap; }.jump-form .btn,.jump-undo { min-height: 44px; }.jump-meta,.jump-hint { margin: 0; line-height: 1.7; }
+.listen-cover { width: 132px; height: 185px; margin: 4px auto; }.listen-hero h2 { font-size: 18px; }.listen-options { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 8px; }.listen-options button { border: 1px solid var(--border); border-radius: 12px; background: var(--card); gap: 5px; padding: 12px 4px; min-height: 82px; }.listen-options svg { width: 18px; height: 18px; }.listen-options small { font-size: 11px; color: var(--text-3); }.listen-options strong { font-size: 13px; font-weight: 600; color: var(--text); max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }.tts-progress-head,.tts-progress-sub { flex-wrap: wrap; gap: 4px 12px; }.tts-progress-eta { margin-left: auto; }.tts-progress-sub > span { white-space: normal; }.listen-setting-body .tts-row { min-width: 0; }.tts-panel { padding-inline: max(20px,var(--lr-safe-left)); }
+@media(max-width:359px) { .progress-meta { gap: 6px; }.progress-meta .progress-label { font-size: 11px; }.tts-panel { padding-inline: 16px; }.listen-options strong { font-size: 12px; } }
 
 </style>

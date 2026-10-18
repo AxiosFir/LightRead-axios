@@ -29,6 +29,7 @@ export interface KwSmartInput {
 export interface KeyWordLayerParams {
   book?: TermBook
   level: KwLevel
+  densityAmount?: number
   spoilerSafe: boolean
   smart: KwSmartInput | null
 }
@@ -122,7 +123,7 @@ export class KeyWordLayer {
     const prm = this.#opts.params()
     const mask = prm.smart ? this.#aiMask(prm.smart) : null
     const words = prm.smart?.words ?? []
-    const key = sig(`${JSON.stringify(prm.book ?? {})}|${prm.level}|${prm.spoilerSafe ? 1 : 0}|${this.#opts.service.version}|${mask ? mask.join('') : '-'}|${words.map(w => w.join(',')).join(';')}`)
+    const key = sig(`${JSON.stringify(prm.book ?? {})}|${prm.level}|${prm.densityAmount ?? ''}|${prm.spoilerSafe ? 1 : 0}|${this.#opts.service.version}|${mask ? mask.join('') : '-'}|${words.map(w => w.join(',')).join(';')}`)
     if (key === this.#reqSig) return
     this.#reqSig = key
     const t0 = Date.now()
@@ -131,6 +132,7 @@ export class KeyWordLayer {
       book: prm.book,
       paras: this.#paras,
       level: prm.level,
+      densityAmount: prm.densityAmount,
       spoilerSafe: prm.spoilerSafe,
       smart: prm.smart && mask ? { words, aiParas: Array.from(mask) } : null,
     }, this.#opts.host).then(picks => {

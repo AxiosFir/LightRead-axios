@@ -77,6 +77,8 @@ export interface DjMeta {
 }
 
 export interface UseDianjingOptions {
+  /** Optional fine density supplied by a host; legacy hosts retain presets. */
+  densityAmount?: () => number | undefined
   getView: () => any
   bookId: string
   getMeta: () => DjMeta | null | undefined
@@ -202,6 +204,7 @@ export function useDianjing(opts: UseDianjingOptions) {
     },
     channel,
     density: () => prefs.value.density as Density,
+    densityAmount: opts.densityAmount,
     kinds: () => prefs.value.kinds,
     fictionOverride: () => prefs.value.fiction[opts.bookId] ?? null,
     colors: () => djColors(opts.getThemeName()),
@@ -310,7 +313,7 @@ export function useDianjing(opts: UseDianjingOptions) {
   function cancelConsent() { consentOpen.value = false }
 
   watch(active, syncEngine)
-  watch(() => [prefs.value.density, prefs.value.kinds.key, prefs.value.kinds.term, prefs.value.kinds.note], () => engine.repaint())
+  watch(() => [prefs.value.density, opts.densityAmount?.(), prefs.value.kinds.key, prefs.value.kinds.term, prefs.value.kinds.note], () => engine.repaint())
   watch(() => opts.getThemeName(), () => engine.repaint())
   watch(() => prefs.value.fiction[opts.bookId], () => engine.refreshFiction())
   watch(() => [settings.aiProvider, settings.aiBaseUrl, settings.aiApiKey, settings.aiModel, prefs.value.channel], () => engine.resetErrors())
@@ -547,7 +550,7 @@ export function useDianjing(opts: UseDianjingOptions) {
           bySection.set(rec.section, sec)
         }
         const keys = rec.items.filter((i): i is KeyItem => i.t === 'key' && !engine.dismissed.has(i.id))
-        const chosen = selectKeys(keys, k => rec.lengths[`${k.block}.${k.sentence}`] ?? 40, rec.chars, dens)
+        const chosen = selectKeys(keys, k => rec.lengths[`${k.block}.${k.sentence}`] ?? 40, rec.chars, dens, opts.densityAmount?.())
         for (const k of keys) {
           const p = { section: rec.section, block: k.block, sentence: k.sentence }
           if (chosen.has(k.id) && before(p)) sec.keys.push({ text: rec.texts[k.id] ?? '', why: k.why, r: k.r, pos: p })

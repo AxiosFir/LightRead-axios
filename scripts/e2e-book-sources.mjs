@@ -112,11 +112,15 @@ await page.route('**/*', async route => {
 try {
   await page.goto(base + '/#/catalogs')
   const search = page.getByRole('searchbox', { name: '统一搜书' })
+  await search.waitFor()
+  // App keeps scope choices in a sheet; desktop keeps them inline.
+  if (await page.locator('button.scope-choose').count()) await page.locator('button.scope-choose').click()
   assert.equal(await page.getByRole('checkbox', { name: 'GitHub', exact: true }).isChecked(), true)
   assert.equal(await page.getByRole('checkbox', { name: '哲学文库', exact: true }).isChecked(), true, '哲学文库 is a default source')
   assert.equal(await page.getByRole('checkbox', { name: '教材', exact: true }).isChecked(), true, 'textbooks are a default source')
   assert.equal(await page.getByRole('checkbox', { name: '研辞问典', exact: true }).isChecked(), true, '研辞问典 is a default source')
   assert.equal(await page.getByText('维基文库').count(), 0, 'Wikisource has been removed')
+  if (await page.locator('.scope-done').count()) await page.locator('.scope-done').click()
   await search.fill('陋室 /?&铭')
   await page.getByRole('button', { name: '搜索', exact: true }).click()
   await page.getByText('Public Archive Book', { exact: true }).waitFor()
@@ -128,6 +132,7 @@ try {
   await page.getByRole('button', { name: '浏览器下载 TXT' }).waitFor()
   assert.equal(metadataCalls, 1)
   assert.equal(await page.getByRole('button', { name: '浏览器下载 PDF' }).count(), 0)
+  if (await page.locator('.catalog-more:not([open]) > summary').count()) await page.locator('.catalog-more > summary').click()
   await page.locator('.web-source-card').filter({ hasText: 'Z-Library' }).getByRole('button').click()
   assert.equal((await page.evaluate(() => window.__openedBooks)).at(-1), 'https://z-library.sk/s/' + encodeURIComponent('陋室 /?&铭'))
 
@@ -187,7 +192,9 @@ try {
   assert.equal(wendianRequests.length, 0, 'searching never touches the site')
 
   await search.fill('陋室 /?&铭')
+  if (await page.locator('button.scope-choose').count()) await page.locator('button.scope-choose').click()
   await page.getByRole('checkbox', { name: 'Open Library', exact: true }).check()
+  if (await page.locator('.scope-done').count()) await page.locator('.scope-done').click()
   await page.getByRole('button', { name: '搜索', exact: true }).click()
   await page.getByText('Borrowable Book', { exact: true }).waitFor()
   await page.getByText(/借阅需登录/).waitFor()
@@ -241,10 +248,10 @@ try {
   failArchive = false
   // With the existing CORS proxy configured, download/import stays in the app.
   await page.evaluate(() => {
-    const settings = JSON.parse(localStorage.getItem('lightread-settings') || '{}')
+    const settings = document.querySelector('#app').__vue_app__.config.globalProperties.$pinia._s.get('settings')
     settings.corsProxy = 'https://catalog-proxy.test/?url={url}'
-    localStorage.setItem('lightread-settings', JSON.stringify(settings))
   })
+  await page.waitForFunction(() => JSON.parse(localStorage.getItem('lightread-settings') || '{}').corsProxy === 'https://catalog-proxy.test/?url={url}')
   await page.reload()
   await search.fill('public')
   await page.getByRole('button', { name: '搜索', exact: true }).click()
@@ -290,8 +297,10 @@ try {
   await page.goto(base + '/#/catalogs')
   await page.setViewportSize({ width: 375, height: 812 })
   assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), 'mobile catalog should not overflow')
-  for (const box of await page.locator('.uni-scopes input').all()) await box.uncheck()
-  await page.getByText('请至少选择一个搜索来源。').waitFor()
+  if (await page.locator('button.scope-choose').count()) await page.locator('button.scope-choose').click()
+  for (const box of await page.locator('.uni-scopes input,.scope-options input').all()) await box.uncheck()
+  if (await page.locator('.scope-done').count()) await page.locator('.scope-done').click()
+  await page.getByText('请至少选择一个搜索来源。', { exact: true }).waitFor()
   assert.equal(await page.getByRole('button', { name: '搜索', exact: true }).isDisabled(), true)
   assert.deepEqual(errors, [])
   console.log('PASS: public catalog search, 哲学文库 local index + downloads, 教材 merged parts + import, 研辞问典 local index + EPUB import, lazy formats, browser fallback, import, partial failure, mobile layout')

@@ -41,6 +41,8 @@ export interface ListenFeed {
 }
 
 export interface ListenCallbacks {
+  /** Hosts without Web Speech can reject system fallback; omitted preserves the desktop policy. */
+  canUseSystemSpeech?(): boolean
   /** 某句开始出声 */
   onSentenceStart(key: string): void
   /** 播放结束: 读完 / 被停止 / 出错 */
@@ -388,6 +390,12 @@ export class ListenPlayer {
           if (!alive()) continue
           // 合成 / 播放失败: 已排上的照常播完, 余下 (含失败块) 改用系统语音
           reportNeuralFailure(e)
+          if (this.cb.canUseSystemSpeech?.() === false) {
+            // Finish audio already scheduled, then report the original service error.
+            // Do not enter a system engine the host cannot provide.
+            if (!(await waitForClock(this.clock, this.tail, alive))) continue
+            throw e
+          }
           switching = true
           const back = e instanceof PlaybackError ? [...e.chunk.sentences] : []
           this.heldChunk = null
@@ -575,6 +583,7 @@ export class ListenPlayer {
   // ================= 系统语音 =================
 
   private async runSystem(session: number): Promise<RunOutcome> {
+    if (this.cb.canUseSystemSpeech?.() === false) throw new Error('System speech is unavailable on this device')
     const source = this.source!
     const settings = useSettings()
     const alive = () => session === this.session

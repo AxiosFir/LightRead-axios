@@ -1,5 +1,10 @@
+<script lang="ts">
+// Keep the selected list when returning from its reader within this App session.
+let readerReturnBooklist: string | null = null
+</script>
 <script setup lang="ts">
 import BookCover from '../components/BookCover.vue'
+import RecommendedBooklists from '../components/RecommendedBooklists.vue'
 import { askConfirm } from '../../services/confirm.ts'
 import AppSelect from '../../components/AppSelect.vue'
 import AppModal from '../../components/AppModal.vue'
@@ -128,7 +133,12 @@ const showTagModal = ref(false)
 const tagDraft = ref('')
 
 // 书单
-const activeBooklistId = ref('')
+const activeBooklistId = ref(paperMode.value ? '' : readerReturnBooklist ?? '')
+readerReturnBooklist = null
+const showBooklistOverview = ref(false)
+const visibleBooklists = computed(() => library.booklists.filter(list => !keyword.value.trim() || list.name.toLocaleLowerCase().includes(keyword.value.trim().toLocaleLowerCase())))
+function showBooklists() { showBooklistOverview.value = true; activeBooklistId.value = ''; keyword.value = ''; tagFilter.value = ''; shelfStatus.value = 'all' }
+function openBooklist(id: string) { showBooklistOverview.value = false; activeBooklistId.value = id; keyword.value = ''; tagFilter.value = ''; shelfStatus.value = 'all' }
 const showBooklistCreate = ref(false)
 const showBooklistManage = ref(false)
 const showBooklistPicker = ref(false)
@@ -147,9 +157,10 @@ const showOnlyWanted = computed(() =>
 // 书源页「全部加入我的书单」→「查看」: /library?booklist=<id> (路由按 fullPath 重建视图, 不清查询参数)
 watch(() => [route.query.booklist, library.loaded] as const, ([id]) => {
   if (typeof id === 'string' && id && !paperMode.value && library.booklists.some(item => item.id === id)) {
-    activeBooklistId.value = id
+    openBooklist(id)
   }
 }, { immediate: true })
+watch(() => route.query.view, view => { if (view === 'booklists' && !paperMode.value) showBooklists() }, { immediate: true })
 
 // 顶部「今日阅读」入口 (藏书模式), 记录变化时实时刷新
 const todaySeconds = ref(0)
@@ -176,6 +187,7 @@ onMounted(() => {
   stopReadingLog = onReadingLogChange(() => void refreshToday())
 })
 onBeforeUnmount(() => {
+  if (/^\/(read|paper|djvu)\//.test(router.currentRoute.value.path)) readerReturnBooklist = activeBooklistId.value || null
   window.removeEventListener('keydown', onGlobalKeydown)
   stopReadingLog?.()
 })
@@ -199,6 +211,8 @@ function onGlobalKeydown(e: KeyboardEvent) {
   else if (showBooklistCreate.value) showBooklistCreate.value = false
   else if (importMenu.value) importMenu.value = false
   else if (manageMode.value) toggleManage()
+  else if (activeBooklistId.value) showBooklists()
+  else if (showBooklistOverview.value) showBooklistOverview.value = false
   else return
   e.preventDefault()
 }
@@ -522,7 +536,7 @@ async function createBooklist() {
     return
   }
   const id = await library.createBooklist(name)
-  activeBooklistId.value = id
+  if (!showBooklistOverview.value) openBooklist(id)
   showBooklistCreate.value = false
   booklistDraft.value = ''
   toast(t('library.booklistCreated', { name }), 'success')
@@ -904,7 +918,7 @@ async function batchClearTags() {
     <p v-if="!phone" class="add-books-hint">{{ t(touchPrimary ? 'library.addFormatsHintTouch' : 'library.addFormatsHint') }}<span v-if="activeBooklist"> · {{ t('library.addIntoBooklist', { name: activeBooklist.name }) }}</span></p>
 
     <!-- 手机: 继续阅读 (最近打开的书) -->
-    <section v-if="resumeBook" class="resume card" role="button" tabindex="0" :aria-label="`${t('library.continueReading')}: ${resumeBook.title}`" @click="openBook(resumeBook)" @keydown.enter.prevent="openBook(resumeBook)">
+    <section v-if="resumeBook && !showBooklistOverview && !activeBooklistId" class="resume card" role="button" tabindex="0" :aria-label="`${t('library.continueReading')}: ${resumeBook.title}`" @click="openBook(resumeBook)" @keydown.enter.prevent="openBook(resumeBook)">
       <div class="resume-cover" aria-hidden="true">
         <BookCover :title="shortTitle(resumeBook.title)" :author="shortAuthor(resumeBook.author)" :src="library.coverUrls[resumeBook.id]" />
       </div>
@@ -917,50 +931,6 @@ async function batchClearTags() {
           <span class="resume-pct">{{ paperMode ? paperProgressText(resumeBook) : `${resumePercent}%` }}</span>
           <span class="resume-go" aria-hidden="true">{{ t('library.continue') }}</span>
         </span>
-      </div>
-    </section>
-
-    <!-- 书单: 一级内容分组，可与标签和搜索组合筛选; 手机上只有建过书单才出现, 操作在添加面板 / 列表标题里 -->
-    <section v-if="!paperMode && (!phone || library.booklists.length)" class="booklist-section">
-      <div v-if="!phone" class="booklist-heading">
-        <span>{{ t('library.booklists') }}</span>
-        <button class="booklist-text-action hit" @click="openCreateBooklist">
-          <svg viewBox="0 0 24 24" width="13" height="13"><path fill="currentColor" d="M11 13H5a1 1 0 1 1 0-2h6V5a1 1 0 1 1 2 0v6h6a1 1 0 1 1 0 2h-6v6a1 1 0 1 1-2 0v-6z"/></svg>
-          {{ t('library.newBooklist') }}
-        </button>
-        <button
-          v-if="library.booklists.length"
-          class="booklist-text-action hit"
-          @click="openBooklistManage"
-        >{{ t('library.manageBooklists') }}</button>
-        <button v-if="activeBooklist && booklistCount(activeBooklist.id)" class="booklist-text-action hit" @click="uploadBooks(library.booklistBookIds[activeBooklist.id] ?? [])">{{ t('library.uploadBooklist') }}</button>
-        <button v-if="activeBooklist" class="booklist-text-action hit" @click="showBooklistShare = true">{{ t('booklist.share') }}</button>
-        <button class="booklist-text-action hit" @click="showBooklistImport = true">{{ t('booklist.import') }}</button>
-      </div>
-      <div class="booklist-row">
-        <button
-          class="booklist-chip"
-          :class="{ active: !activeBooklistId }"
-          @click="activeBooklistId = ''"
-        >
-          <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15.5a2.5 2.5 0 0 1-2.5 2.5H6.5A2.5 2.5 0 0 1 4 18.5v-13zM6.5 5A.5.5 0 0 0 6 5.5V16.05c.16-.03.32-.05.5-.05H18V5H6.5zM6 18.5a.5.5 0 0 0 .5.5H18v-1H6.5a.5.5 0 0 0-.5.5z"/></svg>
-          <span>{{ t('library.allBooks') }}</span>
-          <span class="booklist-count">{{ kindBooks.length }}</span>
-        </button>
-        <button
-          v-for="item in library.booklists"
-          :key="item.id"
-          class="booklist-chip"
-          :class="{ active: activeBooklistId === item.id }"
-          @click="activeBooklistId = item.id"
-        >
-          <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M5 4a2 2 0 0 1 2-2h9a3 3 0 0 1 3 3v15a1 1 0 0 1-1.45.9L12 18.12 6.45 20.9A1 1 0 0 1 5 20V4zm2 0v14.38l4.55-2.28a1 1 0 0 1 .9 0L17 18.38V5a1 1 0 0 0-1-1H7z"/></svg>
-          <span>{{ item.name }}</span>
-          <span class="booklist-count">{{ booklistCount(item.id) }}</span>
-        </button>
-        <button v-if="phone" class="booklist-add-chip" :title="t('library.newBooklist')" :aria-label="t('library.newBooklist')" @click="openCreateBooklist">
-          <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M11 13H5a1 1 0 1 1 0-2h6V5a1 1 0 1 1 2 0v6h6a1 1 0 1 1 0 2h-6v6a1 1 0 1 1-2 0v-6z"/></svg>
-        </button>
       </div>
     </section>
 
@@ -1026,8 +996,8 @@ async function batchClearTags() {
     </div>
 
     <!-- 手机: 列表标题 (范围 · 数量 / 排序 / 选择) -->
-    <div v-if="phone && library.loaded && kindBooks.length && !manageMode" class="list-head">
-      <span class="list-scope">{{ listScope }}</span>
+    <div v-if="library.loaded && (kindBooks.length || activeBooklist) && !manageMode && !showBooklistOverview && (phone || activeBooklist)" class="list-head">
+      <button v-if="activeBooklist" class="list-text-btn list-back" :aria-label="t('v2.backToBooklists')" @click="showBooklists">‹ {{ t('library.booklists') }}</button><span class="list-scope">{{ listScope }}</span>
       <AppSelect v-model="sortBy" class="list-sort" :aria-label="t('common.sortBy')">
         <option value="recent">{{ t('library.sortRecent') }}</option>
         <option value="added">{{ t('library.sortAdded') }}</option>
@@ -1040,9 +1010,10 @@ async function batchClearTags() {
       <button class="list-text-btn" @click="toggleManage">{{ t('library.select') }}</button>
     </div>
 
-    <nav v-if="!paperMode && kindBooks.length && !manageMode" class="shelf-filters" :aria-label="t('v2.readingStatus')">
-      <button v-for="state in shelfChoices" :key="state" :class="{ active: shelfStatus === state }" :aria-pressed="shelfStatus === state" @click="shelfStatus = state">{{ t(`v2.shelf.${state}`) }}</button>
-      <button @click="openBooklistManage">{{ t('library.booklists') }}</button>
+      <div v-if="showBooklistOverview && !paperMode" class="booklist-overview-head"><h2>{{ t('v2.myBooklists') }}</h2><button v-if="library.booklists.length" class="list-text-btn" @click="openBooklistManage">{{ t('library.manage') }}</button></div>
+    <nav v-if="!paperMode && library.loaded && !manageMode" class="shelf-filters" :aria-label="t('v2.readingStatus')">
+      <button v-for="state in shelfChoices" :key="state" :class="{ active: !showBooklistOverview && !activeBooklistId && shelfStatus === state }" :aria-pressed="!showBooklistOverview && !activeBooklistId && shelfStatus === state" @click="showBooklistOverview = false; activeBooklistId = ''; shelfStatus = state">{{ t(`v2.shelf.${state}`) }}</button>
+      <button :class="{ active: showBooklistOverview || !!activeBooklistId }" :aria-pressed="showBooklistOverview || !!activeBooklistId" @click="showBooklists">{{ t('library.booklists') }}</button>
     </nav>
 
     <!-- 手机选择模式: 顶部「取消 · 已选 N 本 · 全选」 -->
@@ -1062,7 +1033,20 @@ async function batchClearTags() {
       </div>
     </div>
 
-    <div v-else-if="!kindBooks.length" class="empty">
+    <section v-else-if="showBooklistOverview && !paperMode" class="booklist-overview" :aria-label="t('v2.myBooklists')">
+      <div v-if="visibleBooklists.length" class="booklist-tiles">
+        <button v-for="item in visibleBooklists" :key="item.id" class="booklist-tile" @click="openBooklist(item.id)">
+          <span class="booklist-tile-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 5h5v15H4zM10 4h5v16h-5zM17 5l4 1-3 14-4-1" /></svg></span>
+          <span class="booklist-tile-copy"><strong>{{ item.name }}</strong><small>{{ t('library.bookCount', { count: booklistCount(item.id) }) }}<template v-if="library.booklistWanted[item.id]?.length"> · {{ t('v2.wantedCount', { count: library.booklistWanted[item.id].length }) }}</template></small></span>
+          <svg class="booklist-tile-chevron" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m9 5 7 7-7 7" /></svg>
+        </button>
+      </div>
+      <p v-else class="booklist-overview-empty">{{ keyword.trim() ? t('reader.noResults') : t('v2.booklistsEmptyHint') }}</p>
+      <button class="btn booklist-create" @click="openCreateBooklist"><span aria-hidden="true">＋</span>{{ t('library.newBooklist') }}</button>
+      <RecommendedBooklists v-if="settings.features.recommendedBooklists" :keyword="keyword" />
+    </section>
+
+    <div v-else-if="!kindBooks.length && !activeBooklist" class="empty">
       <div class="empty-icon" aria-hidden="true">
         <svg v-if="paperMode" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6M9 9h1"/></svg>
         <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/><path d="M9 7h7M9 11h5"/></svg>
@@ -1092,9 +1076,10 @@ async function batchClearTags() {
       <p class="empty-title">{{ t('library.emptyBooklist') }}</p>
       <p class="hint">{{ t('library.emptyBooklistHint') }}</p>
       <div class="empty-actions">
-        <button class="btn btn-primary" @click="activeBooklistId = ''; manageMode = true">
+        <button v-if="kindBooks.length" class="btn btn-primary" @click="activeBooklistId = ''; manageMode = true">
           {{ t('library.chooseBooks') }}
         </button>
+        <router-link v-else to="/catalogs" class="btn">{{ t('library.browseCatalogs') }}</router-link>
       </div>
     </div>
 
@@ -1192,7 +1177,7 @@ async function batchClearTags() {
 
     <!-- 书单里还不在藏书中的书 (待找) -->
     <BooklistWantedPanel
-      v-if="activeBooklist && library.loaded && !paperMode"
+      v-if="activeBooklist && library.loaded && !paperMode && !showBooklistOverview"
       :key="activeBooklist.id"
       :booklist-id="activeBooklist.id"
       :keyword="keyword"
@@ -1382,7 +1367,7 @@ async function batchClearTags() {
     </AppModal>
 
     <BooklistShareDialog v-if="showBooklistShare && activeBooklist" :booklist-id="activeBooklist.id" @close="showBooklistShare = false" />
-    <BooklistImportDialog v-if="showBooklistImport" @close="showBooklistImport = false" @imported="id => (activeBooklistId = id)" />
+    <BooklistImportDialog v-if="showBooklistImport" @close="showBooklistImport = false" @imported="openBooklist" />
 
     <LibraryUploadDialog v-if="showCloudUpload" :book-ids="cloudBookIds" @close="showCloudUpload = false" />
     <FolderPickDialog
@@ -1396,9 +1381,8 @@ async function batchClearTags() {
     />
 
     <!-- 新建书单 -->
-    <div v-if="showBooklistCreate" class="modal-mask" @click.self="showBooklistCreate = false">
-      <div class="modal booklist-modal" role="dialog" aria-modal="true" aria-labelledby="booklist-create-title">
-        <h3 id="booklist-create-title">{{ t('library.newBooklist') }}</h3>
+    <AppModal v-if="showBooklistCreate" :title="t('library.newBooklist')" @close="showBooklistCreate = false">
+      <div class="booklist-modal dialog-content">
         <p class="modal-description">{{ t('library.booklistCreateHint') }}</p>
         <input
           v-model="booklistDraft"
@@ -1416,12 +1400,11 @@ async function batchClearTags() {
           </button>
         </div>
       </div>
-    </div>
+    </AppModal>
 
     <!-- 选择书单 -->
-    <div v-if="showBooklistPicker" class="modal-mask" @click.self="showBooklistPicker = false">
-      <div class="modal booklist-modal" role="dialog" aria-modal="true" aria-labelledby="booklist-picker-title">
-        <h3 id="booklist-picker-title">{{ t('library.chooseBooklist') }}</h3>
+    <AppModal v-if="showBooklistPicker" :title="t('library.chooseBooklist')" @close="showBooklistPicker = false">
+      <div class="booklist-modal dialog-content">
         <p class="modal-description">
           {{ t('library.chooseBooklistHint', { count: pickerBookIds.length }) }}
         </p>
@@ -1447,6 +1430,7 @@ async function batchClearTags() {
               v-model="pickerDraft"
               class="input"
               :placeholder="t('library.booklistNamePlaceholder')"
+              :aria-label="t('library.booklistNamePlaceholder')"
               maxlength="40"
               @keyup.enter="createBooklistAndAdd"
             />
@@ -1461,13 +1445,12 @@ async function batchClearTags() {
           <button class="btn btn-sm" @click="showBooklistPicker = false">{{ t('common.cancel') }}</button>
         </div>
       </div>
-    </div>
+    </AppModal>
 
     <!-- 管理书单 -->
-    <div v-if="showBooklistManage" class="modal-mask" @click.self="showBooklistManage = false">
-      <div class="modal booklist-modal" role="dialog" aria-modal="true" aria-labelledby="booklist-manage-title">
+    <AppModal v-if="showBooklistManage" :title="t('library.manageBooklists')" @close="showBooklistManage = false">
+      <div class="booklist-modal dialog-content">
         <div class="modal-title-row">
-          <h3 id="booklist-manage-title">{{ t('library.manageBooklists') }}</h3>
           <button class="btn btn-sm" @click="showBooklistManage = false; openCreateBooklist()">
             {{ t('library.newBooklist') }}
           </button>
@@ -1478,6 +1461,7 @@ async function batchClearTags() {
             <input
               v-model="booklistRenames[item.id]"
               class="input"
+              :aria-label="item.name"
               maxlength="40"
               @keyup.enter="renameBooklist(item.id)"
             />
@@ -1497,16 +1481,12 @@ async function batchClearTags() {
             {{ t('library.noBooklists') }}
           </p>
         </div>
-        <div class="form-actions">
-          <button class="btn btn-sm" @click="showBooklistManage = false">{{ t('common.close') }}</button>
-        </div>
       </div>
-    </div>
+    </AppModal>
 
     <!-- 批量标签弹窗 -->
-    <div v-if="showTagModal" class="modal-mask" @click.self="showTagModal = false">
-      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="tag-modal-title">
-        <h3 id="tag-modal-title">{{ t('library.tagModalTitle', { count: selectedIds.size }) }}</h3>
+    <AppModal v-if="showTagModal" :title="t('library.tagModalTitle', { count: selectedIds.size })" @close="showTagModal = false">
+      <div class="dialog-content">
         <input v-model="tagDraft" class="input full" :placeholder="t('library.tagPlaceholder')" :aria-label="t('library.setTags')" autofocus @keyup.enter="batchTag" />
         <div class="form-actions">
           <button class="btn btn-sm" @click="batchClearTags">{{ t('library.clearTags') }}</button>
@@ -1514,12 +1494,11 @@ async function batchClearTags() {
           <button class="btn btn-sm btn-primary" :disabled="!tagDraft.trim()" @click="batchTag">{{ t('common.add') }}</button>
         </div>
       </div>
-    </div>
+    </AppModal>
 
     <!-- URL 导入弹窗 -->
-    <div v-if="showUrlModal" class="modal-mask" @click.self="!urlImporting && (showUrlModal = false)">
-      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="url-modal-title">
-        <h3 id="url-modal-title">{{ t('library.urlImportTitle') }}</h3>
+    <AppModal v-if="showUrlModal" :title="t('library.urlImportTitle')" :close-disabled="!!urlImporting" @close="showUrlModal = false">
+      <div class="dialog-content">
         <input
           v-model="urlDraft"
           class="input full"
@@ -1540,12 +1519,11 @@ async function batchClearTags() {
           </button>
         </div>
       </div>
-    </div>
+    </AppModal>
 
     <!-- 分类管理弹窗 -->
-    <div v-if="showTagManage" class="modal-mask" @click.self="showTagManage = false">
-      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="tag-manage-title">
-        <h3 id="tag-manage-title">{{ t('library.manageTags') }}</h3>
+    <AppModal v-if="showTagManage" :title="t('library.manageTags')" @close="showTagManage = false">
+      <div class="dialog-content">
         <div class="tag-manage-list">
           <div v-for="tag in allTags" :key="tag" class="tag-manage-row">
             <input v-model="tagRenames[tag]" class="input" :aria-label="tag" @keyup.enter="renameTag(tag)" />
@@ -1559,11 +1537,8 @@ async function batchClearTags() {
           </div>
           <p v-if="!allTags.length" class="tag-manage-empty">{{ t('library.noTags') }}</p>
         </div>
-        <div class="form-actions">
-          <button class="btn btn-sm" @click="showTagManage = false">{{ t('common.close') }}</button>
-        </div>
       </div>
-    </div>
+    </AppModal>
 
     <div v-if="dragging" class="drop-hint" aria-hidden="true">
       <div class="drop-hint-inner">
@@ -1921,6 +1896,8 @@ async function batchClearTags() {
   color: var(--text-3);
   white-space: nowrap;
 }
+.dialog-content { padding: 20px; }
+.dialog-content .btn { min-height: 44px; }
 .booklist-modal {
   width: min(560px, 100%);
 }
@@ -2431,8 +2408,8 @@ async function batchClearTags() {
   .list-head .list-sort {
     flex: none;
     width: auto;
-    height: 36px;
-    min-height: 0;
+    height: 44px;
+    min-height: 44px;
     padding: 0 6px 0 8px;
     gap: 2px;
     border: none;
@@ -2921,5 +2898,25 @@ async function batchClearTags() {
   .today-link { grid-area: 1/2/3/3; margin: 0; font-size: 12px; }
   .list-text-btn, .list-sort { min-height: 44px; }
 }
+
+
+/* Hallmark · approved v3 booklist flow · pre-emit critique: P4 H5 E4 S5 R5 V4 */
+.booklist-overview { margin-top: var(--space-4); }
+.booklist-overview-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); margin: var(--space-5) 0 var(--space-3); }
+.booklist-overview-head h2 { margin: 0; font-size: 20px; font-weight: 650; }
+.booklist-tiles { display: grid; gap: var(--space-3); }
+.booklist-tile { display: flex; align-items: center; gap: var(--space-4); width: 100%; min-height: 74px; padding: var(--space-4); border: 1px solid transparent; border-radius: var(--radius-lg); background: var(--card); color: var(--text); text-align: left; cursor: pointer; }
+.booklist-tile-icon { display: grid; place-items: center; flex: none; width: 32px; height: 32px; color: var(--text-2); }
+.booklist-tile-copy { display: grid; gap: var(--space-1); flex: 1; min-width: 0; }
+.booklist-tile-copy strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 16px; font-weight: 600; }
+.booklist-tile-copy small { font-size: 13px; color: var(--text-3); }
+.booklist-tile-chevron { flex: none; color: var(--text-3); }
+.booklist-tile:active { background: var(--surface-2); }
+.booklist-tile:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+.booklist-tile:nth-child(even) { background: var(--surface-2); }
+.booklist-create { border-radius: var(--radius-pill); width: 100%; min-height: 48px; margin-top: var(--space-4); gap: var(--space-2); white-space: nowrap; }
+.booklist-overview-empty { margin: var(--space-6) 0; color: var(--text-3); font-size: 14px; line-height: 1.7; }
+.list-back { flex: none; white-space: nowrap; }
+@media (hover: hover) { .booklist-tile:hover { border-color: var(--brand); } }
 
 </style>

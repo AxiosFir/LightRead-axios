@@ -1,0 +1,13 @@
+{
+  "date": "2026-10-18",
+  "scope": "existing prototype reader controls + stats colors",
+  "font": "LightRead Sans / Song / Kai (prototype:20)",
+  "palette": "existing LightRead OKLCH blue and semantic surface tokens (prototype:9-18)",
+  "spacing": "4/8/12/20/28/40 (prototype:21)",
+  "motion": "existing CSS; reduced-motion retained",
+  "framework": "standalone HTML prototype; App Vue untouched",
+  "modified": [
+    "docs/prototypes/lightread-mobile-v3.html"
+  ],
+  "deleted": []
+}

@@ -42,6 +42,8 @@ export interface KwParams {
   decay: number
   /** 一个词在一段里最多点亮几次 */
   perParaType: number
+  /** Minimum token distance; App's extended density may select adjacent whole words. */
+  minTokenGap?: number
   /** 软门槛: 常用词 K ≥ kOverride (且名次 ≥ 200) 时仍可参选 */
   kOverride: number
 }
@@ -640,6 +642,8 @@ export interface AiWord {
 }
 
 export interface PickOptions {
+  /** App extended density: exact count budget after word/paragraph constraints. */
+  targetCount?: number
   /** 智能版: AI 词表 (原文写法 → 重要度) */
   ai?: ReadonlyMap<string, AiWord> | null
   /** ai: 只亮 AI 词; aiFill: AI 词优先, 再用统计词补满 (统计词弱样式) */
@@ -653,9 +657,10 @@ export interface PickOptions {
 interface Cand { para: number; t: KwTok; gord: number; s: number; strong: boolean; ai: boolean }
 interface Sentence { n: number; cands: Cand[] }
 
-/** 给定阈值做一遍选择: 句内上限、不相邻、一段里同一个词至多 perParaType 次 */
+/** 给定阈值做一遍选择: 句内上限、词间距、一段里同一个词至多 perParaType 次 */
 function selectWith(sents: Sentence[], prm: KwParams, theta: number, out: KwPick[]): number {
   out.length = 0
+  const minGap = prm.minTokenGap ?? 2
   const lastOrdByPara = new Map<number, number>()
   const perPara = new Map<string, number>()
   for (const { n, cands } of sents) {
@@ -663,9 +668,9 @@ function selectWith(sents: Sentence[], prm: KwParams, theta: number, out: KwPick
     const taken: Cand[] = []
     for (const c of cands) {
       if (c.s < theta || taken.length >= cap) break
-      if (taken.some(x => Math.abs(x.gord - c.gord) < 2)) continue
+      if (taken.some(x => Math.abs(x.gord - c.gord) < minGap)) continue
       const lo = lastOrdByPara.get(c.para)
-      if (lo !== undefined && Math.abs(lo - c.gord) < 2) continue
+      if (lo !== undefined && Math.abs(lo - c.gord) < minGap) continue
       const pk = c.para + '|' + c.t.text
       if ((perPara.get(pk) ?? 0) >= prm.perParaType) continue
       perPara.set(pk, (perPara.get(pk) ?? 0) + 1)
@@ -789,6 +794,13 @@ export function pickSection(
     gbase += n + 1 // 段与段之间留一个空位, 跨段不算相邻
   })
   for (const s of sents) s.cands.sort((a, b) => b.s - a.s)
+  if (opts.targetCount !== undefined) {
+    const candidates: KwPick[] = []
+    selectWith(sents, prm, -Infinity, candidates)
+    return candidates.sort((a, b) => b.score - a.score)
+      .slice(0, Math.max(0, Math.floor(opts.targetCount)))
+      .sort((a, b) => a.para - b.para || a.index - b.index)
+  }
   const target = prm.density * total
   let lo = -50
   let hi = 200

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useLibrary } from '../../stores/library.ts'
 import { useSettings } from '../../stores/settings.ts'
@@ -66,8 +66,10 @@ const legacySeconds = computed(() => library.books.reduce((sum, b) => sum + (b.r
 function setGoal(m: number) {
   settings.dailyGoalMinutes = m
 }
-function openBook(book: BookMeta) {
-  void router.push(readerPath(book))
+async function openBook(book: BookMeta) {
+  detailDay.value = null
+  await nextTick()
+  await router.push(readerPath(book))
 }
 
 // ---- 当天详情 (桌面右侧面板 / 手机底部面板) ----
@@ -356,4 +358,9 @@ h1 {
 
 .page-head h1 { font-size: var(--page-title); letter-spacing: -.5px; }
 
+@media (pointer: coarse) {
+  .how-btn { min-width: 44px; min-height: 44px; }
+  :deep(.segmented button) { min-width: 44px; min-height: 44px; }
+  :deep(button.value.link) { min-width: 44px; min-height: 44px; }
+}
 </style>

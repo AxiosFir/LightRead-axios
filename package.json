@@ -9,6 +9,11 @@
     "test:book-sources": "node --experimental-strip-types --test scripts/test-catalog-errors.mjs scripts/test-open-library.mjs scripts/test-internet-archive.mjs scripts/test-philosophy-archive.mjs scripts/test-web-book-sources.mjs scripts/test-opds-download.mjs scripts/test-github-books.mjs scripts/test-book-query.mjs scripts/test-china-textbook.mjs scripts/test-wendian.mjs",
     "test:archive": "node scripts/test-library-archive.mjs",
     "e2e:mobile": "node scripts/e2e-mobile.mjs",
+    "e2e:v2": "node scripts/e2e-v2.mjs",
+    "e2e:reader-refinements": "node scripts/e2e-reader-refinements.mjs",
+    "e2e:v2-reading": "node scripts/e2e-v2-reading.mjs",
+    "e2e:v2-features": "node scripts/e2e-v2-features.mjs",
+    "test:app-boundary": "node --experimental-strip-types --test scripts/test-platform-boundary.mjs scripts/test-mobile-tts.mjs scripts/test-apk-layout.mjs",
     "test:plain-text": "node --experimental-strip-types --test scripts/test-plain-text.mjs",
     "test:convert-epub": "node --experimental-strip-types --test scripts/test-convert-epub.mjs",
     "e2e:convert-epub": "node scripts/e2e-convert-epub.mjs",
@@ -66,7 +71,10 @@
     "audit:keywords": "node --experimental-strip-types scripts/audit-keyword-candidates.mjs",
     "test:concept-recognition": "node --experimental-strip-types --test scripts/test-concept-recognition.mjs",
     "test:auto-scroll": "node --experimental-strip-types --test scripts/test-auto-scroll.mjs",
-    "e2e:concept-recognition": "node scripts/e2e-concept-recognition.mjs"
+    "e2e:concept-recognition": "node scripts/e2e-concept-recognition.mjs",
+    "e2e:mobile-booklists": "node scripts/e2e-mobile-booklists.mjs",
+    "test:mobile-messages": "node --test scripts/test-mobile-messages.mjs",
+    "e2e:mobile-messages": "node scripts/e2e-mobile-messages.mjs"
   },
   "dependencies": {
     "@embedpdf/pdfium": "^2.14.4",

@@ -1,0 +1,76 @@
+{
+  "date": "2026-10-18",
+  "branch": "Dev",
+  "scope": "在原有移动端原型上优化阅读、听书与阅读记录 UI，用户确认后再修改 App。",
+  "prototype": "lightread-mobile-v3.html",
+  "sha256": "ecb1cd93f46540c9caa9c2cbcebc1a00f7f688cb639bee85df8ca60f8106ce66",
+  "preview": "https://6ad480b15fd059fb9665833b--yzfly-html-preview.netlify.app/?review=1",
+  "reviewAreas": [
+    "语速调整",
+    "听书",
+    "背景音：独立阅读与听书双入口",
+    "点睛阅读",
+    "五个场景",
+    "阅读进度与右侧数值",
+    "阅读记录顶部配色"
+  ],
+  "appSourceChanged": false,
+  "browser": {
+    "layouts": 70,
+    "widths": [
+      320,
+      375,
+      392,
+      414,
+      768
+    ],
+    "themes": [
+      "light",
+      "dark"
+    ],
+    "checks": [
+      "语速预设、0.05微调、边界禁用、真实拖动、数值同步、保持暂停",
+      "阅读与听书的背景音双入口、独立开停、独立定时、关闭面板返回原入口",
+      "录音下载加载、失败、重试完成的原型状态",
+      "五个场景开关、状态文字、设置入口、逐层返回",
+      "点睛开关、示例随密度和颜色变化、智能设置分层",
+      "页码越界提示、百分比跳转、返回原位置",
+      "右侧五位数页码显示不截断",
+      "横屏面板可滚动至末尾、返回评审清单"
+    ],
+    "errors": []
+  },
+  "k30Browser": {
+    "model": "Redmi K30 Pro",
+    "pages": [
+      "speed",
+      "player",
+      "ambient",
+      "dianjing",
+      "modes",
+      "progress",
+      "stats"
+    ],
+    "viewport": {
+      "width": 392,
+      "height": 765
+    },
+    "nestedNativeBack": {
+      "open": true,
+      "sheet": "modes"
+    },
+    "errors": []
+  },
+  "access": {
+    "url": "https://6ad480b15fd059fb9665833b--yzfly-html-preview.netlify.app/?review=1",
+    "anonymous_status": 401,
+    "login_redirect": true,
+    "prototype_content_exposed": false
+  },
+  "limitations": [
+    "验证对象是 HTML 交互原型，不表示对应 App 功能已实现。",
+    "听书默认为无声节奏演示；背景音为可播放的合成声示例。",
+    "智能点睛与录音下载为标明的状态演示。",
+    "原型页码按本章排版计算，App 实现时沿用已有真实页码模型。"
+  ]
+}

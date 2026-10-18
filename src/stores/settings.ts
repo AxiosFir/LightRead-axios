@@ -181,6 +181,8 @@ export interface DianjingPrefs {
    * 重点词 基础版 2% / 4% / 8% (占词数), 智能版 只亮重要度≥2 的 AI 词 / 全部 AI 词 / AI 词 + 离线补到 8%
    */
   density: 'low' | 'normal' | 'high'
+  /** Fine adjustment on supporting clients; preset mismatch falls back to the synced preset. */
+  densityFine?: { value: number; preset: 'low' | 'normal' | 'high' }
   /** 标记类型 (kw: 智能版的重点词) */
   kinds: { key: boolean; term: boolean; note: boolean; kw: boolean }
   /** 通道: auto (已配置自己的密钥则用自己的, 否则内置) / builtin / own */
@@ -323,6 +325,7 @@ const defaults: SettingsState = {
     consentAll: false,
     perBook: {},
     density: 'normal',
+    densityFine: undefined,
     kinds: { key: true, term: true, note: true, kw: true },
     channel: 'auto',
     fiction: {},

@@ -5,6 +5,7 @@
 import { resolveParagraph, resolveSentence, sentenceText, type Chunk } from './chunker.ts'
 import { locateTerm } from '../readingModes/keyWords.ts'
 
+import { blendDensity, densityBand } from './density.ts'
 export type Density = 'low' | 'normal' | 'high'
 export type DjKind = 'key' | 'term' | 'note'
 
@@ -273,8 +274,19 @@ export function selectKeys(
   sentenceLength: (k: KeyItem) => number,
   chunkChars: number,
   density: Density,
+  amount?: number,
 ): Set<string> {
-  const budget = DENSITY_SHARE[density] * Math.max(1, chunkChars)
+  const extended = Number.isFinite(amount) && amount! > 100
+  if (amount !== undefined && !extended) {
+    const { lower, upper, fraction } = densityBand(amount)
+    return new Set(blendDensity(
+      [...selectKeys(keys, sentenceLength, chunkChars, lower)],
+      [...selectKeys(keys, sentenceLength, chunkChars, upper)], fraction, id => id,
+    ))
+  }
+  const multiplier = extended ? Math.min(3, amount! / 100) : 1
+  if (extended) density = 'high'
+  const budget = DENSITY_SHARE[density] * Math.max(1, chunkChars) * multiplier
   const sorted = keys
     .map((k, i) => ({ k, i }))
     .sort((a, b) => b.k.r - a.k.r || a.i - b.i)
@@ -285,7 +297,7 @@ export function selectKeys(
     if (chosen.has(k.id)) continue
     const len = Math.max(1, sentenceLength(k))
     const n = perBlock.get(k.block) ?? 0
-    if (n >= MAX_KEYS_PER_BLOCK) continue
+    if (n >= Math.ceil(MAX_KEYS_PER_BLOCK * multiplier)) continue
     if (chosen.size > 0 && used + len > budget) continue
     // 少档只留 r≥2 (r=1 的「可标可不标」在少档不出现)
     if (density === 'low' && k.r < 2 && chosen.size > 0) continue
@@ -296,7 +308,14 @@ export function selectKeys(
   return chosen
 }
 
-export function selectTerms(terms: TermItem[], density: Density): TermItem[] {
+export function selectTerms(terms: TermItem[], density: Density, amount?: number): TermItem[] {
+  // High already includes every validated AI term: never invent terms to fill a quota.
+  if (Number.isFinite(amount) && amount! > 100) return selectTerms(terms, 'high')
+  if (amount !== undefined) {
+    const { lower, upper, fraction } = densityBand(amount)
+    const selected = new Set(blendDensity(selectTerms(terms, lower), selectTerms(terms, upper), fraction, item => item.id).map(item => item.id))
+    return terms.filter(item => selected.has(item.id))
+  }
   return terms.filter(t => t.r >= TERM_MIN_RANK[density])
 }
 

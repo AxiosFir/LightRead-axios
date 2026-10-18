@@ -498,11 +498,12 @@ function resetEnv(engine = 'edge') {
   env.elementsPlayed = 0
 }
 
-function makePlayer() {
+function makePlayer(options = {}) {
   const log = { keys: [], ends: [], buffering: [] }
   let resolveEnd
   log.done = new Promise(resolve => { resolveEnd = resolve })
   const player = new ListenPlayer({
+    ...options,
     onSentenceStart: k => log.keys.push(k),
     onEnd: (reason, error) => { log.ends.push(reason); resolveEnd({ reason, error }) },
     onBuffering: w => log.buffering.push(w),
@@ -663,6 +664,46 @@ test('播放器: 神经引擎失败 → 已排上的播完, 余下改用系统�
   const first = env.synthCalls[0]
   assert.equal(first + env.spoken.join(''), sentences.map(s => s.text).join(''))
   assert.ok(env.maxSpeechQueue <= 3)
+})
+
+test('播放器: host without system speech preserves the service error and finishes scheduled audio', async () => {
+  resetEnv('edge')
+  const originalSpeech = globalThis.speechSynthesis
+  const originalUtterance = globalThis.SpeechSynthesisUtterance
+  const failure = new Error('online service unavailable')
+  let calls = 0
+  env.synth = async text => {
+    if (++calls >= 2) throw failure
+    return new Blob([text])
+  }
+  const { player, log } = makePlayer({ canUseSystemSpeech: () => false })
+  try {
+    delete globalThis.speechSynthesis
+    delete globalThis.SpeechSynthesisUtterance
+    player.play(makeFeed(book(15)))
+    const end = await log.done
+    assert.equal(end.reason, 'error')
+    assert.equal(end.error, failure)
+    assert.ok(log.keys.length > 0, 'already scheduled audio finishes')
+    assert.equal(env.spoken.length, 0)
+    assert.equal(player.state, 'idle')
+    assert.doesNotThrow(() => player.stop())
+  } finally {
+    player.stop()
+    globalThis.speechSynthesis = originalSpeech
+    globalThis.SpeechSynthesisUtterance = originalUtterance
+  }
+})
+
+test('播放器: host can reject an unsupported system engine before constructing an utterance', async () => {
+  resetEnv('system')
+  const { player, log } = makePlayer({ canUseSystemSpeech: () => false })
+  player.play(makeFeed(book(3)))
+  const end = await log.done
+  assert.equal(end.reason, 'error')
+  assert.match(end.error.message, /System speech is unavailable/)
+  assert.equal(env.spoken.length, 0)
+  assert.equal(player.state, 'idle')
 })
 
 test('播放器: 解码失败退回 <audio> 逐块播放', async () => {

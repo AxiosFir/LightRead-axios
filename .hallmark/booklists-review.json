@@ -1,0 +1,31 @@
+{
+  "date": "2026-10-18",
+  "scope": "approved mobile v3 booklists and sources",
+  "reference": "docs/prototypes/lightread-mobile-v3.html",
+  "structure": "inline named booklists with recommendations and details in Library → Booklists; public/private/personal source groups",
+  "style": "existing LightRead semantic tokens and font, no new theme",
+  "files": [
+    "src/mobile/views/LibraryView.vue",
+    "src/mobile/views/CatalogView.vue",
+    "src/mobile/i18n/zh.ts",
+    "src/mobile/i18n/en.ts",
+    "scripts/e2e-mobile-booklists.mjs",
+    "src/mobile/components/RecommendedBooklists.vue"
+  ],
+  "deletedFiles": [],
+  "review": {
+    "purpose": 4,
+    "hierarchy": 5,
+    "evidence": 4,
+    "structure": 5,
+    "restraint": 5,
+    "voice": 4
+  },
+  "browserEvidence": "/tmp/lightread-mobile-booklists/results.json",
+  "deviceEvidence": [
+    "/tmp/lightread-k30-full-20261018/booklists-native-results.json",
+    "/tmp/lightread-k30-full-20261018/booklists-remaining-results.json",
+    "/tmp/lightread-k30-full-20261018/recommendations-native-results.json"
+  ],
+  "deviceStatus": "Targeted booklist and source prototype scenarios passed across recorded APKs; interrupted scripts and corrected selectors are documented"
+}

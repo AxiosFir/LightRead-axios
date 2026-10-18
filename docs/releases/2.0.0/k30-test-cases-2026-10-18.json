@@ -1,0 +1,3010 @@
+{
+  "device": "Redmi K30 Pro / lmi",
+  "branch": "Dev",
+  "status": "本轮可执行验收完成：201通过，9受阻，0待测，0失败",
+  "cases": [
+    {
+      "id": "ENV-01",
+      "module": "环境与保护",
+      "capability": "设备身份",
+      "steps": "确认 lmi / Android / WebView / App / 签名与安装包哈希",
+      "expected": "只操作 K30，测试对象与产物对应",
+      "status": "通过",
+      "actual": "K30 Pro / lmi，Android 12，WebView 155.0.8059.43；2.0.0 / 2000000 固定签名与当前 APK 哈希匹配",
+      "evidence": [
+        "/tmp/lightread-k30-dianjing-qa/build.log"
+      ],
+      "apk": "34a4bfffc230be20d8a92cc91290b873236a4af28ddb969f8b4ea4d3564dbc65",
+      "checkedAt": "2026-10-18T09:50:44.393Z"
+    },
+    {
+      "id": "ENV-02",
+      "module": "环境与保护",
+      "capability": "覆盖升级",
+      "steps": "保存新快照后覆盖安装并比对",
+      "expected": "书架、阅读进度、设置无丢失",
+      "status": "通过",
+      "actual": "两次固定签名覆盖安装成功；34 本书及原偏好保留，已将理想国测试前精确 CFI 和进度恢复",
+      "evidence": [
+        "/tmp/lightread-k30-dianjing-qa/pre-upgrade-metadata.tar",
+        "/tmp/lightread-k30-full-20261018/baseline.json"
+      ],
+      "apk": "34a4bfffc230be20d8a92cc91290b873236a4af28ddb969f8b4ea4d3564dbc65",
+      "checkedAt": "2026-10-18T09:50:44.395Z"
+    },
+    {
+      "id": "ENV-03",
+      "module": "环境与保护",
+      "capability": "样本盘点",
+      "steps": "统计已有书格式、大小、章节及阅读位置",
+      "expected": "使用理想国及现有书，缺少格式明确记录",
+      "status": "通过",
+      "actual": "已保存现存书样本及原位置，按实际格式选择：{\"txt\":4,\"epub\":21,\"pdf\":4,\"mobi\":5}",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/samples.json"
+      ],
+      "apk": "34a4bfffc230be20d8a92cc91290b873236a4af28ddb969f8b4ea4d3564dbc65",
+      "checkedAt": "2026-10-18T09:50:44.396Z"
+    },
+    {
+      "id": "ENV-04",
+      "module": "环境与保护",
+      "capability": "入口清点",
+      "steps": "从每页顶部到末尾收集全部可交互控件",
+      "expected": "动态入口、二级窗口、条件按钮均有清单",
+      "status": "通过",
+      "actual": "按五个主栏目及阅读器逐页清点控件，保留51份窗口/页面控件清单和19组跨页尺寸/名称清点；已识别入口对应210项能力清单。平台不提供、现有样本缺失及需外部授权的条件入口明确列受阻，不以打开页面替代功能通过。",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/entry-inventory-manifest.json",
+        "/tmp/lightread-k30-full-20261018/robust-ui-controls.json"
+      ],
+      "apk": "8d44b41e7e754b4188006512349516c7335461a5fe583dea358a5e1fb6775aa1",
+      "checkedAt": "2026-10-18T16:30:00.232056+00:00"
+    },
+    {
+      "id": "ENV-05",
+      "module": "环境与保护",
+      "capability": "系统遮挡",
+      "steps": "检查状态栏、底栏、键盘及悬浮窗口",
+      "expected": "区分系统浮窗与 App 遮挡",
+      "status": "通过",
+      "actual": "K30状态栏/导航栏及横竖屏阅读和听书面板已检查；键盘弹出消息与表单按钮不互相遮挡（keyboard-native-results.json）。左侧灰色系统悬浮标记在Android DocumentsUI也存在，已与App遮挡区分。键盘证据来自6b547修复包，旋转证据来自54794573包。",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/keyboard-native-results.json",
+        "/tmp/lightread-k30-full-20261018/messages-keyboard-real.png",
+        "/tmp/lightread-k30-full-20261018/backup-save-picker.png",
+        "/tmp/lightread-k30-full-20261018/rotation-metrics.json"
+      ],
+      "apk": "5479457386522c39b8434ddae4f9645db9e8c36b8d8a655317e369182f22c2b2",
+      "checkedAt": "2026-10-18T14:50:22.809589+00:00"
+    },
+    {
+      "id": "LIB-01",
+      "module": "藏书",
+      "capability": "顶部今日阅读",
+      "steps": "点击今日阅读入口并返回",
+      "expected": "进入阅读记录且返回保持列表",
+      "status": "通过",
+      "actual": "实际点击今日阅读进入统计，再由底栏返回藏书，列表正常",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/LIB-01.png"
+      ],
+      "apk": "6b547e0d4e61add19821b03642649049b0973085404bf877e94cc8c0a77b1378",
+      "checkedAt": "2026-10-18T10:42:02.153Z"
+    },
+    {
+      "id": "LIB-02",
+      "module": "藏书",
+      "capability": "顶部继续阅读",
+      "steps": "点击继续阅读并返回",
+      "expected": "进入对应书及原位置",
+      "status": "通过",
+      "actual": "继续阅读实际打开理想国；ADB 触摸正文中央唤出工具栏，再实际触摸顶部返回按钮回藏书。此前 CDP 点击恰逢初次工具栏自动隐藏，属于时序失配",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/resume-reader-controls.png",
+        "/tmp/lightread-k30-full-20261018/resume-returned.png"
+      ],
+      "apk": "6b547e0d4e61add19821b03642649049b0973085404bf877e94cc8c0a77b1378",
+      "checkedAt": "2026-10-18T10:45:18.273Z"
+    },
+    {
+      "id": "LIB-03",
+      "module": "藏书",
+      "capability": "搜索命中",
+      "steps": "搜索理想国、作者和部分书名",
+      "expected": "结果正确，键盘和清除按钮可用",
+      "status": "通过",
+      "actual": "完整书名、部分书名、作者搜索均命中；清除按钮恢复列表",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/LIB-03.png"
+      ],
+      "apk": "6b547e0d4e61add19821b03642649049b0973085404bf877e94cc8c0a77b1378",
+      "checkedAt": "2026-10-18T10:42:43.465Z"
+    },
+    {
+      "id": "LIB-04",
+      "module": "藏书",
+      "capability": "搜索空结果",
+      "steps": "输入无结果词，清除",
+      "expected": "空状态正确且清除恢复",
+      "status": "通过",
+      "actual": "无结果状态可见，清除恢复已有书",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/LIB-04.png"
+      ],
+      "apk": "6b547e0d4e61add19821b03642649049b0973085404bf877e94cc8c0a77b1378",
+      "checkedAt": "2026-10-18T10:42:54.227Z"
+    },
+    {
+      "id": "LIB-05",
+      "module": "藏书",
+      "capability": "书架状态筛选",
+      "steps": "依次全部、在读、未读、读完",
+      "expected": "筛选与计数相符，选中态清楚",
+      "status": "通过",
+      "actual": "全部／在读／未读／读完逐项点击，显示数量与书库阅读状态一致",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/LIB-05.png"
+      ],
+      "apk": "6b547e0d4e61add19821b03642649049b0973085404bf877e94cc8c0a77b1378",
+      "checkedAt": "2026-10-18T10:43:14.658Z"
+    },
+    {
+      "id": "LIB-06",
+      "module": "藏书",
+      "capability": "排序",
+      "steps": "遍历实际排序选项并恢复",
+      "expected": "列表顺序与选项一致",
+      "status": "通过",
+      "actual": "最近阅读／添加时间／书名／作者四种排序逐项实际点击，并以书卡可见完整书名顺序核对全部书目；恢复最近阅读。此前失败来自生产包无 Vue 私有组件属性",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/sort-recent.png",
+        "/tmp/lightread-k30-full-20261018/sort-added.png",
+        "/tmp/lightread-k30-full-20261018/sort-title.png",
+        "/tmp/lightread-k30-full-20261018/sort-author.png"
+      ],
+      "apk": "6b547e0d4e61add19821b03642649049b0973085404bf877e94cc8c0a77b1378",
+      "checkedAt": "2026-10-18T10:46:35.808Z"
+    },
+    {
+      "id": "LIB-07",
+      "module": "藏书",
+      "capability": "书单入口",
+      "steps": "点书单显示页内列表、点入内容、管理返回、切回全部",
+      "expected": "计数和范围正确",
+      "status": "通过",
+      "actual": "书单入口显示页内列表，无管理弹窗；理想国加入后为 1 本，打开真实正文并返回，全部筛选正常",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/booklists-republic-list.png"
+      ],
+      "apk": "ecd8b9950fe7933ea5919f43209fb8e62865041bedccac7d008aa24500e43750",
+      "checkedAt": "2026-10-18T10:31:15.358Z"
+    },
+    {
+      "id": "LIB-08",
+      "module": "藏书",
+      "capability": "新增书单",
+      "steps": "创建临时书单、重命名",
+      "expected": "新名字立即生效",
+      "status": "通过",
+      "actual": "原生 UI 空值禁用、新建临时书单、打开空书单、返回、管理中改名立即生效",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/booklists-created.png"
+      ],
+      "apk": "ecd8b9950fe7933ea5919f43209fb8e62865041bedccac7d008aa24500e43750",
+      "checkedAt": "2026-10-18T10:30:41.788Z"
+    },
+    {
+      "id": "LIB-09",
+      "module": "藏书",
+      "capability": "书单加减书",
+      "steps": "临时书单添加已有书再移除",
+      "expected": "仅书单关联改变，书本保留",
+      "status": "通过",
+      "actual": "通过单书菜单加入理想国，再通过多选菜单移出；仅关联改变，34 本原书保留",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/booklists-removed.png"
+      ],
+      "apk": "ecd8b9950fe7933ea5919f43209fb8e62865041bedccac7d008aa24500e43750",
+      "checkedAt": "2026-10-18T10:31:51.488Z"
+    },
+    {
+      "id": "LIB-10",
+      "module": "藏书",
+      "capability": "分享书单窗口",
+      "steps": "打开分享，检查格式和关闭",
+      "expected": "不自动发送，分享内容可预览",
+      "status": "通过",
+      "actual": "JSON 和纯文本预览均包含理想国，仅预览未发送／导出",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/booklists-share.png"
+      ],
+      "apk": "ecd8b9950fe7933ea5919f43209fb8e62865041bedccac7d008aa24500e43750",
+      "checkedAt": "2026-10-18T10:31:28.870Z"
+    },
+    {
+      "id": "LIB-11",
+      "module": "藏书",
+      "capability": "导入书单窗口",
+      "steps": "空输入、无效格式、取消",
+      "expected": "禁用／错误明确，无脏数据",
+      "status": "通过",
+      "actual": "导入书单空值与无效 JSON 均禁用提交，错误提示可见，取消未增添条目",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/messages-import-invalid.png"
+      ],
+      "apk": "6b547e0d4e61add19821b03642649049b0973085404bf877e94cc8c0a77b1378",
+      "checkedAt": "2026-10-18T10:37:57.203Z"
+    },
+    {
+      "id": "LIB-12",
+      "module": "藏书",
+      "capability": "删除临时书单",
+      "steps": "删除本轮创建的空书单",
+      "expected": "确认对象明确，真实书不受影响",
+      "status": "通过",
+      "actual": "删除提示明确临时书单名称，取消保留、确认删除书单，理想国和其余原书不删除",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/booklists-cleaned.png"
+      ],
+      "apk": "6b547e0d4e61add19821b03642649049b0973085404bf877e94cc8c0a77b1378",
+      "checkedAt": "2026-10-18T10:39:08.609Z"
+    },
+    {
+      "id": "LIB-13",
+      "module": "藏书",
+      "capability": "新增菜单",
+      "steps": "逐一检查可见导入入口和返回",
+      "expected": "菜单完整、返回一致",
+      "status": "通过",
+      "actual": "添加菜单已逐项清点，Android 返回关闭菜单且不离开书架",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/LIB-13.png"
+      ],
+      "apk": "6b547e0d4e61add19821b03642649049b0973085404bf877e94cc8c0a77b1378",
+      "checkedAt": "2026-10-18T10:43:34.292Z"
+    },
+    {
+      "id": "LIB-14",
+      "module": "藏书",
+      "capability": "文件选择器",
+      "steps": "打开系统文件选择器后取消",
+      "expected": "返回书架，无重复导入或卡住",
+      "status": "通过",
+      "actual": "实际打开 Android 系统文件选择器，物理返回取消，藏书仍34本，未导入、未卡住",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/library-system-picker.png",
+        "/tmp/lightread-k30-full-20261018/library-system-picker-cancel.png"
+      ],
+      "apk": "6b547e0d4e61add19821b03642649049b0973085404bf877e94cc8c0a77b1378",
+      "checkedAt": "2026-10-18T11:16:17.426Z"
+    },
+    {
+      "id": "LIB-15",
+      "module": "藏书",
+      "capability": "文件夹导入入口",
+      "steps": "打开文件夹选择、取消",
+      "expected": "权限与取消提示正确",
+      "status": "受阻",
+      "actual": "Android 产品不提供文件夹导入；真机添加面板无此入口，canPickFolder 对 Android 明确返回 false。文件多选由系统选择器覆盖",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/library-add-no-folder.png"
+      ],
+      "apk": "6b547e0d4e61add19821b03642649049b0973085404bf877e94cc8c0a77b1378",
+      "checkedAt": "2026-10-18T11:16:07.355Z"
+    },
+    {
+      "id": "LIB-16",
+      "module": "藏书",
+      "capability": "网址导入",
+      "steps": "空输入、非法地址、取消",
+      "expected": "校验明确，不误导入",
+      "status": "通过",
+      "actual": "网址导入空值禁用，非法地址未导入，取消回书架，书数未变",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/LIB-16.png"
+      ],
+      "apk": "6b547e0d4e61add19821b03642649049b0973085404bf877e94cc8c0a77b1378",
+      "checkedAt": "2026-10-18T10:43:54.567Z"
+    },
+    {
+      "id": "LIB-17",
+      "module": "藏书",
+      "capability": "单书更多菜单",
+      "steps": "在测试对象上打开所有可见项",
+      "expected": "菜单对象、格式与状态正确",
+      "status": "通过",
+      "actual": "理想国单书菜单显示书籍对应信息；可见操作和关闭路径已清点，修改操作另项验证",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/LIB-17.png"
+      ],
+      "apk": "6b547e0d4e61add19821b03642649049b0973085404bf877e94cc8c0a77b1378",
+      "checkedAt": "2026-10-18T10:44:02.858Z"
+    },
+    {
+      "id": "LIB-18",
+      "module": "藏书",
+      "capability": "置顶",
+      "steps": "对一本书置顶再取消",
+      "expected": "排序即时改变，最终恢复",
+      "status": "通过",
+      "actual": "理想国置顶与取消置顶实际生效，并恢复原状态",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/LIB-18.png"
+      ],
+      "apk": "6b547e0d4e61add19821b03642649049b0973085404bf877e94cc8c0a77b1378",
+      "checkedAt": "2026-10-18T10:44:19.576Z"
+    },
+    {
+      "id": "LIB-19",
+      "module": "藏书",
+      "capability": "私有标记",
+      "steps": "只检查入口和说明／隔离条目验证",
+      "expected": "不触发真实书云同步变化",
+      "status": "通过",
+      "actual": "独立临时 TXT 设为私密、显示私密标记，再取消；原书未改动",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/LIB-19-isolated.png"
+      ],
+      "apk": "6b547e0d4e61add19821b03642649049b0973085404bf877e94cc8c0a77b1378",
+      "checkedAt": "2026-10-18T11:17:46.725Z"
+    },
+    {
+      "id": "LIB-20",
+      "module": "藏书",
+      "capability": "移动藏书论文",
+      "steps": "临时条目来回移动",
+      "expected": "归类和计数更新且可恢复",
+      "status": "通过",
+      "actual": "临时条目藏书→论文→藏书，真实移动后对应列表消失/出现，kind 和计数一致",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/LIB-20-isolated.png"
+      ],
+      "apk": "6b547e0d4e61add19821b03642649049b0973085404bf877e94cc8c0a77b1378",
+      "checkedAt": "2026-10-18T11:18:13.835Z"
+    },
+    {
+      "id": "LIB-21",
+      "module": "藏书",
+      "capability": "格式转换",
+      "steps": "支持格式的临时副本转 EPUB",
+      "expected": "可阅读、章节与正文保留，不覆盖原书",
+      "status": "通过",
+      "actual": "临时 TXT 转 EPUB，新文件入库且原 TXT 保留；新 EPUB 真机可打开并读到原章节及正文",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/LIB-21-converted.png"
+      ],
+      "apk": "6b547e0d4e61add19821b03642649049b0973085404bf877e94cc8c0a77b1378",
+      "checkedAt": "2026-10-18T11:18:30.874Z"
+    },
+    {
+      "id": "LIB-22",
+      "module": "藏书",
+      "capability": "多选状态",
+      "steps": "进入多选、选中、取消、全选再取消",
+      "expected": "计数和禁用态正确",
+      "status": "通过",
+      "actual": "多选、单选、全选、取消全选、退出均生效",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/LIB-22.png"
+      ],
+      "apk": "6b547e0d4e61add19821b03642649049b0973085404bf877e94cc8c0a77b1378",
+      "checkedAt": "2026-10-18T10:44:39.713Z"
+    },
+    {
+      "id": "LIB-23",
+      "module": "藏书",
+      "capability": "批量更多",
+      "steps": "逐项打开批量菜单、取消",
+      "expected": "操作对象范围明确",
+      "status": "通过",
+      "actual": "批量更多明确已选1本；逐项核对上传/转换/移动/私密/标签入口，标签与上传打开取消，物理返回不丢选择；转换/移动/私密另已在隔离条目执行",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/LIB-23-batch-closed.png"
+      ],
+      "apk": "db3e66f826d7dbfb0f947a7b0230f311295416fca2b95eecd9708d1d3d8a8341",
+      "checkedAt": "2026-10-18T11:22:18.721Z"
+    },
+    {
+      "id": "LIB-24",
+      "module": "藏书",
+      "capability": "标签",
+      "steps": "在临时条目增删、重命名标签",
+      "expected": "筛选正确，无残留",
+      "status": "通过",
+      "actual": "临时条目新增标签→改名→按标签筛选仅1本→删除取消→确认删除，标签清理且其他34本未改",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/LIB-24-tags-clean.png"
+      ],
+      "apk": "6b547e0d4e61add19821b03642649049b0973085404bf877e94cc8c0a77b1378",
+      "checkedAt": "2026-10-18T11:19:27.785Z"
+    },
+    {
+      "id": "LIB-25",
+      "module": "藏书",
+      "capability": "云端上传窗口",
+      "steps": "打开、选择目标、取消",
+      "expected": "不未经确认上传真实书",
+      "status": "通过",
+      "actual": "临时书进入上传窗口，未选择目标时开始上传禁用；选择已有书库仅检查连接能力，关闭窗口且未开始上传",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/LIB-25-upload-target.png"
+      ],
+      "apk": "db3e66f826d7dbfb0f947a7b0230f311295416fca2b95eecd9708d1d3d8a8341",
+      "checkedAt": "2026-10-18T11:21:42.022Z"
+    },
+    {
+      "id": "LIB-26",
+      "module": "藏书",
+      "capability": "删除临时条目",
+      "steps": "仅删除本轮导入的测试项",
+      "expected": "二次确认、计数与文件状态正确",
+      "status": "通过",
+      "actual": "本轮独立 TXT 与转换 EPUB 均先取消删除再确认删除；恢复原34本且原ID集合完全一致",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/LIB-26-restored34.png"
+      ],
+      "apk": "db3e66f826d7dbfb0f947a7b0230f311295416fca2b95eecd9708d1d3d8a8341",
+      "checkedAt": "2026-10-18T11:23:03.954Z"
+    },
+    {
+      "id": "READ-01",
+      "module": "普通阅读／理想国",
+      "capability": "打开与首屏",
+      "steps": "打开理想国及各格式现有书",
+      "expected": "无空白、乱码、错书、异常加载",
+      "status": "通过",
+      "actual": "《理想国》EPUB及设备已有TXT/MOBI/PDF实测正文打开、目录或页码和翻页；隔离离线回归再次核对文本非空及PDF实际canvas，未见白屏。设备缺少的其余格式另列PAPER-15受阻，不作已测结论",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/offline-native-results.json",
+        "/tmp/lightread-k30-full-20261018/ROBUST-08-offline-pdf.png"
+      ],
+      "apk": "6d15267ae7417183ee046d539843da47e90446355d86f18c32d1025f9272dbb6",
+      "checkedAt": "2026-10-18T16:23:29.223247+00:00"
+    },
+    {
+      "id": "READ-02",
+      "module": "普通阅读／理想国",
+      "capability": "顶部返回",
+      "steps": "点返回书架，再打开",
+      "expected": "阅读位置保留",
+      "status": "通过",
+      "actual": "顶部返回藏书后重新打开理想国，保留刚才阅读位置，重排误差小于0.2%",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/READ-02-reading.png"
+      ],
+      "apk": "47780be5cde1fcc7f2bbe494273d823597493591d2f8f6c1be8291191a5d5977",
+      "checkedAt": "2026-10-18T12:18:34.343Z"
+    },
+    {
+      "id": "READ-03",
+      "module": "普通阅读／理想国",
+      "capability": "工具栏显隐",
+      "steps": "轻点中部、等待隐藏、再次唤出",
+      "expected": "按钮可达，不误翻页",
+      "status": "通过",
+      "actual": "《理想国》真实中央触摸显示工具栏；目录打开/关闭后正文和底栏正常，初次自动隐藏生效",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/READ-03-navigation.png"
+      ],
+      "apk": "db3e66f826d7dbfb0f947a7b0230f311295416fca2b95eecd9708d1d3d8a8341",
+      "checkedAt": "2026-10-18T11:26:47.899Z"
+    },
+    {
+      "id": "READ-04",
+      "module": "普通阅读／理想国",
+      "capability": "点按翻页",
+      "steps": "上下／左右有效区域前后翻页",
+      "expected": "方向与手机实际版式一致",
+      "status": "通过",
+      "actual": "理想国分页模式实际ADB触摸下部下一页、上部上一页，CFI与进度方向正确；工具栏隐藏后命中正文有效区域",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/READ-04-tap-pages.png"
+      ],
+      "apk": "5479457386522c39b8434ddae4f9645db9e8c36b8d8a655317e369182f22c2b2",
+      "checkedAt": "2026-10-18T14:44:09.812Z"
+    },
+    {
+      "id": "READ-05",
+      "module": "普通阅读／理想国",
+      "capability": "滑动翻页",
+      "steps": "短划、长划、连续划、逆向划",
+      "expected": "不重复页、不丢页、不跳错章",
+      "status": "通过",
+      "actual": "理想国分页模式原生短划、长划、逆向划均实际改变CFI，连续三次划动后正文保持可读",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/READ-05-swipes.png"
+      ],
+      "apk": "5479457386522c39b8434ddae4f9645db9e8c36b8d8a655317e369182f22c2b2",
+      "checkedAt": "2026-10-18T14:44:35.410Z"
+    },
+    {
+      "id": "READ-06",
+      "module": "普通阅读／理想国",
+      "capability": "目录",
+      "steps": "展开层级、点击章节、关闭和返回",
+      "expected": "定位正确，选中章节一致",
+      "status": "通过",
+      "actual": "目录有真实长篇章节，点击第4条实际改变 CFI 并回正文；目录滚动和关闭正常：插页",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/READ-06-navigation.png"
+      ],
+      "apk": "db3e66f826d7dbfb0f947a7b0230f311295416fca2b95eecd9708d1d3d8a8341",
+      "checkedAt": "2026-10-18T11:27:02.170Z"
+    },
+    {
+      "id": "READ-07",
+      "module": "普通阅读／理想国",
+      "capability": "上一章下一章",
+      "steps": "连续切换含边界章节",
+      "expected": "跳转正确，首尾有合理反馈",
+      "status": "通过",
+      "actual": "实际上一章/下一章往返章节正确；定位书首/书末后再点边界按钮无空白或异常，阅读位置保持有效",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/reader-navigation-native.json"
+      ],
+      "apk": "5479457386522c39b8434ddae4f9645db9e8c36b8d8a655317e369182f22c2b2",
+      "checkedAt": "2026-10-18T14:45:02.116Z"
+    },
+    {
+      "id": "READ-08",
+      "module": "普通阅读／理想国",
+      "capability": "正文搜索",
+      "steps": "搜索常见词、点击命中、上一下一结果",
+      "expected": "高亮和跳转对应真实文字",
+      "status": "通过",
+      "actual": "搜索理想国“正义”命中真实正文，结果列表关键字高亮，先后点击两个命中可定位；当前产品无单独上一/下一结果按钮",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/READ-08-reading.png"
+      ],
+      "apk": "47780be5cde1fcc7f2bbe494273d823597493591d2f8f6c1be8291191a5d5977",
+      "checkedAt": "2026-10-18T12:18:13.384Z"
+    },
+    {
+      "id": "READ-09",
+      "module": "普通阅读／理想国",
+      "capability": "搜索异常",
+      "steps": "空串、无结果、特殊符号、取消",
+      "expected": "不崩溃，返回原阅读状态",
+      "status": "通过",
+      "actual": "空串、无结果字符串、特殊符号与无效正则不崩溃；错误/空状态可返回，未留下无效搜索标记",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/READ-09-reading.png"
+      ],
+      "apk": "47780be5cde1fcc7f2bbe494273d823597493591d2f8f6c1be8291191a5d5977",
+      "checkedAt": "2026-10-18T12:17:46.800Z"
+    },
+    {
+      "id": "READ-10",
+      "module": "普通阅读／理想国",
+      "capability": "书签",
+      "steps": "新增自己的测试书签、面板定位、删除",
+      "expected": "状态一致，不改动原有书签",
+      "status": "通过",
+      "actual": "新增本轮书签、书签列表确认、点击定位、再从列表删除，数据库与界面一致，原有书签保留",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/READ-10-reading.png"
+      ],
+      "apk": "47780be5cde1fcc7f2bbe494273d823597493591d2f8f6c1be8291191a5d5977",
+      "checkedAt": "2026-10-18T12:15:28.879Z"
+    },
+    {
+      "id": "READ-11",
+      "module": "普通阅读／理想国",
+      "capability": "划线",
+      "steps": "长按选择正文、调整选区、四色切换",
+      "expected": "范围精确，菜单无遮挡",
+      "status": "通过",
+      "actual": "理想国实际ADB长按选字，四种划线按钮逐个保存真实选区；SQLite记录颜色和数量均正确，结束仅清理本轮新增标注",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/READ-11-four-highlights.png"
+      ],
+      "apk": "b8c0c9ca57cb967d83b5e430492e97fb8f579c3a5de77e1f47d33c1f8c4612a1",
+      "checkedAt": "2026-10-18T11:44:51.541Z"
+    },
+    {
+      "id": "READ-12",
+      "module": "普通阅读／理想国",
+      "capability": "想法",
+      "steps": "给本轮划线添加、编辑、取消和删除想法",
+      "expected": "保存与取消语义正确",
+      "status": "通过",
+      "actual": "真实长按新增想法；通过阅读器标注定位接口重开已有标注后，实际表单的修改取消、保存修改、清空保存再打开及删除均验证持久化一致",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/READ-12-notes.png"
+      ],
+      "apk": "e6524690311ffb4a808980ba9acfd13af74b07e6bdad33d9f9a0ad753fcef1ed",
+      "checkedAt": "2026-10-18T11:55:43.907Z"
+    },
+    {
+      "id": "READ-13",
+      "module": "普通阅读／理想国",
+      "capability": "笔记列表",
+      "steps": "筛选、定位、删除本轮测试笔记",
+      "expected": "只处理本轮条目，数量一致",
+      "status": "通过",
+      "actual": "本轮想法在笔记列表显示，切换书签/划线分类数量正确；点击列表定位正文，随后标注面板删除本轮条目，原标注保留",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/READ-13-notes-list.png"
+      ],
+      "apk": "e6524690311ffb4a808980ba9acfd13af74b07e6bdad33d9f9a0ad753fcef1ed",
+      "checkedAt": "2026-10-18T11:55:38.984Z"
+    },
+    {
+      "id": "READ-14",
+      "module": "普通阅读／理想国",
+      "capability": "AI 入口",
+      "steps": "打开问书面板、预设问题和取消",
+      "expected": "配置不足有说明，不自动发送正文",
+      "status": "通过",
+      "actual": "打开AI面板、检查未配置提示/输入区后关闭；未自动发送正文或产生对话",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/READ-14-navigation.png"
+      ],
+      "apk": "db3e66f826d7dbfb0f947a7b0230f311295416fca2b95eecd9708d1d3d8a8341",
+      "checkedAt": "2026-10-18T11:30:23.748Z"
+    },
+    {
+      "id": "READ-15",
+      "module": "普通阅读／理想国",
+      "capability": "页码进度",
+      "steps": "核对章名、页码、百分比、长数值",
+      "expected": "无截断溢出，实际进度匹配",
+      "status": "通过",
+      "actual": "理想国长文本进度显示非空，右侧数值在 K30 宽度内，无裁切或横向溢出：299/655·45.5%",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/READ-15-navigation.png"
+      ],
+      "apk": "db3e66f826d7dbfb0f947a7b0230f311295416fca2b95eecd9708d1d3d8a8341",
+      "checkedAt": "2026-10-18T11:30:10.964Z"
+    },
+    {
+      "id": "READ-16",
+      "module": "普通阅读／理想国",
+      "capability": "进度拖动",
+      "steps": "拖动预览、提交、撤销",
+      "expected": "预览不提前跳转，提交与撤销准确",
+      "status": "通过",
+      "actual": "拖动到30%时仅更新预览，提交change后CFI变化；返回原处按钮恢复45.5%附近阅读位置",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/READ-16-navigation.png"
+      ],
+      "apk": "db3e66f826d7dbfb0f947a7b0230f311295416fca2b95eecd9708d1d3d8a8341",
+      "checkedAt": "2026-10-18T11:30:03.072Z"
+    },
+    {
+      "id": "READ-17",
+      "module": "普通阅读／理想国",
+      "capability": "跳转边界",
+      "steps": "页码 0／负数／超上限／有效值",
+      "expected": "非法值提示，有效值能跳转",
+      "status": "通过",
+      "actual": "页码空值、0、负值、超范围及非数字均提示错误；有效第2页跳转成功并提供返回原处",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/READ-17-navigation.png"
+      ],
+      "apk": "db3e66f826d7dbfb0f947a7b0230f311295416fca2b95eecd9708d1d3d8a8341",
+      "checkedAt": "2026-10-18T11:29:00.378Z"
+    },
+    {
+      "id": "READ-18",
+      "module": "普通阅读／理想国",
+      "capability": "百分比边界",
+      "steps": "0／100／小数／超界／空输入",
+      "expected": "值与实际位置一致",
+      "status": "通过",
+      "actual": "百分比 -1、100.1 拒绝，0、45.5、100 均可跳到对应起点、中间和终点，页面仍可操作",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/READ-18-navigation.png"
+      ],
+      "apk": "db3e66f826d7dbfb0f947a7b0230f311295416fca2b95eecd9708d1d3d8a8341",
+      "checkedAt": "2026-10-18T11:29:42.768Z"
+    },
+    {
+      "id": "READ-19",
+      "module": "普通阅读／理想国",
+      "capability": "键盘展开点击",
+      "steps": "系统键盘展开时触摸跳转和取消",
+      "expected": "不被键盘挡住，点击命中正确",
+      "status": "通过",
+      "actual": "K30真实键盘开启时使用ADB触摸跳转按钮，提交后键盘收起且错误可见；有效页码提交、键盘返回及窗口返回正常。脚本已按Playwright视觉坐标修正，不是App故障。",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/progress-keyboard-invalid.png",
+        "/tmp/lightread-k30-full-20261018/progress-keyboard-valid.png"
+      ],
+      "apk": "db3e66f826d7dbfb0f947a7b0230f311295416fca2b95eecd9708d1d3d8a8341",
+      "checkedAt": "2026-10-18T11:32:37.169Z"
+    },
+    {
+      "id": "READ-20",
+      "module": "普通阅读／理想国",
+      "capability": "阅读位置恢复",
+      "steps": "结束专项后回到事先记录的位置",
+      "expected": "阅读位置及原设置恢复",
+      "status": "通过",
+      "actual": "完成专项后恢复用户独占测试前记录的所有阅读位置、进度与最近阅读顺序；理想国恢复用户最新位置，保留绿色点睛和2.08强度，不覆盖为早期测试默认值",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/final-restoration-results.json"
+      ],
+      "apk": "88b932839af3591771acacb77dec36b46a31a2b08c887097a7247beb263f7cd9",
+      "checkedAt": "2026-10-18T17:22:28.893Z"
+    },
+    {
+      "id": "TYPE-01",
+      "module": "排版",
+      "capability": "字体选项",
+      "steps": "逐一选择现有字体、观察中文和标点",
+      "expected": "字体实际加载，无缺字",
+      "status": "通过",
+      "actual": "默认/宋体/黑体/楷体逐项选择，正文实际font-family改变、嵌入字体加载完成且无字体错误；中文标点截图逐项留档",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/font-options-native.json",
+        "/tmp/lightread-k30-full-20261018/font-option-3.png"
+      ],
+      "apk": "e6524690311ffb4a808980ba9acfd13af74b07e6bdad33d9f9a0ad753fcef1ed",
+      "checkedAt": "2026-10-18T12:06:23.798Z"
+    },
+    {
+      "id": "TYPE-02",
+      "module": "排版",
+      "capability": "字号",
+      "steps": "滑条／加减／边界／恢复",
+      "expected": "字号与正文一致，无溢出",
+      "status": "通过",
+      "actual": "字号滑条8/64/22和加减按钮实际影响理想国正文computed fontSize，范围与保存值一致",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/TYPE-02-typography.png"
+      ],
+      "apk": "db3e66f826d7dbfb0f947a7b0230f311295416fca2b95eecd9708d1d3d8a8341",
+      "checkedAt": "2026-10-18T11:39:36.215Z"
+    },
+    {
+      "id": "TYPE-03",
+      "module": "排版",
+      "capability": "行距",
+      "steps": "逐项调整并恢复",
+      "expected": "正文行距实际改变",
+      "status": "通过",
+      "actual": "行距1.2/2.6/1.8实际计算高度与字号×行距一致，长段落可读",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/TYPE-03-typography.png"
+      ],
+      "apk": "db3e66f826d7dbfb0f947a7b0230f311295416fca2b95eecd9708d1d3d8a8341",
+      "checkedAt": "2026-10-18T11:39:44.320Z"
+    },
+    {
+      "id": "TYPE-04",
+      "module": "排版",
+      "capability": "边距",
+      "steps": "调整水平和垂直边距并恢复",
+      "expected": "可见文本范围合理",
+      "status": "通过",
+      "actual": "边距2%/16%/6%可以调整并保存，正文仍渲染，面板无越界",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/TYPE-04-typography.png"
+      ],
+      "apk": "db3e66f826d7dbfb0f947a7b0230f311295416fca2b95eecd9708d1d3d8a8341",
+      "checkedAt": "2026-10-18T11:39:53.217Z"
+    },
+    {
+      "id": "TYPE-05",
+      "module": "排版",
+      "capability": "段间距缩进",
+      "steps": "切换可见段落设置并恢复",
+      "expected": "只影响预期排版",
+      "status": "通过",
+      "actual": "更多文字设置字距0.1em和两端/左对齐可切换，实际正文computed字距改变；当前产品无独立段距/首行缩进控件",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/TYPE-05-typography.png"
+      ],
+      "apk": "db3e66f826d7dbfb0f947a7b0230f311295416fca2b95eecd9708d1d3d8a8341",
+      "checkedAt": "2026-10-18T11:41:06.373Z"
+    },
+    {
+      "id": "TYPE-06",
+      "module": "排版",
+      "capability": "翻页方式",
+      "steps": "翻页／滚动模式互切",
+      "expected": "位置保留，手势正确",
+      "status": "通过",
+      "actual": "分页、章内滚动、连续滚动逐个切换，保存偏好和实际正文保持正常；模式说明随选择更新",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/TYPE-06-typography.png"
+      ],
+      "apk": "db3e66f826d7dbfb0f947a7b0230f311295416fca2b95eecd9708d1d3d8a8341",
+      "checkedAt": "2026-10-18T11:41:55.210Z"
+    },
+    {
+      "id": "TYPE-07",
+      "module": "排版",
+      "capability": "单双栏",
+      "steps": "实际可用栏数及横竖屏组合",
+      "expected": "栏数与屏幕规则一致",
+      "status": "通过",
+      "actual": "实际系统旋转横屏后选择单栏/双栏，渲染器上限与保存值一致；回竖屏排版正常且位置保持附近",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/rotation-columns-1.png",
+        "/tmp/lightread-k30-full-20261018/rotation-columns-2.png",
+        "/tmp/lightread-k30-full-20261018/rotation-reader-portrait.png"
+      ],
+      "apk": "5479457386522c39b8434ddae4f9645db9e8c36b8d8a655317e369182f22c2b2",
+      "checkedAt": "2026-10-18T14:48:15.957Z"
+    },
+    {
+      "id": "TYPE-08",
+      "module": "排版",
+      "capability": "正文主题",
+      "steps": "白／纸／护眼／夜间等实际选项",
+      "expected": "正文与面板可读，应用外观不误改",
+      "status": "通过",
+      "actual": "逐个切换全部5个正文主题，选中和正文颜色同步，保留应用外观独立性",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/TYPE-08-typography.png"
+      ],
+      "apk": "db3e66f826d7dbfb0f947a7b0230f311295416fca2b95eecd9708d1d3d8a8341",
+      "checkedAt": "2026-10-18T11:41:34.501Z"
+    },
+    {
+      "id": "TYPE-09",
+      "module": "排版",
+      "capability": "进度显示",
+      "steps": "页码／百分比／组合等实际选项",
+      "expected": "右端数值正确、无截断",
+      "status": "通过",
+      "actual": "页码+百分比/页码/百分比逐一切换，底栏实际显示与偏好一致且无截断",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/TYPE-09-typography.png"
+      ],
+      "apk": "db3e66f826d7dbfb0f947a7b0230f311295416fca2b95eecd9708d1d3d8a8341",
+      "checkedAt": "2026-10-18T11:42:36.871Z"
+    },
+    {
+      "id": "TYPE-10",
+      "module": "排版",
+      "capability": "排版恢复默认",
+      "steps": "检查确认、取消；隔离设置下确认",
+      "expected": "取消不改设置，确认后恢复测试前偏好",
+      "status": "通过",
+      "actual": "恢复默认排版先取消确认设置不变，再确认恢复默认；专项完成恢复测试前排版",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/TYPE-10-reset.png"
+      ],
+      "apk": "e6524690311ffb4a808980ba9acfd13af74b07e6bdad33d9f9a0ad753fcef1ed",
+      "checkedAt": "2026-10-18T12:07:30.424Z"
+    },
+    {
+      "id": "DJ-01",
+      "module": "点睛阅读",
+      "capability": "总开关",
+      "steps": "开启／关闭，检查正文和预览",
+      "expected": "关闭无残留，开启恢复标记",
+      "status": "通过",
+      "actual": "真实长篇正文点睛开关：开启有CSS文字标记，关闭清除所有基础标记，再开启恢复",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/DJ-01-dianjing.png"
+      ],
+      "apk": "e6524690311ffb4a808980ba9acfd13af74b07e6bdad33d9f9a0ad753fcef1ed",
+      "checkedAt": "2026-10-18T12:08:26.109Z"
+    },
+    {
+      "id": "DJ-02",
+      "module": "点睛阅读",
+      "capability": "基础模式切换",
+      "steps": "词与词／重点词互切",
+      "expected": "真实正文效果与说明一致",
+      "status": "通过",
+      "actual": "词与词和重点词逐项切换，真实正文渲染的标记类型对应，非仅预览变化",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/DJ-02-dianjing.png"
+      ],
+      "apk": "e6524690311ffb4a808980ba9acfd13af74b07e6bdad33d9f9a0ad753fcef1ed",
+      "checkedAt": "2026-10-18T12:08:41.942Z"
+    },
+    {
+      "id": "DJ-03",
+      "module": "点睛阅读",
+      "capability": "密度三档",
+      "steps": "少／适中／多",
+      "expected": "值对应 1／50／100，标记量改变",
+      "status": "通过",
+      "actual": "新适中对应原高档；K30生产Worker整章实际选词913→2739、1138→3414，均准确3倍。当前绘制窗口合计690→2155，局部比例随关键词分布变化，不把局部窗口当整章。少/中/多对应1/50/100，原失败已修复。",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/density-tripled-native.json",
+        "/tmp/lightread-k30-full-20261018/density-tripled-max-settings.png",
+        "/tmp/lightread-k30-full-20261018/density-tripled-max-republic.png",
+        "/tmp/lightread-k30-full-20261018/density-tripled-middle-republic.png"
+      ],
+      "apk": "eac01f0825455330c457a71af499a127296344d67d876f214ad89c6585e52b08",
+      "checkedAt": "2026-10-18T13:34:24.654911+00:00"
+    },
+    {
+      "id": "DJ-04",
+      "module": "点睛阅读",
+      "capability": "密度细调",
+      "steps": "1／25／50／75／100 和任意中间值",
+      "expected": "中间值有真实效果，非只有三档",
+      "status": "通过",
+      "actual": "K30《理想国》滑条1/25/50/75/100实际绘制171/358/690/1471/2155处；整章75档为适中2倍，100档为3倍；滑动有连续中间值。",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/density-tripled-native.json",
+        "/tmp/lightread-k30-full-20261018/density-tripled-max-settings.png",
+        "/tmp/lightread-k30-full-20261018/density-tripled-max-republic.png",
+        "/tmp/lightread-k30-full-20261018/density-tripled-middle-republic.png"
+      ],
+      "apk": "eac01f0825455330c457a71af499a127296344d67d876f214ad89c6585e52b08",
+      "checkedAt": "2026-10-18T13:34:24.654985+00:00"
+    },
+    {
+      "id": "DJ-05",
+      "module": "点睛阅读",
+      "capability": "密度加减",
+      "steps": "±1、上下限、拖动、重开面板",
+      "expected": "数值、禁用态、持久化正确",
+      "status": "通过",
+      "actual": "密度 ±1、上限禁用、任意值、三档选中与重开面板保留均通过。",
+      "evidence": [
+        "/tmp/lightread-k30-dianjing-qa/republic-results.json"
+      ],
+      "apk": "34a4bfffc230be20d8a92cc91290b873236a4af28ddb969f8b4ea4d3564dbc65"
+    },
+    {
+      "id": "DJ-06",
+      "module": "点睛阅读",
+      "capability": "五种强调色",
+      "steps": "每色逐一切换",
+      "expected": "正文和预览一致、舒适可读",
+      "status": "通过",
+      "actual": "五种强调色逐项选择，选中状态与保存值对应，真实正文样式逐项留档供视觉核查",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/DJ-06-dianjing.png"
+      ],
+      "apk": "e6524690311ffb4a808980ba9acfd13af74b07e6bdad33d9f9a0ad753fcef1ed",
+      "checkedAt": "2026-10-18T12:09:07.326Z"
+    },
+    {
+      "id": "DJ-07",
+      "module": "点睛阅读",
+      "capability": "明显程度",
+      "steps": "最小／中间／最大",
+      "expected": "强度独立于数量，文字对比足够",
+      "status": "通过",
+      "actual": "新版适中强度1对应原最大值，最高3；K30实际选择最高与中点，正文和设置截图核查，玫瑰色选择保留。算法测试覆盖全部颜色/主题最高档对比度；最小档此前真机已验证。",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/density-tripled-native.json",
+        "/tmp/lightread-k30-full-20261018/density-tripled-max-settings.png",
+        "/tmp/lightread-k30-full-20261018/density-tripled-max-republic.png",
+        "/tmp/lightread-k30-full-20261018/density-tripled-middle-republic.png"
+      ],
+      "apk": "eac01f0825455330c457a71af499a127296344d67d876f214ad89c6585e52b08",
+      "checkedAt": "2026-10-18T13:34:24.655009+00:00"
+    },
+    {
+      "id": "DJ-08",
+      "module": "点睛阅读",
+      "capability": "智能面板",
+      "steps": "基础／智能切换和选项检查",
+      "expected": "同一密度保留，未授权不自动发送",
+      "status": "通过",
+      "actual": "智能入口显示授权说明，取消保持基础模式和原有密度，未授权未调用书籍分析",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/DJ-08-dianjing.png"
+      ],
+      "apk": "e6524690311ffb4a808980ba9acfd13af74b07e6bdad33d9f9a0ad753fcef1ed",
+      "checkedAt": "2026-10-18T12:09:28.226Z"
+    },
+    {
+      "id": "DJ-09",
+      "module": "点睛阅读",
+      "capability": "智能服务路径",
+      "steps": "有条件时授权测试、错误与回退",
+      "expected": "真实服务与受控结果分开记录",
+      "status": "受阻",
+      "actual": "未向外部AI服务发送用户书籍正文；真机验证到授权取消，浏览器使用受控响应另行验证正常/错误/回退，不冒充真实服务成功",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/DJ-09-consent-boundary.png"
+      ],
+      "apk": "e6524690311ffb4a808980ba9acfd13af74b07e6bdad33d9f9a0ad753fcef1ed",
+      "checkedAt": "2026-10-18T12:09:33.222Z"
+    },
+    {
+      "id": "DJ-10",
+      "module": "点睛阅读",
+      "capability": "速读脉络",
+      "steps": "查看入口、导航、空状态／可用状态",
+      "expected": "状态与内容对应，无伪成功",
+      "status": "受阻",
+      "actual": "速读脉络需要启用智能分析；当前真实书籍未授权发送正文，受控浏览器已验证脉络/原文定位，真机服务结果尚未验收",
+      "evidence": [],
+      "apk": "e6524690311ffb4a808980ba9acfd13af74b07e6bdad33d9f9a0ad753fcef1ed",
+      "checkedAt": "2026-10-18T12:09:33.224Z"
+    },
+    {
+      "id": "DJ-11",
+      "module": "点睛阅读",
+      "capability": "长文连续翻页",
+      "steps": "理想国中段连续五页及跨章",
+      "expected": "标记更新，不串页、不切碎词",
+      "status": "通过",
+      "actual": "理想国连续五页及下一章均更新实际文字标记，CFI与标记留档；无空白或前页标记遗留",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/DJ-11-dianjing.png"
+      ],
+      "apk": "f81e0842ba4678288b7cd3d0cf4f1bbe2efddeb5f033ee4d6edb0f9d671b76bf",
+      "checkedAt": "2026-10-18T12:59:14.136Z"
+    },
+    {
+      "id": "DJ-12",
+      "module": "点睛阅读",
+      "capability": "点睛与打字机",
+      "steps": "隐藏／淡显未出字区域像素对照",
+      "expected": "文字前不提前出现高亮底色",
+      "status": "通过",
+      "actual": "隐藏与淡显两种后文模式，未显示关键词区域与移除关键词标记后的像素完全一致；出字推进、暂停稳定、退出保留点睛。",
+      "evidence": [
+        "/tmp/lightread-k30-dianjing-qa/republic-results.json"
+      ],
+      "apk": "34a4bfffc230be20d8a92cc91290b873236a4af28ddb969f8b4ea4d3564dbc65"
+    },
+    {
+      "id": "DJ-13",
+      "module": "点睛阅读",
+      "capability": "点睛持久化",
+      "steps": "退出页面、重启 App 后读取",
+      "expected": "数值和配色保留，原偏好最终恢复",
+      "status": "通过",
+      "actual": "退出阅读器并重载WebView后，点睛密度/配色/强度保留，重新打开理想国正文标记恢复；进程重启另在鲁棒性专项验证",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/DJ-13-dianjing.png"
+      ],
+      "apk": "f81e0842ba4678288b7cd3d0cf4f1bbe2efddeb5f033ee4d6edb0f9d671b76bf",
+      "checkedAt": "2026-10-18T12:59:40.325Z"
+    },
+    {
+      "id": "MODE-01",
+      "module": "阅读模式与场景",
+      "capability": "自动阅读启动",
+      "steps": "启动、暂停、继续、停止",
+      "expected": "进度推进且暂停稳定",
+      "status": "通过",
+      "actual": "自动阅读真实滚动推进，暂停1秒位置稳定，继续推进，退出后位置停止变化",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/MODE-01-auto.png"
+      ],
+      "apk": "1b7d1018c8d6f87930472af8dfa2cabacde841f6c0dca522002c9566ad4d3c9b",
+      "checkedAt": "2026-10-18T13:25:24.006Z"
+    },
+    {
+      "id": "MODE-02",
+      "module": "阅读模式与场景",
+      "capability": "自动阅读速度",
+      "steps": "各档、滑条、翻页／滚动",
+      "expected": "速度实际改变，不只是标签",
+      "status": "通过",
+      "actual": "60秒/屏和3秒/屏实际测量滚动距离，快档单位时间推进明显更快，非仅速度标签变化",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/MODE-02-auto.png"
+      ],
+      "apk": "1b7d1018c8d6f87930472af8dfa2cabacde841f6c0dca522002c9566ad4d3c9b",
+      "checkedAt": "2026-10-18T13:26:10.380Z"
+    },
+    {
+      "id": "MODE-03",
+      "module": "阅读模式与场景",
+      "capability": "自动阅读干预",
+      "steps": "手动翻页／滚动及返回",
+      "expected": "不会抢回用户操作位置",
+      "status": "通过",
+      "actual": "实际点击正文暂停自动阅读后手势滚动，手动位置改变且不会被自动推进抢回，退出恢复普通阅读",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/MODE-03-auto.png"
+      ],
+      "apk": "1b7d1018c8d6f87930472af8dfa2cabacde841f6c0dca522002c9566ad4d3c9b",
+      "checkedAt": "2026-10-18T13:26:39.717Z"
+    },
+    {
+      "id": "MODE-04",
+      "module": "阅读模式与场景",
+      "capability": "打字机启动",
+      "steps": "逐字／逐词／逐句等实际单位",
+      "expected": "正文推进符合选择",
+      "status": "通过",
+      "actual": "理想国逐字/逐句/逐行均启动真实揭字，记录隐藏文本长度减少；暂停边界稳定，退出清除隐藏层；已显示文字与后续逐句帧逐像素一致，未发现字形裁切。",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/MODE-04-typewriter.png",
+        "/tmp/lightread-k30-full-20261018/typewriter-unit-boundaries.json",
+        "/tmp/lightread-k30-full-20261018/typewriter-char-pixel-review.json"
+      ],
+      "apk": "eac01f0825455330c457a71af499a127296344d67d876f214ad89c6585e52b08",
+      "checkedAt": "2026-10-18T13:36:32.137Z"
+    },
+    {
+      "id": "MODE-05",
+      "module": "阅读模式与场景",
+      "capability": "打字机速度",
+      "steps": "慢／中／快、滑条和暂停",
+      "expected": "速度生效，暂停边界不漂移",
+      "status": "通过",
+      "actual": "速度滑轨最慢/最快对比真实揭字数量，快档实际更快；暂停稳定、继续推进、退出恢复",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/MODE-05-typewriter.png"
+      ],
+      "apk": "eac01f0825455330c457a71af499a127296344d67d876f214ad89c6585e52b08",
+      "checkedAt": "2026-10-18T13:37:31.497Z"
+    },
+    {
+      "id": "MODE-06",
+      "module": "阅读模式与场景",
+      "capability": "打字机后文",
+      "steps": "隐藏／淡显、清新墨迹、标点停顿",
+      "expected": "各效果正确，点睛不提前露出",
+      "status": "通过",
+      "actual": "后文隐藏/淡显实际使用对应渲染层，点睛提前露出由既有像素及真机专项回归；标点停顿/墨迹未干开关保存正确，动画细节截图留档；墨迹未干开启产生真实fresh范围，关闭及退出后清空。",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/MODE-06-typewriter.png",
+        "/tmp/lightread-k30-full-20261018/typewriter-extras-native.json",
+        "/tmp/lightread-k30-full-20261018/typewriter-fresh-ink.png"
+      ],
+      "apk": "eac01f0825455330c457a71af499a127296344d67d876f214ad89c6585e52b08",
+      "checkedAt": "2026-10-18T13:39:03.044Z"
+    },
+    {
+      "id": "MODE-07",
+      "module": "阅读模式与场景",
+      "capability": "打字机音效",
+      "steps": "开关、预览、音量及退出",
+      "expected": "音效与设置一致，退出不残留",
+      "status": "通过",
+      "actual": "打字声所有音色逐项选择并产生真实音频节点，试听按钮生效；音量0/100%边界保存正确，关闭后退出阅读器清理音频",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/MODE-07-typewriter-sound.png",
+        "/tmp/lightread-k30-full-20261018/typewriter-extras-native.json"
+      ],
+      "apk": "eac01f0825455330c457a71af499a127296344d67d876f214ad89c6585e52b08",
+      "checkedAt": "2026-10-18T13:41:03.860Z"
+    },
+    {
+      "id": "MODE-08",
+      "module": "阅读模式与场景",
+      "capability": "歌词阅读",
+      "steps": "节奏／听书驱动、聚焦行数、暂停退出",
+      "expected": "跟随和位置恢复正确",
+      "status": "通过",
+      "actual": "新包K30淡显区点睛底色像素抑制通过；手动三行、上下移动、自动推进/暂停、在线听书驱动与互斥切换已在专项验证",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/lyric-dim-fixed.json",
+        "/tmp/lightread-k30-full-20261018/lyric-dim-fixed.png",
+        "/tmp/lightread-k30-full-20261018/lyric-dim-fixed-marked.png",
+        "/tmp/lightread-k30-full-20261018/lyric-dim-fixed-plain.png"
+      ],
+      "apk": "5479457386522c39b8434ddae4f9645db9e8c36b8d8a655317e369182f22c2b2",
+      "checkedAt": "2026-10-18T14:33:02.058Z"
+    },
+    {
+      "id": "MODE-09",
+      "module": "阅读模式与场景",
+      "capability": "模式互斥",
+      "steps": "自动／打字机／歌词／听书互切",
+      "expected": "只保留合理会话，不重叠推进",
+      "status": "通过",
+      "actual": "自动阅读→打字机→歌词逐项实际启动，始终仅一个带读会话，切换清除旧揭字层，退出清除聚焦层",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/MODE-09-mutual.png"
+      ],
+      "apk": "eac01f0825455330c457a71af499a127296344d67d876f214ad89c6585e52b08",
+      "checkedAt": "2026-10-18T13:44:55.399Z"
+    },
+    {
+      "id": "MODE-10",
+      "module": "阅读模式与场景",
+      "capability": "夜读场景",
+      "steps": "开关、详情、返回、恢复",
+      "expected": "背景与字体清楚，关闭还原",
+      "status": "通过",
+      "actual": "夜读场景实际开关、进入详情、Android 返回及关闭恢复原排版通过。",
+      "evidence": [
+        "/tmp/lightread-k30-dianjing-qa/results.json"
+      ],
+      "apk": "d7327eeb8ebd60cf6f04c07bb99c52dc029672567e70b295b4131cb476cd79a3"
+    },
+    {
+      "id": "MODE-11",
+      "module": "阅读模式与场景",
+      "capability": "护眼场景",
+      "steps": "开关、详情、返回、恢复",
+      "expected": "配色舒适，关闭还原",
+      "status": "通过",
+      "actual": "护眼场景实际开关、进入详情、Android 返回及关闭恢复原排版通过。",
+      "evidence": [
+        "/tmp/lightread-k30-dianjing-qa/results.json"
+      ],
+      "apk": "d7327eeb8ebd60cf6f04c07bb99c52dc029672567e70b295b4131cb476cd79a3"
+    },
+    {
+      "id": "MODE-12",
+      "module": "阅读模式与场景",
+      "capability": "墨水屏场景",
+      "steps": "开关、详情、返回、恢复",
+      "expected": "黑白可读，无多余动画残留",
+      "status": "通过",
+      "actual": "墨水屏场景实际开关、进入详情、Android 返回及关闭恢复原排版通过。",
+      "evidence": [
+        "/tmp/lightread-k30-dianjing-qa/results.json"
+      ],
+      "apk": "d7327eeb8ebd60cf6f04c07bb99c52dc029672567e70b295b4131cb476cd79a3"
+    },
+    {
+      "id": "MODE-13",
+      "module": "阅读模式与场景",
+      "capability": "大字场景",
+      "steps": "开关、详情、返回、恢复",
+      "expected": "文字变大但按钮布局正常",
+      "status": "通过",
+      "actual": "大字场景实际开关、进入详情、Android 返回及关闭恢复原排版通过。",
+      "evidence": [
+        "/tmp/lightread-k30-dianjing-qa/results.json"
+      ],
+      "apk": "d7327eeb8ebd60cf6f04c07bb99c52dc029672567e70b295b4131cb476cd79a3"
+    },
+    {
+      "id": "MODE-14",
+      "module": "阅读模式与场景",
+      "capability": "沉浸场景",
+      "steps": "开关、详情、返回、退出",
+      "expected": "进入退出路径明确，原排版恢复",
+      "status": "通过",
+      "actual": "沉浸场景实际开关、进入详情、Android 返回及关闭恢复原排版通过。",
+      "evidence": [
+        "/tmp/lightread-k30-dianjing-qa/results.json"
+      ],
+      "apk": "d7327eeb8ebd60cf6f04c07bb99c52dc029672567e70b295b4131cb476cd79a3"
+    },
+    {
+      "id": "TTS-01",
+      "module": "听书",
+      "capability": "播放器入口",
+      "steps": "阅读／模式／迷你条入口互相返回",
+      "expected": "同一会话、同一当前位置",
+      "status": "通过",
+      "actual": "阅读入口开始实际听书后暂停，收起→迷你条→模式页听书入口均返回同一暂停会话和当前位置，没有另开会话",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/TTS-01-session-entry.png"
+      ],
+      "apk": "6d15267ae7417183ee046d539843da47e90446355d86f18c32d1025f9272dbb6",
+      "checkedAt": "2026-10-18T16:12:16.965Z"
+    },
+    {
+      "id": "TTS-02",
+      "module": "听书",
+      "capability": "在线开始",
+      "steps": "理想国和另一本现有书开始朗读",
+      "expected": "真实音频成功解码、游标推进",
+      "status": "通过",
+      "actual": "理想国 EPUB 与设备现存西游记 TXT 均完成真实在线朗读，观察到非零PCM与正文跟随",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/TTS-02-tts.png"
+      ],
+      "apk": "e6524690311ffb4a808980ba9acfd13af74b07e6bdad33d9f9a0ad753fcef1ed",
+      "checkedAt": "2026-10-18T11:57:51.335Z"
+    },
+    {
+      "id": "TTS-03",
+      "module": "听书",
+      "capability": "暂停继续",
+      "steps": "暂停一段时间再继续",
+      "expected": "不跳错句、不重复旧长段",
+      "status": "通过",
+      "actual": "理想国真实在线PCM播放，句子自动推进；暂停后3秒句子不动，继续恢复真实音频输出",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/TTS-03-tts.png"
+      ],
+      "apk": "b8c0c9ca57cb967d83b5e430492e97fb8f579c3a5de77e1f47d33c1f8c4612a1",
+      "checkedAt": "2026-10-18T11:51:14.201Z"
+    },
+    {
+      "id": "TTS-04",
+      "module": "听书",
+      "capability": "停止重开",
+      "steps": "停止，再从当前位置开始",
+      "expected": "按钮和位置一致，无残余音频",
+      "status": "通过",
+      "actual": "停止后恢复开始状态、跳句禁用；再次开始能产生非零PCM并继续阅读",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/TTS-04-tts.png"
+      ],
+      "apk": "b8c0c9ca57cb967d83b5e430492e97fb8f579c3a5de77e1f47d33c1f8c4612a1",
+      "checkedAt": "2026-10-18T11:52:34.662Z"
+    },
+    {
+      "id": "TTS-05",
+      "module": "听书",
+      "capability": "上一下一句",
+      "steps": "逐项点击前后句",
+      "expected": "朗读与文稿定位一致",
+      "status": "通过",
+      "actual": "暂停状态下上一句/下一句改变实际跟读文字，保持暂停，不被跳转偷偷启动",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/TTS-05-tts.png"
+      ],
+      "apk": "b8c0c9ca57cb967d83b5e430492e97fb8f579c3a5de77e1f47d33c1f8c4612a1",
+      "checkedAt": "2026-10-18T11:51:29.688Z"
+    },
+    {
+      "id": "TTS-06",
+      "module": "听书",
+      "capability": "上一下一段",
+      "steps": "逐项点击前后段",
+      "expected": "不越错章节",
+      "status": "通过",
+      "actual": "上一段/下一段改变实际文本位置，暂停状态保留",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/TTS-06-tts.png"
+      ],
+      "apk": "b8c0c9ca57cb967d83b5e430492e97fb8f579c3a5de77e1f47d33c1f8c4612a1",
+      "checkedAt": "2026-10-18T11:51:42.161Z"
+    },
+    {
+      "id": "TTS-07",
+      "module": "听书",
+      "capability": "跨章",
+      "steps": "章节末尾自动衔接",
+      "expected": "不断音卡死，不重复整章",
+      "status": "通过",
+      "actual": "长时播放从理想国章节末自然进入下一章，真实音频与游标继续推进，无手动跨章替代",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/listening-soak-2-samples.json"
+      ],
+      "apk": "88b932839af3591771acacb77dec36b46a31a2b08c887097a7247beb263f7cd9",
+      "checkedAt": "2026-10-18T17:06:31.871Z"
+    },
+    {
+      "id": "TTS-08",
+      "module": "听书",
+      "capability": "音色",
+      "steps": "选择不同在线音色并恢复",
+      "expected": "名称、选中态、实际请求一致",
+      "status": "通过",
+      "actual": "中文女声/男声通过真实音色列表选择，设置和听书摘要更新，两种音色均实际产生非零语音PCM",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/TTS-08-tts.png"
+      ],
+      "apk": "e6524690311ffb4a808980ba9acfd13af74b07e6bdad33d9f9a0ad753fcef1ed",
+      "checkedAt": "2026-10-18T11:57:24.452Z"
+    },
+    {
+      "id": "TTS-09",
+      "module": "听书",
+      "capability": "语速滑条",
+      "steps": "0.5／1／1.5／3 及中间值",
+      "expected": "声音调度与数值一致",
+      "status": "通过",
+      "actual": "语速0.5/1/1.5/3滑动值、两位小数和保存值一致；3倍上限禁用增加，恢复标准回1倍",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/TTS-09-tts.png"
+      ],
+      "apk": "b8c0c9ca57cb967d83b5e430492e97fb8f579c3a5de77e1f47d33c1f8c4612a1",
+      "checkedAt": "2026-10-18T11:46:59.684Z"
+    },
+    {
+      "id": "TTS-10",
+      "module": "听书",
+      "capability": "语速加减",
+      "steps": "0.05 步长、边界、恢复标准",
+      "expected": "边界禁用正确",
+      "status": "通过",
+      "actual": "语速±0.05精确步进、0.5下限禁用减少，恢复标准生效",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/TTS-10-tts.png"
+      ],
+      "apk": "b8c0c9ca57cb967d83b5e430492e97fb8f579c3a5de77e1f47d33c1f8c4612a1",
+      "checkedAt": "2026-10-18T11:48:24.133Z"
+    },
+    {
+      "id": "TTS-11",
+      "module": "听书",
+      "capability": "暂停时调速",
+      "steps": "暂停后调整再返回",
+      "expected": "仍暂停，继续时使用新速度",
+      "status": "通过",
+      "actual": "暂停时调至 1.05 倍返回仍暂停，继续播放正常。",
+      "evidence": [
+        "/tmp/lightread-k30-dianjing-qa/results.json"
+      ],
+      "apk": "d7327eeb8ebd60cf6f04c07bb99c52dc029672567e70b295b4131cb476cd79a3"
+    },
+    {
+      "id": "TTS-12",
+      "module": "听书",
+      "capability": "定时选项",
+      "steps": "关闭／各分钟／本章结束／取消",
+      "expected": "标签和停止方式一致",
+      "status": "通过",
+      "actual": "不定时/15分钟/30分钟/1小时/听完本章逐个选择，状态正确；取消定时移除计时标记",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/TTS-12-tts.png"
+      ],
+      "apk": "b8c0c9ca57cb967d83b5e430492e97fb8f579c3a5de77e1f47d33c1f8c4612a1",
+      "checkedAt": "2026-10-18T11:52:14.219Z"
+    },
+    {
+      "id": "TTS-13",
+      "module": "听书",
+      "capability": "定时到点",
+      "steps": "真实等待最短分钟档到点",
+      "expected": "淡出并暂停，保留续播位置",
+      "status": "通过",
+      "actual": "选择最短15分钟定时后真实等待，到时暂停并清除定时标记，之后5秒无新增PCM；未修改时钟",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/listening-soak-2-samples.json",
+        "/tmp/lightread-k30-full-20261018/listening-soak-2-timer-paused.png"
+      ],
+      "apk": "88b932839af3591771acacb77dec36b46a31a2b08c887097a7247beb263f7cd9",
+      "checkedAt": "2026-10-18T17:22:08.198Z"
+    },
+    {
+      "id": "TTS-14",
+      "module": "听书",
+      "capability": "原文定位",
+      "steps": "读书时手动翻离当前句再返回原文",
+      "expected": "回到朗读位置",
+      "status": "通过",
+      "actual": "暂停听书后从原文连续向后滑动四次，再点回到听书处，回到原朗读位置附近且暂停会话保留",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/TTS-14-return-original.png"
+      ],
+      "apk": "6d15267ae7417183ee046d539843da47e90446355d86f18c32d1025f9272dbb6",
+      "checkedAt": "2026-10-18T16:12:36.763Z"
+    },
+    {
+      "id": "TTS-15",
+      "module": "听书",
+      "capability": "歌词目录",
+      "steps": "播放器歌词／目录切换与导航",
+      "expected": "切换后会话保持合理",
+      "status": "通过",
+      "actual": "播放器歌词/目录入口实际切换，目录选择章节后继续产生真实音频，听书会话保持可暂停/停止",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/TTS-15-lyrics-toc.png"
+      ],
+      "apk": "6d15267ae7417183ee046d539843da47e90446355d86f18c32d1025f9272dbb6",
+      "checkedAt": "2026-10-18T16:14:39.190Z"
+    },
+    {
+      "id": "TTS-16",
+      "module": "听书",
+      "capability": "迷你条",
+      "steps": "收起、暂停／继续、展开",
+      "expected": "状态、语速、剩余时间一致",
+      "status": "通过",
+      "actual": "收起进入迷你控制条，暂停/继续可用，点击重新展开，听书状态同步",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/TTS-16-tts.png"
+      ],
+      "apk": "e6524690311ffb4a808980ba9acfd13af74b07e6bdad33d9f9a0ad753fcef1ed",
+      "checkedAt": "2026-10-18T11:56:38.502Z"
+    },
+    {
+      "id": "TTS-17",
+      "module": "听书",
+      "capability": "离线不支持",
+      "steps": "查看系统／离线引擎状态",
+      "expected": "不把不支持状态报告成可用",
+      "status": "通过",
+      "actual": "Android离线语音明确禁用；系统语音按钮依据可用能力禁用；在线可选，未误触下载包",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/TTS-17-tts.png"
+      ],
+      "apk": "b8c0c9ca57cb967d83b5e430492e97fb8f579c3a5de77e1f47d33c1f8c4612a1",
+      "checkedAt": "2026-10-18T11:46:42.874Z"
+    },
+    {
+      "id": "TTS-18",
+      "module": "听书",
+      "capability": "失败与重试",
+      "steps": "网络错误或服务失败路径",
+      "expected": "错误明确，不卡在永久加载",
+      "status": "通过",
+      "actual": "对实际语音服务传入隔离无效音色触发失败，界面退出加载显示错误；恢复原音色点击重试产生真实非零PCM。新包拒绝不可用的系统语音回退，整个失败及重试过程无ReferenceError；未伪造网络响应或改变手机连接",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/TTS-18-service-error.png",
+        "/tmp/lightread-k30-full-20261018/TTS-18-retry.png"
+      ],
+      "apk": "8d44b41e7e754b4188006512349516c7335461a5fe583dea358a5e1fb6775aa1",
+      "checkedAt": "2026-10-18T16:29:17.539Z"
+    },
+    {
+      "id": "TTS-19",
+      "module": "听书",
+      "capability": "后台短时",
+      "steps": "Home 后观察真实音频时钟",
+      "expected": "后台仍推进",
+      "status": "通过",
+      "actual": "Home 后 6 秒内 AudioContext 时钟推进超过 4 秒，返回后继续。",
+      "evidence": [
+        "/tmp/lightread-k30-dianjing-qa/results.json"
+      ],
+      "apk": "d7327eeb8ebd60cf6f04c07bb99c52dc029672567e70b295b4131cb476cd79a3"
+    },
+    {
+      "id": "TTS-20",
+      "module": "听书",
+      "capability": "锁屏持续",
+      "steps": "在可安全解锁条件下锁屏再返回",
+      "expected": "音频／进度继续或明确失败",
+      "status": "受阻",
+      "actual": "K30系统报告secure=true；无安全自动解锁条件，未主动锁定用户手机。已验证的Home后台播放不等同于锁屏持续，锁屏能力仍需可解锁条件下补测",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/lockscreen-precondition.json"
+      ],
+      "apk": "124798cf070a21769bc4081abc874110a481b3608b1f092d69c6a086137714d6",
+      "checkedAt": "2026-10-18T15:19:35.952022+00:00"
+    },
+    {
+      "id": "TTS-21",
+      "module": "听书",
+      "capability": "持续听书",
+      "steps": "持续至少 30 分钟并记录中途状态",
+      "expected": "无累积卡顿、重播、会话丢失",
+      "status": "通过",
+      "actual": "《理想国》真实连续在线听书超过30分钟，逐30秒记录PCM来源、AudioContext、句子哈希及章节；跨章且无长时间停滞",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/listening-soak-2-samples.json",
+        "/tmp/lightread-k30-full-20261018/listening-soak-2-30min.png"
+      ],
+      "apk": "88b932839af3591771acacb77dec36b46a31a2b08c887097a7247beb263f7cd9",
+      "checkedAt": "2026-10-18T17:06:31.868Z"
+    },
+    {
+      "id": "AM-01",
+      "module": "背景音",
+      "capability": "三个入口",
+      "steps": "顶栏／模式／听书分别打开",
+      "expected": "共享状态且返回各自来源",
+      "status": "通过",
+      "actual": "顶栏、模式和听书三个入口均已实际打开并返回，播放状态共享。",
+      "evidence": [
+        "/tmp/lightread-k30-dianjing-qa/results.json"
+      ],
+      "apk": "d7327eeb8ebd60cf6f04c07bb99c52dc029672567e70b295b4131cb476cd79a3"
+    },
+    {
+      "id": "AM-02",
+      "module": "背景音",
+      "capability": "四个合成场景",
+      "steps": "雨／风／噪声／和声逐一播放停止",
+      "expected": "存在真实信号，切换无双重播放",
+      "status": "通过",
+      "actual": "雨/风/噪声/和声四个合成场景真实播放和停止，AudioContext输出有非零信号，停止淡出后归零",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/AM-02-ambient.png"
+      ],
+      "apk": "47780be5cde1fcc7f2bbe494273d823597493591d2f8f6c1be8291191a5d5977",
+      "checkedAt": "2026-10-18T12:24:30.295Z"
+    },
+    {
+      "id": "AM-03",
+      "module": "背景音",
+      "capability": "独立阅读播放",
+      "steps": "不打开听书时播放并读书",
+      "expected": "离开面板继续，离开阅读器按设计停止",
+      "status": "通过",
+      "actual": "不开听书单独播放背景音，关闭面板和翻页仍有声音；返回书库后淡出停止",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/AM-03-ambient.png"
+      ],
+      "apk": "47780be5cde1fcc7f2bbe494273d823597493591d2f8f6c1be8291191a5d5977",
+      "checkedAt": "2026-10-18T12:25:56.673Z"
+    },
+    {
+      "id": "AM-04",
+      "module": "背景音",
+      "capability": "音量",
+      "steps": "0／37／100／中间值",
+      "expected": "静音和音量状态一致",
+      "status": "通过",
+      "actual": "总音量0/37/100/30状态与保存值一致，0实测静音，非零音量恢复音频输出",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/AM-04-ambient.png"
+      ],
+      "apk": "47780be5cde1fcc7f2bbe494273d823597493591d2f8f6c1be8291191a5d5977",
+      "checkedAt": "2026-10-18T12:24:46.517Z"
+    },
+    {
+      "id": "AM-05",
+      "module": "背景音",
+      "capability": "定时显示",
+      "steps": "选 15 分钟，查看文字和布局",
+      "expected": "立即显示 15，标签一行",
+      "status": "通过",
+      "actual": "最终 APK 选择 15 分钟后即时显示 15 分钟；定时（分钟）标签一行。",
+      "evidence": [
+        "/tmp/lightread-k30-dianjing-qa/final-results.json"
+      ],
+      "apk": "34a4bfffc230be20d8a92cc91290b873236a4af28ddb969f8b4ea4d3564dbc65"
+    },
+    {
+      "id": "AM-06",
+      "module": "背景音",
+      "capability": "定时切换取消",
+      "steps": "各档与关闭",
+      "expected": "截止时间更新，取消清除",
+      "status": "通过",
+      "actual": "全部背景音定时档逐项选择，剩余时间立即更新；关闭定时清除倒计时，听书计时独立",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/AM-06-ambient.png"
+      ],
+      "apk": "47780be5cde1fcc7f2bbe494273d823597493591d2f8f6c1be8291191a5d5977",
+      "checkedAt": "2026-10-18T12:25:10.801Z"
+    },
+    {
+      "id": "AM-07",
+      "module": "背景音",
+      "capability": "混音",
+      "steps": "各层开关、音量、恢复",
+      "expected": "只改变对应层",
+      "status": "通过",
+      "actual": "混音逐层静音、45%调整并恢复，仅目标层变化，其余滑条保存不变",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/AM-07-ambient.png"
+      ],
+      "apk": "47780be5cde1fcc7f2bbe494273d823597493591d2f8f6c1be8291191a5d5977",
+      "checkedAt": "2026-10-18T12:25:30.962Z"
+    },
+    {
+      "id": "AM-08",
+      "module": "背景音",
+      "capability": "录音列表",
+      "steps": "展开、折叠、下载状态、取消",
+      "expected": "容量和状态清楚",
+      "status": "通过",
+      "actual": "实地录音展开显示7个场景及每项下载容量/状态，折叠恢复简洁面板；未误触整包下载",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/AM-08-ambient.png"
+      ],
+      "apk": "47780be5cde1fcc7f2bbe494273d823597493591d2f8f6c1be8291191a5d5977",
+      "checkedAt": "2026-10-18T12:25:44.340Z"
+    },
+    {
+      "id": "AM-09",
+      "module": "背景音",
+      "capability": "录音下载播放",
+      "steps": "小录音下载、离线播放、移除本轮缓存",
+      "expected": "完成／失败均可恢复，无假成功",
+      "status": "通过",
+      "actual": "K30真实下载雨声录音并播放，重载App后缓存字节保留；仅阻断录音域名后再次播放有实际PCM输出；界面移除本轮录音缓存成功，原缓存不变",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/ambient-download-native.json",
+        "/tmp/lightread-k30-full-20261018/ambient-cache-boot-fixed.json",
+        "/tmp/lightread-k30-full-20261018/AM-09-recording-offline.png"
+      ],
+      "apk": "5479457386522c39b8434ddae4f9645db9e8c36b8d8a655317e369182f22c2b2",
+      "checkedAt": "2026-10-18T14:38:18.819Z"
+    },
+    {
+      "id": "AM-10",
+      "module": "背景音",
+      "capability": "听书压低",
+      "steps": "同时播放、暂停／继续听书",
+      "expected": "自动压低与恢复符合状态",
+      "status": "通过",
+      "actual": "先单独播放背景音，再听书播放/暂停/继续及开关自动压低；实际背景音GainNode从1降至低于0.5、暂停恢复大于0.95，开关关闭恢复原音量，不只检查提示文字",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/ambient-duck-signals.json",
+        "/tmp/lightread-k30-full-20261018/AM-10-duck.png"
+      ],
+      "apk": "6d15267ae7417183ee046d539843da47e90446355d86f18c32d1025f9272dbb6",
+      "checkedAt": "2026-10-18T16:20:35.534Z"
+    },
+    {
+      "id": "AM-11",
+      "module": "背景音",
+      "capability": "独立停止",
+      "steps": "分别停止听书和背景音",
+      "expected": "互不错误停止",
+      "status": "通过",
+      "actual": "停止背景音不影响朗读；停止朗读不影响背景音并恢复音量。",
+      "evidence": [
+        "/tmp/lightread-k30-dianjing-qa/results.json"
+      ],
+      "apk": "d7327eeb8ebd60cf6f04c07bb99c52dc029672567e70b295b4131cb476cd79a3"
+    },
+    {
+      "id": "AM-12",
+      "module": "背景音",
+      "capability": "来源许可",
+      "steps": "打开声音来源、返回",
+      "expected": "可读、无返回断层",
+      "status": "通过",
+      "actual": "声音来源与许可实际打开系统浏览器，Android返回恢复背景音窗口；测试结束前已停止听书与背景音",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/AM-12-license-return.png"
+      ],
+      "apk": "6d15267ae7417183ee046d539843da47e90446355d86f18c32d1025f9272dbb6",
+      "checkedAt": "2026-10-18T16:20:52.392Z"
+    },
+    {
+      "id": "PAPER-01",
+      "module": "论文与 PDF／其他格式",
+      "capability": "论文列表",
+      "steps": "搜索、状态筛选、排序、更多菜单",
+      "expected": "与藏书分区一致且不串数据",
+      "status": "通过",
+      "actual": "用设备已有PDF建立仅本机隔离副本；论文搜索命中/无结果、全部/未读/在读/读完/标签筛选、全部排序选项与更多窗口返回逐项检查；真实原书及元数据未修改，副本在结束删除",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/PAPER-01-list.png"
+      ],
+      "apk": "6d15267ae7417183ee046d539843da47e90446355d86f18c32d1025f9272dbb6",
+      "checkedAt": "2026-10-18T16:09:28.469Z"
+    },
+    {
+      "id": "PAPER-02",
+      "module": "论文与 PDF／其他格式",
+      "capability": "已有 PDF 打开",
+      "steps": "选 K30 已有 PDF，记录原页",
+      "expected": "实际渲染，无白屏或乱码",
+      "status": "通过",
+      "actual": "打开K30现存设备已有PDF样本，实际PDF画布渲染、总页数168，无加载错误",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/PAPER-02-pdf.png"
+      ],
+      "apk": "6c3315989eb2bb75bd7d2d8715a6bf0965a9d5282553e37752cfd63a513cc86d",
+      "checkedAt": "2026-10-18T12:35:11.194Z"
+    },
+    {
+      "id": "PAPER-03",
+      "module": "论文与 PDF／其他格式",
+      "capability": "PDF 翻页",
+      "steps": "前后、跳页、边界、页内滚动",
+      "expected": "页码和画面一致",
+      "status": "通过",
+      "actual": "真实PDF前后页、跳第10页、首尾边界及0/负数/超范围/非数/空输入均保持有效页码，首尾翻页禁用",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/PAPER-03-pdf.png"
+      ],
+      "apk": "6c3315989eb2bb75bd7d2d8715a6bf0965a9d5282553e37752cfd63a513cc86d",
+      "checkedAt": "2026-10-18T12:36:01.442Z"
+    },
+    {
+      "id": "PAPER-04",
+      "module": "论文与 PDF／其他格式",
+      "capability": "PDF 目录",
+      "steps": "展开、跳转、返回",
+      "expected": "页内定位正确",
+      "status": "通过",
+      "actual": "PDF目录展开并点击实际章节，跳转保持有效页码，关闭返回正文",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/PAPER-04-pdf.png"
+      ],
+      "apk": "6c3315989eb2bb75bd7d2d8715a6bf0965a9d5282553e37752cfd63a513cc86d",
+      "checkedAt": "2026-10-18T12:36:16.325Z"
+    },
+    {
+      "id": "PAPER-05",
+      "module": "论文与 PDF／其他格式",
+      "capability": "PDF 缩放",
+      "steps": "适高／适宽／放大／缩小",
+      "expected": "不丢页、不遮住主操作",
+      "status": "通过",
+      "actual": "适宽/放大/缩小/适页逐项操作，实际画布继续渲染，页码保留",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/PAPER-05-pdf.png"
+      ],
+      "apk": "6c3315989eb2bb75bd7d2d8715a6bf0965a9d5282553e37752cfd63a513cc86d",
+      "checkedAt": "2026-10-18T12:36:47.267Z"
+    },
+    {
+      "id": "PAPER-06",
+      "module": "论文与 PDF／其他格式",
+      "capability": "PDF 双页旋转",
+      "steps": "可用布局及横竖屏",
+      "expected": "封面／奇偶页排列正确",
+      "status": "通过",
+      "actual": "K30实际横屏单页/对页/书籍视图：1页分别[1]/[1,2]/[1]，书籍第3页[2,3]；竖屏恢复无横向溢出",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/pdf-spreads.json",
+        "/tmp/lightread-k30-full-20261018/pdf-rotation-portrait.png"
+      ],
+      "apk": "b6375bc3fe909a9f7e38218d892b7bdbc3efa0b0c6f770a30cc64c273e0067dd",
+      "checkedAt": "2026-10-18T15:44:50.497Z"
+    },
+    {
+      "id": "PAPER-07",
+      "module": "论文与 PDF／其他格式",
+      "capability": "PDF 搜索",
+      "steps": "已知短词、无结果、跳结果",
+      "expected": "结果与画面匹配",
+      "status": "通过",
+      "actual": "PDF正文learning搜索高亮可见，上下结果可跳；不存在字符串清除命中，关闭搜索回正文",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/PAPER-07-pdf.png"
+      ],
+      "apk": "6c3315989eb2bb75bd7d2d8715a6bf0965a9d5282553e37752cfd63a513cc86d",
+      "checkedAt": "2026-10-18T12:37:15.313Z"
+    },
+    {
+      "id": "PAPER-08",
+      "module": "论文与 PDF／其他格式",
+      "capability": "PDF 书签笔记",
+      "steps": "仅新建测试标记后删除",
+      "expected": "恢复原状态",
+      "status": "通过",
+      "actual": "现有PDF真实WebView双击选词、新建专用测试想法、清空、退出重开确认空值、Android返回只关弹窗，最后删除本次划线；未删除原标注",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/pdf-note-cleaned.png"
+      ],
+      "apk": "b6375bc3fe909a9f7e38218d892b7bdbc3efa0b0c6f770a30cc64c273e0067dd",
+      "checkedAt": "2026-10-18T15:48:09.997Z"
+    },
+    {
+      "id": "PAPER-09",
+      "module": "论文与 PDF／其他格式",
+      "capability": "PDF 排版主题",
+      "steps": "可用主题／引擎切换并恢复",
+      "expected": "支持范围明确，不误显示可用项",
+      "status": "通过",
+      "actual": "现有PDF原版排版保留文档配色，界面深色主题可用；两种显示引擎均实际渲染。当前界面未提供重排主题入口，不把隐藏能力算作已点测",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/pdf-dark-controls.png",
+        "/tmp/lightread-k30-full-20261018/pdf-engine-mupdf.png",
+        "/tmp/lightread-k30-full-20261018/pdf-engine-pdfium.png"
+      ],
+      "apk": "b6375bc3fe909a9f7e38218d892b7bdbc3efa0b0c6f770a30cc64c273e0067dd",
+      "checkedAt": "2026-10-18T15:44:00.601Z"
+    },
+    {
+      "id": "PAPER-10",
+      "module": "论文与 PDF／其他格式",
+      "capability": "PDF 听书",
+      "steps": "有文本 PDF 的真实朗读",
+      "expected": "文本与页码匹配；扫描件明确限制",
+      "status": "通过",
+      "actual": "设备已有文本PDF第10页在线朗读：真实MP3解码非零PCM，HTML音频currentTime推进；暂停全部media.paused、继续后恢复推进、停止及Android返回通过。扫描件无样本，不作实机结论",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/pdf-html-audio-playing.json",
+        "/tmp/lightread-k30-full-20261018/pdf-tts-stopped.png"
+      ],
+      "apk": "88b932839af3591771acacb77dec36b46a31a2b08c887097a7247beb263f7cd9",
+      "checkedAt": "2026-10-18T16:34:49.918Z"
+    },
+    {
+      "id": "PAPER-11",
+      "module": "论文与 PDF／其他格式",
+      "capability": "PDF 自动阅读",
+      "steps": "启动、暂停、速度、停止",
+      "expected": "推进与页内滚动正确",
+      "status": "通过",
+      "actual": "PDF自动滚动调至100档(3秒/屏)，真实7秒滚动位移大于50px；暂停后1.2秒不移动，停止关闭面板",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/pdf-auto-stopped.png"
+      ],
+      "apk": "b6375bc3fe909a9f7e38218d892b7bdbc3efa0b0c6f770a30cc64c273e0067dd",
+      "checkedAt": "2026-10-18T15:45:36.184Z"
+    },
+    {
+      "id": "PAPER-12",
+      "module": "论文与 PDF／其他格式",
+      "capability": "论文翻译与 AI",
+      "steps": "打开配置、任务入口、取消",
+      "expected": "缺服务时明确受阻，不伪造结果",
+      "status": "通过",
+      "actual": "隔离清空AI连接配置后，论文翻译入口明确显示配置提示，点设置入口并返回PDF、重新打开及Android返回均正常；Android未显示不支持的桌面Agent。仅验证入口/缺配置/取消路径，未向AI发送私有PDF或执行整本翻译；原AI配置退出后恢复",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/PAPER-12-translation-return.png"
+      ],
+      "apk": "6d15267ae7417183ee046d539843da47e90446355d86f18c32d1025f9272dbb6",
+      "checkedAt": "2026-10-18T16:09:49.187Z"
+    },
+    {
+      "id": "PAPER-13",
+      "module": "论文与 PDF／其他格式",
+      "capability": "MOBI／AZW3",
+      "steps": "已有格式书打开、目录、翻页",
+      "expected": "内容与进度正常",
+      "status": "通过",
+      "actual": "K30已有MOBI实际打开正文、目录及翻页，CFI正常变化；设备无AZW3样本，不扩展宣称",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/format-mobi-body.png"
+      ],
+      "apk": "5479457386522c39b8434ddae4f9645db9e8c36b8d8a655317e369182f22c2b2",
+      "checkedAt": "2026-10-18T14:39:08.827Z"
+    },
+    {
+      "id": "PAPER-14",
+      "module": "论文与 PDF／其他格式",
+      "capability": "TXT／EPUB",
+      "steps": "已有格式书打开、章节、搜索",
+      "expected": "编码、章节和进度正常",
+      "status": "通过",
+      "actual": "设备现有TXT与理想国EPUB均打开正文/章节/翻页，中文无乱码；EPUB书内搜索另在READ-08记录",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/format-txt-body.png",
+        "/tmp/lightread-k30-full-20261018/format-epub-body.png"
+      ],
+      "apk": "5479457386522c39b8434ddae4f9645db9e8c36b8d8a655317e369182f22c2b2",
+      "checkedAt": "2026-10-18T14:40:01.327Z"
+    },
+    {
+      "id": "PAPER-15",
+      "module": "论文与 PDF／其他格式",
+      "capability": "其他现存格式",
+      "steps": "盘点到的其他格式逐一打开",
+      "expected": "未有样本的格式不宣称通过",
+      "status": "受阻",
+      "actual": "设备34本现有书只有EPUB/MOBI/TXT/PDF；没有azw3/fb2/cbz/cbr/djvu/md/html样本，未用空文件或伪格式冒充支持通过",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/format-reader-results.json"
+      ],
+      "apk": "5479457386522c39b8434ddae4f9645db9e8c36b8d8a655317e369182f22c2b2",
+      "checkedAt": "2026-10-18T14:40:01.329Z"
+    },
+    {
+      "id": "CAT-01",
+      "module": "书源",
+      "capability": "顶部搜索",
+      "steps": "理想国相关词、清空、无结果",
+      "expected": "查询范围和结果明确",
+      "status": "通过",
+      "actual": "K30顶部搜索在全部公共来源实际查询理想国和用户指定fhw，每次结束均有结果/明确无结果或来源错误；清空后旧结果消失且空查询按钮禁用，私人书库未参与查询",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/catalog-public-queries.json",
+        "/tmp/lightread-k30-full-20261018/CAT-01-search-clear.png"
+      ],
+      "apk": "b6375bc3fe909a9f7e38218d892b7bdbc3efa0b0c6f770a30cc64c273e0067dd",
+      "checkedAt": "2026-10-18T15:53:20.851Z"
+    },
+    {
+      "id": "CAT-02",
+      "module": "书源",
+      "capability": "来源范围",
+      "steps": "各搜索来源开关和选择",
+      "expected": "选中态与请求范围一致",
+      "status": "通过",
+      "actual": "8 个来源逐个开关恢复；单源搜索仅哲学文库选中并返回真实索引结果；Android 返回关闭范围窗口",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/sources-results.png"
+      ],
+      "apk": "6b547e0d4e61add19821b03642649049b0973085404bf877e94cc8c0a77b1378",
+      "checkedAt": "2026-10-18T10:37:37.645Z"
+    },
+    {
+      "id": "CAT-03",
+      "module": "书源",
+      "capability": "来源分组",
+      "steps": "展开、折叠、更多、加载下一页",
+      "expected": "结果不重复、不丢失",
+      "status": "通过",
+      "actual": "哲学文库真实索引搜索Marx，预览6条与展开全部反复往返，数量稳定没有追加重复；无下一页入口的该组未声称分页已测",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/catalog-public-queries.json",
+        "/tmp/lightread-k30-full-20261018/CAT-03-groups.png"
+      ],
+      "apk": "b6375bc3fe909a9f7e38218d892b7bdbc3efa0b0c6f770a30cc64c273e0067dd",
+      "checkedAt": "2026-10-18T15:54:21.270Z"
+    },
+    {
+      "id": "CAT-04",
+      "module": "书源",
+      "capability": "哲学文库",
+      "steps": "浏览、搜索、详情、返回",
+      "expected": "真实内容或明确网络错误",
+      "status": "通过",
+      "actual": "哲学文库实际搜索结果可展开，查看原文打开系统浏览器后返回保留结果；理想国不在当前索引时显示无结果而非假造条目",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/catalog-public-queries.json",
+        "/tmp/lightread-k30-full-20261018/CAT-04-returned.png"
+      ],
+      "apk": "b6375bc3fe909a9f7e38218d892b7bdbc3efa0b0c6f770a30cc64c273e0067dd",
+      "checkedAt": "2026-10-18T15:54:29.852Z"
+    },
+    {
+      "id": "CAT-05",
+      "module": "书源",
+      "capability": "研辞问典",
+      "steps": "浏览、搜索、详情、返回",
+      "expected": "状态和返回正确",
+      "status": "通过",
+      "actual": "研辞问典实际查询论语并显示来源条目/许可提示，查看原文和Android返回正常；未自动导入或上传内容",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/catalog-public-queries.json",
+        "/tmp/lightread-k30-full-20261018/CAT-05-returned.png"
+      ],
+      "apk": "b6375bc3fe909a9f7e38218d892b7bdbc3efa0b0c6f770a30cc64c273e0067dd",
+      "checkedAt": "2026-10-18T15:55:13.547Z"
+    },
+    {
+      "id": "CAT-06",
+      "module": "书源",
+      "capability": "教材／公共来源",
+      "steps": "各内置入口、搜索、失败重试",
+      "expected": "无永远加载或空白无说明",
+      "status": "通过",
+      "actual": "四个主要公共入口逐个进入/返回，目录浏览Android返回在书源内逐级退回；教材、Internet Archive、Open Library、arXiv、GitHub及古登堡公共范围逐个查询，均结束为内容/无结果/明确来源错误，原始结果逐次保存；未把网络错误描述为下载成功",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/catalog-public-queries.json",
+        "/tmp/lightread-k30-full-20261018/CAT-06-sources.png"
+      ],
+      "apk": "b6375bc3fe909a9f7e38218d892b7bdbc3efa0b0c6f770a30cc64c273e0067dd",
+      "checkedAt": "2026-10-18T15:59:48.056Z"
+    },
+    {
+      "id": "CAT-07",
+      "module": "书源",
+      "capability": "推荐书单",
+      "steps": "分类切换、书单详情、返回",
+      "expected": "条目和按钮布局正确",
+      "status": "通过",
+      "actual": "依用户要求推荐书单移至藏书→书单；K30 逐个打开全部10个推荐分类，真实书目、来源、返回和宽度正常",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/CAT-07-recommendations.png"
+      ],
+      "apk": "db3e66f826d7dbfb0f947a7b0230f311295416fca2b95eecd9708d1d3d8a8341",
+      "checkedAt": "2026-10-18T11:25:36.443Z"
+    },
+    {
+      "id": "CAT-08",
+      "module": "书源",
+      "capability": "书单找书",
+      "steps": "已有／未有条目查找与关闭",
+      "expected": "结果对应书，不自动导入",
+      "status": "通过",
+      "actual": "哲学入门推荐正确识别设备已有理想国，打开真实正文后返回详情；缺书找书进入书源并带书名，Android 返回恢复原推荐详情",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/CAT-08-return.png"
+      ],
+      "apk": "db3e66f826d7dbfb0f947a7b0230f311295416fca2b95eecd9708d1d3d8a8341",
+      "checkedAt": "2026-10-18T11:25:54.440Z"
+    },
+    {
+      "id": "CAT-09",
+      "module": "书源",
+      "capability": "书单加入",
+      "steps": "仅本轮临时书单添加后删除",
+      "expected": "不改变原书内容",
+      "status": "通过",
+      "actual": "推荐加入我的书单：已有理想国自动关联，未拥有图书列为待找；再次加入复用原书单，没有重复",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/CAT-09-added.png"
+      ],
+      "apk": "db3e66f826d7dbfb0f947a7b0230f311295416fca2b95eecd9708d1d3d8a8341",
+      "checkedAt": "2026-10-18T11:26:05.294Z"
+    },
+    {
+      "id": "CAT-10",
+      "module": "书源",
+      "capability": "来源新增",
+      "steps": "空值／错误 URL／取消",
+      "expected": "校验与保存边界正确",
+      "status": "通过",
+      "actual": "新增来源空值禁用，非法 URL 明确提示，取消关闭不保存",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/messages-source-invalid.png"
+      ],
+      "apk": "6b547e0d4e61add19821b03642649049b0973085404bf877e94cc8c0a77b1378",
+      "checkedAt": "2026-10-18T10:38:20.988Z"
+    },
+    {
+      "id": "CAT-11",
+      "module": "书源",
+      "capability": "来源编辑",
+      "steps": "打开、取消；临时来源保存",
+      "expected": "原来源不误改",
+      "status": "通过",
+      "actual": "仅临时书源编辑名称/URL，取消不落库，保存实际更新SQLite并同步卡片",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/CAT-11-source.png"
+      ],
+      "apk": "47780be5cde1fcc7f2bbe494273d823597493591d2f8f6c1be8291191a5d5977",
+      "checkedAt": "2026-10-18T12:12:57.059Z"
+    },
+    {
+      "id": "CAT-12",
+      "module": "书源",
+      "capability": "来源删除",
+      "steps": "仅删除本轮临时来源",
+      "expected": "确认与列表更新正确",
+      "status": "通过",
+      "actual": "删除临时书源先取消保留，再确认删除；原始书源ID集合不变",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/CAT-12-source.png"
+      ],
+      "apk": "47780be5cde1fcc7f2bbe494273d823597493591d2f8f6c1be8291191a5d5977",
+      "checkedAt": "2026-10-18T12:13:21.862Z"
+    },
+    {
+      "id": "CAT-13",
+      "module": "书源",
+      "capability": "来源鉴权上传",
+      "steps": "检查凭据字段、显示隐藏、取消",
+      "expected": "无凭据泄露，不上传真实书",
+      "status": "通过",
+      "actual": "临时书源鉴权字段可编辑、密码遮蔽，取消保留原占位值；未查看或修改真实私人书源凭据，未发认证请求",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/CAT-13-source.png"
+      ],
+      "apk": "47780be5cde1fcc7f2bbe494273d823597493591d2f8f6c1be8291191a5d5977",
+      "checkedAt": "2026-10-18T12:13:07.347Z"
+    },
+    {
+      "id": "CAT-14",
+      "module": "书源",
+      "capability": "OPDS 浏览",
+      "steps": "有现成连接时目录／搜索／返回",
+      "expected": "鉴权及导航正确；无连接记受阻",
+      "status": "受阻",
+      "actual": "现有私人OPDS实际连接显示错误，可Android返回；未更改凭据或向该书库上传文件，目录/搜索/分页因连接失败无法验证",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/CAT-14-opds-network-error.png"
+      ],
+      "apk": "b6375bc3fe909a9f7e38218d892b7bdbc3efa0b0c6f770a30cc64c273e0067dd",
+      "checkedAt": "2026-10-18T16:00:24.317Z"
+    },
+    {
+      "id": "CAT-15",
+      "module": "书源",
+      "capability": "外部网页",
+      "steps": "来源按钮打开系统浏览器后返回",
+      "expected": "正确地址和 App 返回",
+      "status": "通过",
+      "actual": "更多下载网站6个入口逐个实际打开系统浏览器并Android返回书源页，无提交/下载动作",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/CAT-15-websites-return.png"
+      ],
+      "apk": "b6375bc3fe909a9f7e38218d892b7bdbc3efa0b0c6f770a30cc64c273e0067dd",
+      "checkedAt": "2026-10-18T16:04:30.288Z"
+    },
+    {
+      "id": "CAT-16",
+      "module": "书源",
+      "capability": "Calibre",
+      "steps": "确认 Android 可用性及入口",
+      "expected": "不可用时不提供虚假动作",
+      "status": "通过",
+      "actual": "Android未提供无法遍历目录的本地Calibre入口；连接远程书库使用OPDS",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/CAT-16-no-folder.png"
+      ],
+      "apk": "f81e0842ba4678288b7cd3d0cf4f1bbe2efddeb5f033ee4d6edb0f9d671b76bf",
+      "checkedAt": "2026-10-18T12:46:35.078Z"
+    },
+    {
+      "id": "CAT-17",
+      "module": "书源",
+      "capability": "社区来源",
+      "steps": "刷新、折叠、添加非法仓库、取消",
+      "expected": "反馈明确、不损坏列表",
+      "status": "通过",
+      "actual": "社区列表展开/折叠、刷新反馈、非法四段仓库地址错误均验证；非法输入未改变原有仓库列表，清空取消并收起",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/CAT-17-community.png"
+      ],
+      "apk": "b6375bc3fe909a9f7e38218d892b7bdbc3efa0b0c6f770a30cc64c273e0067dd",
+      "checkedAt": "2026-10-18T16:04:55.297Z"
+    },
+    {
+      "id": "STATS-01",
+      "module": "阅读记录",
+      "capability": "今日卡片",
+      "steps": "数值、完成状态、继续阅读",
+      "expected": "时间和目标关系合理",
+      "status": "通过",
+      "actual": "今日卡片、周条、区间总计及日均的分钟口径统一为完整分钟；K30当前真实阅读记录复验日均不大于总计。浏览器另验证475秒显示7分钟及59/89/3599/3600秒边界；原始秒数未修改，目标环及继续阅读原专项通过",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/stats-consistent-native.json",
+        "/tmp/lightread-k30-full-20261018/stats-rounding-browser.log",
+        "/tmp/lightread-k30-full-20261018/stats-consistent-final.png"
+      ],
+      "apk": "88b932839af3591771acacb77dec36b46a31a2b08c887097a7247beb263f7cd9",
+      "checkedAt": "2026-10-18T16:33:59.143Z"
+    },
+    {
+      "id": "STATS-02",
+      "module": "阅读记录",
+      "capability": "目标全部档位",
+      "steps": "关闭和各档选择后恢复",
+      "expected": "选中和达标语义正确",
+      "status": "通过",
+      "actual": "目标关闭及 关闭／10／15／20／30／45／60／90／120 全部点击生效并恢复原目标",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/STATS-02.png"
+      ],
+      "apk": "98bfcfe0c06dde08f9c30475ddd3cabed448b1d17585401fd24f2c8369296bc0",
+      "checkedAt": "2026-10-18T10:16:03.323Z"
+    },
+    {
+      "id": "STATS-03",
+      "module": "阅读记录",
+      "capability": "周条",
+      "steps": "逐日点击、过去日、今日",
+      "expected": "详情日期与数据正确",
+      "status": "通过",
+      "actual": "周条 7 天逐日打开详情，日期标题、空日／有记录状态和关闭可用",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/STATS-03.png"
+      ],
+      "apk": "98bfcfe0c06dde08f9c30475ddd3cabed448b1d17585401fd24f2c8369296bc0",
+      "checkedAt": "2026-10-18T10:16:54.520Z"
+    },
+    {
+      "id": "STATS-04",
+      "module": "阅读记录",
+      "capability": "周月年切换",
+      "steps": "遍历三种时间范围",
+      "expected": "图表、汇总和日期一致",
+      "status": "通过",
+      "actual": "周／月／年逐个切换，选中态、期间标题与图表类型对应：{\"周\":\"10月12日 – 10月18日\\n本周\",\"月\":\"2026年10月\\n本月\",\"年\":\"2026年\\n今年\"}",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/STATS-04.png"
+      ],
+      "apk": "98bfcfe0c06dde08f9c30475ddd3cabed448b1d17585401fd24f2c8369296bc0",
+      "checkedAt": "2026-10-18T10:17:08.230Z"
+    },
+    {
+      "id": "STATS-05",
+      "module": "阅读记录",
+      "capability": "前后区间",
+      "steps": "上一期、下一期、回到当前",
+      "expected": "边界禁用、无未来假数据",
+      "status": "通过",
+      "actual": "上一期、下一期、回当前均改变／还原实际区间，当前下一期禁用",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/STATS-05.png"
+      ],
+      "apk": "98bfcfe0c06dde08f9c30475ddd3cabed448b1d17585401fd24f2c8369296bc0",
+      "checkedAt": "2026-10-18T10:17:27.409Z"
+    },
+    {
+      "id": "STATS-06",
+      "module": "阅读记录",
+      "capability": "书籍论文筛选",
+      "steps": "全部／书籍／论文",
+      "expected": "汇总随范围改变",
+      "status": "通过",
+      "actual": "全部／书籍／论文筛选选中与统计输出改变：{\"周\":\"10月12日 – 10月18日\\n本周\",\"月\":\"2026年10月\\n本月\",\"年\":\"2026年\\n今年\",\"书籍\":\"2小时33分钟\",\"论文\":\"0分钟\",\"全部\":\"2小时33分钟\"}",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/STATS-06.png"
+      ],
+      "apk": "98bfcfe0c06dde08f9c30475ddd3cabed448b1d17585401fd24f2c8369296bc0",
+      "checkedAt": "2026-10-18T10:17:40.135Z"
+    },
+    {
+      "id": "STATS-07",
+      "module": "阅读记录",
+      "capability": "趋势图点击",
+      "steps": "点击可用日期／柱子",
+      "expected": "详情与选中数据一致",
+      "status": "通过",
+      "actual": "趋势图日期柱可点入当天阅读明细并关闭",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/STATS-07.png"
+      ],
+      "apk": "98bfcfe0c06dde08f9c30475ddd3cabed448b1d17585401fd24f2c8369296bc0",
+      "checkedAt": "2026-10-18T10:17:49.832Z"
+    },
+    {
+      "id": "STATS-08",
+      "module": "阅读记录",
+      "capability": "日历热力",
+      "steps": "月份切换、日期详情、关闭",
+      "expected": "颜色与阅读量对应",
+      "status": "通过",
+      "actual": "日历今日详情与关闭可用；月份边界按钮禁用，若有上一月则往返核对",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/STATS-08.png"
+      ],
+      "apk": "98bfcfe0c06dde08f9c30475ddd3cabed448b1d17585401fd24f2c8369296bc0",
+      "checkedAt": "2026-10-18T10:17:58.846Z"
+    },
+    {
+      "id": "STATS-09",
+      "module": "阅读记录",
+      "capability": "书籍榜单",
+      "steps": "排序／展开／打开书再返回",
+      "expected": "条目与时间正确",
+      "status": "通过",
+      "actual": "本期书籍榜单按真实阅读秒数降序，展开/收起保持条目，点击现有书可打开并返回",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/STATS-09-stats.png"
+      ],
+      "apk": "eac01f0825455330c457a71af499a127296344d67d876f214ad89c6585e52b08",
+      "checkedAt": "2026-10-18T13:51:17.315Z"
+    },
+    {
+      "id": "STATS-10",
+      "module": "阅读记录",
+      "capability": "里程碑",
+      "steps": "展开说明、达成和未达成状态",
+      "expected": "文案不误报",
+      "status": "通过",
+      "actual": "里程碑累计/天数/最长连续/最佳日均有有效值，最佳日进入对应明细，最常读书可打开；当前设计无虚构勋章和未达成奖项",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/STATS-10-stats.png"
+      ],
+      "apk": "eac01f0825455330c457a71af499a127296344d67d876f214ad89c6585e52b08",
+      "checkedAt": "2026-10-18T13:51:35.608Z"
+    },
+    {
+      "id": "STATS-11",
+      "module": "阅读记录",
+      "capability": "时长计入",
+      "steps": "实际阅读、后台、暂停后对比",
+      "expected": "符合文档计时规则，无暴增",
+      "status": "通过",
+      "actual": "前台真实35秒阅读正常计入；Home切后台真实45秒，Android原生前台标记始终为false（WebView仍误报可见）；返回后新增计时不超过一个15秒前台心跳，未将后台时长计入",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/stats-timer-probe.json",
+        "/tmp/lightread-k30-full-20261018/stats-background.json"
+      ],
+      "apk": "124798cf070a21769bc4081abc874110a481b3608b1f092d69c6a086137714d6",
+      "checkedAt": "2026-10-18T14:54:25.679Z"
+    },
+    {
+      "id": "SET-01",
+      "module": "设置",
+      "capability": "账号页",
+      "steps": "打开账号同步页、返回",
+      "expected": "当前状态正确，敏感信息不外泄",
+      "status": "通过",
+      "actual": "从账号卡进入账号与同步二级页，检查登录/未登录真实状态、账号和网盘区块、返回入口与页面边界",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/SET-01-secondary.png"
+      ],
+      "apk": "124798cf070a21769bc4081abc874110a481b3608b1f092d69c6a086137714d6",
+      "checkedAt": "2026-10-18T14:55:06.516Z"
+    },
+    {
+      "id": "SET-02",
+      "module": "设置",
+      "capability": "账号登录表单",
+      "steps": "仅验证空／非法输入、取消",
+      "expected": "无验证码发送或账号变更",
+      "status": "受阻",
+      "actual": "K30当前已有真实登录账号，未退出账号或发送验证码；登录输入校验需隔离未登录环境，不能算本机已通过",
+      "evidence": [],
+      "apk": "124798cf070a21769bc4081abc874110a481b3608b1f092d69c6a086137714d6",
+      "checkedAt": "2026-10-18T14:55:06.706Z"
+    },
+    {
+      "id": "SET-03",
+      "module": "设置",
+      "capability": "WebDAV 表单",
+      "steps": "切换提供商、空值／非法地址、取消",
+      "expected": "字段合理、真实配置恢复",
+      "status": "通过",
+      "actual": "已有网盘通过编辑草稿逐个切换服务商，空用户名/密码和非法地址均本地报错；取消后连接地址/用户名/密码/服务商完全保持，未断开或重新连接网盘",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/SET-03-webdav-validation.png"
+      ],
+      "apk": "124798cf070a21769bc4081abc874110a481b3608b1f092d69c6a086137714d6",
+      "checkedAt": "2026-10-18T15:06:21.445Z"
+    },
+    {
+      "id": "SET-04",
+      "module": "设置",
+      "capability": "同步选项",
+      "steps": "可见开关与敏感同步确认取消",
+      "expected": "不实际改云端数据，取消不生效",
+      "status": "通过",
+      "actual": "自动同步/设置同步开关实际切换并恢复；测试期间先关闭自动同步，密码密钥同步确认分别取消与Android返回，敏感同步始终未开启",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/SET-04-sync-cancel.png"
+      ],
+      "apk": "124798cf070a21769bc4081abc874110a481b3608b1f092d69c6a086137714d6",
+      "checkedAt": "2026-10-18T15:06:53.396Z"
+    },
+    {
+      "id": "SET-05",
+      "module": "设置",
+      "capability": "外观",
+      "steps": "系统／浅／深全部选项并恢复",
+      "expected": "全局界面立即变化",
+      "status": "通过",
+      "actual": "K30 外观面板系统／浅色／深色全部实际选择、重新打开核对选中态、Android 返回关闭，并恢复原外观",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/SET-05.png"
+      ],
+      "apk": "6b547e0d4e61add19821b03642649049b0973085404bf877e94cc8c0a77b1378",
+      "checkedAt": "2026-10-18T10:40:00.862Z"
+    },
+    {
+      "id": "SET-06",
+      "module": "设置",
+      "capability": "语言",
+      "steps": "中英互切并恢复",
+      "expected": "标签可读、布局不溢出",
+      "status": "通过",
+      "actual": "中英切换实际生效，英文标题与选择面板不溢出；恢复中文",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/SET-06.png"
+      ],
+      "apk": "6b547e0d4e61add19821b03642649049b0973085404bf877e94cc8c0a77b1378",
+      "checkedAt": "2026-10-18T10:40:20.387Z"
+    },
+    {
+      "id": "SET-07",
+      "module": "设置",
+      "capability": "阅读目标",
+      "steps": "各档和关闭，返回",
+      "expected": "与统计目标一致",
+      "status": "通过",
+      "actual": "每日阅读目标关闭及 10／15／20／30／45／60／90／120 分钟逐项生效，原目标恢复",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/SET-07.png"
+      ],
+      "apk": "6b547e0d4e61add19821b03642649049b0973085404bf877e94cc8c0a77b1378",
+      "checkedAt": "2026-10-18T10:41:19.829Z"
+    },
+    {
+      "id": "SET-08",
+      "module": "设置",
+      "capability": "PDF 引擎",
+      "steps": "MuPDF／PDFium 切换并恢复",
+      "expected": "选择保留且实际打开验证",
+      "status": "通过",
+      "actual": "设置页MuPDF/PDFium分别选择并实际打开设备已有PDF，画布data-renderer逐项匹配，最后恢复原引擎",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/pdf-engine-mupdf.png",
+        "/tmp/lightread-k30-full-20261018/pdf-engine-pdfium.png"
+      ],
+      "apk": "b6375bc3fe909a9f7e38218d892b7bdbc3efa0b0c6f770a30cc64c273e0067dd",
+      "checkedAt": "2026-10-18T15:43:54.920Z"
+    },
+    {
+      "id": "SET-09",
+      "module": "设置",
+      "capability": "重置排版",
+      "steps": "打开确认、取消",
+      "expected": "取消不改阅读偏好",
+      "status": "通过",
+      "actual": "实际打开恢复默认排版确认，取消与 Android 返回均不改变阅读偏好",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/SET-09.png"
+      ],
+      "apk": "6b547e0d4e61add19821b03642649049b0973085404bf877e94cc8c0a77b1378",
+      "checkedAt": "2026-10-18T10:41:32.890Z"
+    },
+    {
+      "id": "SET-10",
+      "module": "设置",
+      "capability": "AI 配置",
+      "steps": "提供商菜单、模型／地址／密码字段",
+      "expected": "不泄露密钥，未配置说明明确",
+      "status": "通过",
+      "actual": "AI服务商菜单逐个选择，模型空值禁用连接、自定义地址为URL输入、密钥均为密码框；原服务商/地址/模型/密钥已恢复，未对第三方服务发送内容",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/SET-10-secondary.png"
+      ],
+      "apk": "124798cf070a21769bc4081abc874110a481b3608b1f092d69c6a086137714d6",
+      "checkedAt": "2026-10-18T14:57:49.894Z"
+    },
+    {
+      "id": "SET-11",
+      "module": "设置",
+      "capability": "AI 连接测试",
+      "steps": "仅有可用测试配置时执行",
+      "expected": "真实响应与失败分别记录",
+      "status": "通过",
+      "actual": "真实点击内置免费通道连接测试，仅发送固定探测词“请回复: OK”；结果：✅ 连接正常（5084 毫秒）：OK",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/SET-11-trial-test.png"
+      ],
+      "apk": "124798cf070a21769bc4081abc874110a481b3608b1f092d69c6a086137714d6",
+      "checkedAt": "2026-10-18T14:58:01.358Z"
+    },
+    {
+      "id": "SET-12",
+      "module": "设置",
+      "capability": "功能开关",
+      "steps": "书单推荐、互传开关并恢复",
+      "expected": "入口随设置出现／隐藏",
+      "status": "通过",
+      "actual": "推荐书单与设备互传开关逐个操作；书单栏目推荐入口、设置互传入口随开关显示/隐藏，原值已恢复",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/SET-12-secondary.png"
+      ],
+      "apk": "124798cf070a21769bc4081abc874110a481b3608b1f092d69c6a086137714d6",
+      "checkedAt": "2026-10-18T14:55:37.420Z"
+    },
+    {
+      "id": "SET-13",
+      "module": "设置",
+      "capability": "备份窗口",
+      "steps": "导出／导入入口、系统选择器取消",
+      "expected": "不误恢复或覆盖真实数据",
+      "status": "通过",
+      "actual": "K30新包导出打开系统保存窗口，Android返回取消后立即解除忙碌且无成功误报；导入系统文件选择器取消已在上一包验证，34本书保留",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/backup-picker-current.png",
+        "/tmp/lightread-k30-full-20261018/backup-save-canceled.png"
+      ],
+      "apk": "e6622c5f9062177c40daa1fdaf8dadb752ce4be7aa0d0c0ddb1f9034d4778dec",
+      "checkedAt": "2026-10-18T14:08:04.145Z"
+    },
+    {
+      "id": "SET-14",
+      "module": "设置",
+      "capability": "备份完整性",
+      "steps": "可用本机空间时导出到私有位置",
+      "expected": "文件完整且不公开；恢复用隔离数据",
+      "status": "通过",
+      "actual": "e6622新包K30实际系统保存170729882字节藏书包；ZIP完整性、34本原设备文件SHA-256、62个资源长度/哈希及所有阅读位置通过；隔离浏览器恢复34本/166693935字节原文件和进度成功。未对K30执行恢复覆盖。",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/native-backup-verification.json",
+        "/tmp/lightread-k30-full-20261018/backup-isolated-restore.json",
+        "/tmp/lightread-k30-full-20261018/backup-export-fixed.png"
+      ],
+      "apk": "e6622c5f9062177c40daa1fdaf8dadb752ce4be7aa0d0c0ddb1f9034d4778dec",
+      "checkedAt": "2026-10-18T14:18:34.903321+00:00"
+    },
+    {
+      "id": "SET-15",
+      "module": "设置",
+      "capability": "存储页面",
+      "steps": "路径、后端、位置选择取消",
+      "expected": "App 原生后端正确、不移动真实书库",
+      "status": "通过",
+      "actual": "新包K30原生文件后端正常；数据页已移除平台不支持的更改位置入口，保留藏书包导入导出；覆盖升级34本书、阅读位置及10种字体保持",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/settings-data-fixed.png"
+      ],
+      "apk": "e6622c5f9062177c40daa1fdaf8dadb752ce4be7aa0d0c0ddb1f9034d4778dec",
+      "checkedAt": "2026-10-18T14:06:25.874Z"
+    },
+    {
+      "id": "SET-16",
+      "module": "设置",
+      "capability": "网络页面",
+      "steps": "代理类型、字段、测试／取消",
+      "expected": "原配置保持，错误有反馈",
+      "status": "通过",
+      "actual": "六种代理选项与字段启用状态、密码隐藏逐项检查；127.0.0.1:1无服务连接明确返回错误且按钮恢复。原配置和自动同步在退出后恢复，未向第三方发送账号密码",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/SET-16-local-proxy-error.png"
+      ],
+      "apk": "b6375bc3fe909a9f7e38218d892b7bdbc3efa0b0c6f770a30cc64c273e0067dd",
+      "checkedAt": "2026-10-18T15:43:07.490Z"
+    },
+    {
+      "id": "SET-17",
+      "module": "设置",
+      "capability": "关于页面",
+      "steps": "版本、更新检查、格式说明",
+      "expected": "2.0 版本正确，不误装桌面／旧版",
+      "status": "通过",
+      "actual": "新候选App关于页显示v2.0.0，实际检查更新写入独立App缓存并完成；2.0尚未公开时采用已有1.x安装包元数据且不建议降级。正式发布后还需复核2.0可发现性",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/app-updater-native.json",
+        "/tmp/lightread-k30-full-20261018/SET-17-app-channel.png"
+      ],
+      "apk": "6d15267ae7417183ee046d539843da47e90446355d86f18c32d1025f9272dbb6",
+      "checkedAt": "2026-10-18T16:23:04.039Z"
+    },
+    {
+      "id": "SET-18",
+      "module": "设置",
+      "capability": "外部链接",
+      "steps": "项目／文档链接和返回",
+      "expected": "正确浏览器页面、返回 App",
+      "status": "通过",
+      "actual": "项目、问题反馈、版本发布三个外链均实际打开系统浏览器；Android返回均回到原关于页，未提交反馈",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/settings-external-native.json",
+        "/tmp/lightread-k30-full-20261018/SET-18-returned.png"
+      ],
+      "apk": "5479457386522c39b8434ddae4f9645db9e8c36b8d8a655317e369182f22c2b2",
+      "checkedAt": "2026-10-18T14:41:53.373Z"
+    },
+    {
+      "id": "SET-19",
+      "module": "设置",
+      "capability": "说明书",
+      "steps": "目录、章节、锚点、返回",
+      "expected": "信息可读、无空白",
+      "status": "通过",
+      "actual": "六章正文、目录选择与返回已通过；K30跨章节带锚点链接准确滚动到目标小节",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/manual-native-chapters.json",
+        "/tmp/lightread-k30-full-20261018/manual-anchor-native.json",
+        "/tmp/lightread-k30-full-20261018/manual-anchor-native.png"
+      ],
+      "apk": "124798cf070a21769bc4081abc874110a481b3608b1f092d69c6a086137714d6",
+      "checkedAt": "2026-10-18T14:51:45.300Z"
+    },
+    {
+      "id": "SET-20",
+      "module": "设置",
+      "capability": "Agent 可用性",
+      "steps": "检查 Android 是否展示桌面代理入口",
+      "expected": "按平台能力显示，不误承诺",
+      "status": "通过",
+      "actual": "Android 不提供桌面论文Agent运行时，K30设置按平台能力隐藏Agent入口，没有误承诺可运行",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/SET-20-android.png"
+      ],
+      "apk": "124798cf070a21769bc4081abc874110a481b3608b1f092d69c6a086137714d6",
+      "checkedAt": "2026-10-18T14:58:06.366Z"
+    },
+    {
+      "id": "TRANS-01",
+      "module": "互传与系统交互",
+      "capability": "互传入口",
+      "steps": "功能开关打开后进入各通道",
+      "expected": "入口、说明和返回正确",
+      "status": "通过",
+      "actual": "设置开关开启后进入互传，我的设备与取件码逐个切换，独立发送/取件区域与说明可见",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/TRANS-01-transfer.png"
+      ],
+      "apk": "124798cf070a21769bc4081abc874110a481b3608b1f092d69c6a086137714d6",
+      "checkedAt": "2026-10-18T14:58:37.513Z"
+    },
+    {
+      "id": "TRANS-02",
+      "module": "互传与系统交互",
+      "capability": "发送表单",
+      "steps": "文字／链接／文件切换、空值",
+      "expected": "不自动发送，输入状态正确",
+      "status": "通过",
+      "actual": "文字、链接、空值逐项输入检查发送启用状态，10分钟/1小时有效期可切换；未发送内容",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/TRANS-02-transfer.png"
+      ],
+      "apk": "124798cf070a21769bc4081abc874110a481b3608b1f092d69c6a086137714d6",
+      "checkedAt": "2026-10-18T14:58:55.974Z"
+    },
+    {
+      "id": "TRANS-03",
+      "module": "互传与系统交互",
+      "capability": "取件表单",
+      "steps": "空／非法取件码、取消",
+      "expected": "校验合理，无无限等待",
+      "status": "通过",
+      "actual": "空串、过短及非法取件码均保持取件按钮禁用；清空和返回不产生网络取件或无限等待",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/TRANS-03-transfer.png"
+      ],
+      "apk": "124798cf070a21769bc4081abc874110a481b3608b1f092d69c6a086137714d6",
+      "checkedAt": "2026-10-18T14:59:14.296Z"
+    },
+    {
+      "id": "TRANS-04",
+      "module": "互传与系统交互",
+      "capability": "设备列表",
+      "steps": "显示当前可用状态",
+      "expected": "未连接说明明确，不伪造设备",
+      "status": "通过",
+      "actual": "我的设备显示实际账号/网盘连接状态和使用说明；记录真实页面状态，未伪造在线设备或发送内容",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/TRANS-04-transfer.png"
+      ],
+      "apk": "124798cf070a21769bc4081abc874110a481b3608b1f092d69c6a086137714d6",
+      "checkedAt": "2026-10-18T14:58:30.746Z"
+    },
+    {
+      "id": "TRANS-05",
+      "module": "互传与系统交互",
+      "capability": "二维码",
+      "steps": "查看可用二维码窗口、关闭",
+      "expected": "清晰可读，不自动对外分享",
+      "status": "受阻",
+      "actual": "K30当前没有现成取件码；二维码只在外部上传生成取件码后出现，本轮未对外发送，不伪造二维码成功",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/TRANS-05-no-drop.png"
+      ],
+      "apk": "124798cf070a21769bc4081abc874110a481b3608b1f092d69c6a086137714d6",
+      "checkedAt": "2026-10-18T14:59:30.503Z"
+    },
+    {
+      "id": "TRANS-06",
+      "module": "互传与系统交互",
+      "capability": "系统文件取消",
+      "steps": "导入／备份／互传分别取消",
+      "expected": "返回原页面且无卡死",
+      "status": "通过",
+      "actual": "互传添加文件实际打开Android系统文件选择器，取消返回互传且无附件；导入取消在LIB-14另验，备份取消在SET-13另验",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/TRANS-06-transfer.png"
+      ],
+      "apk": "124798cf070a21769bc4081abc874110a481b3608b1f092d69c6a086137714d6",
+      "checkedAt": "2026-10-18T14:59:27.048Z"
+    },
+    {
+      "id": "TRANS-07",
+      "module": "互传与系统交互",
+      "capability": "权限拒绝",
+      "steps": "只测试可恢复权限路径",
+      "expected": "拒绝后有可用返回和说明",
+      "status": "受阻",
+      "actual": "当前文件选择走系统DocumentsUI，无新增运行时权限请求；不撤销用户已有权限以凑拒绝路径，取消路径已验证",
+      "evidence": [],
+      "apk": "124798cf070a21769bc4081abc874110a481b3608b1f092d69c6a086137714d6",
+      "checkedAt": "2026-10-18T14:59:30.505Z"
+    },
+    {
+      "id": "ROBUST-01",
+      "module": "稳定性与无障碍",
+      "capability": "横竖屏",
+      "steps": "阅读、列表、主要弹层旋转来回",
+      "expected": "保留位置、焦点和状态，无溢出",
+      "status": "通过",
+      "actual": "K30真实系统横竖屏旋转覆盖理想国正文、排版、听书和书库，无横向页面溢出，返回保持阅读位置",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/rotation-metrics.json"
+      ],
+      "apk": "5479457386522c39b8434ddae4f9645db9e8c36b8d8a655317e369182f22c2b2",
+      "checkedAt": "2026-10-18T14:48:47.304Z"
+    },
+    {
+      "id": "ROBUST-02",
+      "module": "稳定性与无障碍",
+      "capability": "返回层级",
+      "steps": "各二级窗口点 X、点遮罩、系统返回",
+      "expected": "关闭最上层、不意外退出 App",
+      "status": "通过",
+      "actual": "逐项窗口返回用例完成后，追加书源/新建书单的关闭按钮、遮罩、Android返回三种关闭方式，均留在原路由、恢复页面交互；PDF笔记与属性、日期详情、字体嵌套、模式/听书二级面板的关闭和逐层返回亦已专项验证",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/robust-ui-controls.json",
+        "/tmp/lightread-k30-full-20261018/pdf-tts-stopped.png",
+        "/tmp/lightread-k30-full-20261018/pdf-note-cleaned.png",
+        "/tmp/lightread-k30-full-20261018/fonts-final-regression.json"
+      ],
+      "apk": "6d15267ae7417183ee046d539843da47e90446355d86f18c32d1025f9272dbb6",
+      "checkedAt": "2026-10-18T16:23:29.224591+00:00"
+    },
+    {
+      "id": "ROBUST-03",
+      "module": "稳定性与无障碍",
+      "capability": "触控目标",
+      "steps": "检查主要按钮尺寸、密集按钮和滚动可达",
+      "expected": "可点不遮挡，低于目标的项记录",
+      "status": "通过",
+      "actual": "K30藏书排序、书源搜索/外部网站/社区操作、阅读记录分段/日期入口、排版页签/字号加减和PDF工具主要触控目标修至至少44px，无页面横向溢出。阅读记录密集日期格约43px、柱图列约35px（有间距）已记录，未声称全部控件均44px；320px浏览器字号滑条改两行且有效长度超过100px",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/touch-native-final.json",
+        "/tmp/lightread-k30-full-20261018/pdf-touch-targets.json",
+        "/tmp/lightread-k30-full-20261018/robust-ui-controls.json",
+        "/tmp/lightread-k30-full-20261018/touch-layout-browser.json"
+      ],
+      "apk": "8d44b41e7e754b4188006512349516c7335461a5fe583dea358a5e1fb6775aa1",
+      "checkedAt": "2026-10-18T16:26:27.833Z"
+    },
+    {
+      "id": "ROBUST-04",
+      "module": "稳定性与无障碍",
+      "capability": "可访问名称",
+      "steps": "所有图标按钮和滑条检查名称",
+      "expected": "读屏可识别，不把装饰当动作",
+      "status": "通过",
+      "actual": "K30五个主栏目、阅读器、模式、排版、听书及三个二级面板的可见控件清点未发现无名称按钮/滑条；PDF专项控件名称亦已清点。核对DOM可访问名称、关联标签及title，未声称完成整套TalkBack人工朗读验收",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/robust-ui-controls.json",
+        "/tmp/lightread-k30-full-20261018/inventory-pdf-final.json"
+      ],
+      "apk": "6d15267ae7417183ee046d539843da47e90446355d86f18c32d1025f9272dbb6",
+      "checkedAt": "2026-10-18T16:23:29.225060+00:00"
+    },
+    {
+      "id": "ROBUST-05",
+      "module": "稳定性与无障碍",
+      "capability": "字体放大",
+      "steps": "可安全恢复的应用字体变化",
+      "expected": "内容和按钮可达，数值不溢出",
+      "status": "通过",
+      "actual": "K30理想国正文设为最大64px并核对实际字号；排版/页面控件及进度数值无横向溢出，连续翻页可用，结束恢复原字号。未修改Android系统字体缩放",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/ROBUST-05-max-font.png",
+        "/tmp/lightread-k30-full-20261018/robust-ui-controls.json"
+      ],
+      "apk": "6d15267ae7417183ee046d539843da47e90446355d86f18c32d1025f9272dbb6",
+      "checkedAt": "2026-10-18T16:18:53.366Z"
+    },
+    {
+      "id": "ROBUST-06",
+      "module": "稳定性与无障碍",
+      "capability": "快速重复操作",
+      "steps": "快速开关面板、翻页、暂停继续",
+      "expected": "无重复窗口、双音轨或状态错乱",
+      "status": "通过",
+      "actual": "真机连续八次打开/关闭模式面板、最大字号连续翻页及六轮听书暂停/继续通过；始终单一面板，暂停实际音频静止，继续实际非零PCM，最多一个运行AudioContext，没有重复音轨",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/robust-ui-controls.json",
+        "/tmp/lightread-k30-full-20261018/tts-rapid-result.json"
+      ],
+      "apk": "6d15267ae7417183ee046d539843da47e90446355d86f18c32d1025f9272dbb6",
+      "checkedAt": "2026-10-18T16:23:29.225098+00:00"
+    },
+    {
+      "id": "ROBUST-07",
+      "module": "稳定性与无障碍",
+      "capability": "前后台重开",
+      "steps": "Home／最近任务／强制停止后重开",
+      "expected": "数据和位置保留，无白屏",
+      "status": "通过",
+      "actual": "K30 Home→最近任务→返回，再强制停止当前App进程并重开；34本书、所有保存位置、10种字体及阅读/背景音偏好保持，无白屏。未卸载或清空数据",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/ROBUST-07-recent-return.png",
+        "/tmp/lightread-k30-full-20261018/ROBUST-07-force-reopened.png"
+      ],
+      "apk": "6d15267ae7417183ee046d539843da47e90446355d86f18c32d1025f9272dbb6",
+      "checkedAt": "2026-10-18T16:22:45.178Z"
+    },
+    {
+      "id": "ROBUST-08",
+      "module": "稳定性与无障碍",
+      "capability": "离线本地阅读",
+      "steps": "可不切断远程连接的隔离离线条件",
+      "expected": "已下载书可读；真实断网未做则明确",
+      "status": "通过",
+      "actual": "K30隔离阻断App远端Web请求和原生HTTP调用后，已有理想国EPUB/TXT/MOBI正文及翻页、PDF渲染及第2页可用。保留设备网络以维持ADB；并非物理断网/飞行模式实测",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/offline-native-results.json",
+        "/tmp/lightread-k30-full-20261018/ROBUST-08-offline-pdf.png"
+      ],
+      "apk": "6d15267ae7417183ee046d539843da47e90446355d86f18c32d1025f9272dbb6",
+      "checkedAt": "2026-10-18T16:22:03.864Z"
+    },
+    {
+      "id": "ROBUST-09",
+      "module": "稳定性与无障碍",
+      "capability": "长时阅读",
+      "steps": "理想国至少 30 分钟跨章使用",
+      "expected": "内存、响应、绘制无持续恶化",
+      "status": "通过",
+      "actual": "约46分钟真实听书和定时观察，87份采样；App原生PSS 219.2–226.2MiB，无持续上升趋势。两帧等待采样中位9.7ms、最大37.2ms；真实跨章及界面持续响应，无卡死。采样不是完整性能基准或锁屏结论",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/final-soak-review.json",
+        "/tmp/lightread-k30-full-20261018/listening-soak-2-samples.json"
+      ],
+      "apk": "88b932839af3591771acacb77dec36b46a31a2b08c887097a7247beb263f7cd9",
+      "checkedAt": "2026-10-18T17:23:07.874330+00:00"
+    },
+    {
+      "id": "ROBUST-10",
+      "module": "稳定性与无障碍",
+      "capability": "错误日志",
+      "steps": "收集本轮崩溃、WebView 错误及 ANR",
+      "expected": "逐条归因，不能全过滤",
+      "status": "通过",
+      "actual": "最终候选无未捕获页面异常、无控制台error、当前原生日志无崩溃/ANR；退出历史为安装/主动停止与隔离进程回收。6条既有iframe配置警告、一次互传后台轮询超时对应2条已处理警告；未把联网失败认定为传输成功。旧包语音ReferenceError已有修复及复验记录",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/final-error-audit.json",
+        "/tmp/lightread-k30-full-20261018/final-native-logcat.txt",
+        "/tmp/lightread-k30-full-20261018/final-activity-exit-info.txt"
+      ],
+      "apk": "88b932839af3591771acacb77dec36b46a31a2b08c887097a7247beb263f7cd9",
+      "checkedAt": "2026-10-18T17:23:07.874330+00:00"
+    },
+    {
+      "id": "ROBUST-11",
+      "module": "稳定性与无障碍",
+      "capability": "最终数据恢复",
+      "steps": "核对书架、原进度、偏好与测试残留",
+      "expected": "真实数据完整，测试音频停止",
+      "status": "通过",
+      "actual": "34本原书ID和关键元数据、0个原个人书单、10款字体及全部设置一致；临时副本均清理，音频上下文停止、无活动播放器，自动同步恢复原值。保留实际阅读记录，不伪造或清空测试期间阅读时长",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/final-restoration-results.json",
+        "/tmp/lightread-k30-full-20261018/final-library-restored.png"
+      ],
+      "apk": "88b932839af3591771acacb77dec36b46a31a2b08c887097a7247beb263f7cd9",
+      "checkedAt": "2026-10-18T17:22:33.271Z"
+    },
+    {
+      "id": "LIB-27",
+      "module": "藏书",
+      "capability": "书单与原型一致",
+      "steps": "页内书单列表、本数、新建、管理、进入、返回；浅深色逐项核对",
+      "expected": "无旧横向标签和自动弹管理；结构与原型一致，显示真实数据",
+      "status": "通过",
+      "actual": "K30 页内书单列表、本数、新建和独立管理符合原型；浅深色正常，无旧标签栏",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/booklists-light.png",
+        "/tmp/lightread-k30-full-20261018/booklists-dark.png"
+      ],
+      "apk": "ecd8b9950fe7933ea5919f43209fb8e62865041bedccac7d008aa24500e43750",
+      "checkedAt": "2026-10-18T10:30:39.823Z"
+    },
+    {
+      "id": "CAT-18",
+      "module": "书源",
+      "capability": "书源与原型一致",
+      "steps": "公共／私人／个人书单分组，主来源与更多展开，个人书单跳转，范围窗口返回",
+      "expected": "层级和紧凑行与原型一致；所有入口可达，搜索来源不丢失",
+      "status": "通过",
+      "actual": "K30 公共／私人／个人书单依次显示，主来源为紧凑行；个人书单跳转打开理想国，管理返回页内列表",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/sources-prototype.png"
+      ],
+      "apk": "ecd8b9950fe7933ea5919f43209fb8e62865041bedccac7d008aa24500e43750",
+      "checkedAt": "2026-10-18T10:32:42.712Z"
+    },
+    {
+      "id": "MSG-01",
+      "module": "消息与弹窗",
+      "capability": "短消息与队列",
+      "steps": "真实新建／改名／加入操作；补充服务夹具连续消息",
+      "expected": "单条显示，重复合并，关闭可用，重要操作保留",
+      "status": "通过",
+      "actual": "真实 App 消息服务夹具触发连续成功／错误／可撤销消息；原生 UI 单条显示，重复合并，关闭后可撤销操作保留并执行",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/messages-queue-error.png"
+      ],
+      "apk": "ecd8b9950fe7933ea5919f43209fb8e62865041bedccac7d008aa24500e43750",
+      "checkedAt": "2026-10-18T10:27:16.698Z"
+    },
+    {
+      "id": "MSG-02",
+      "module": "消息与弹窗",
+      "capability": "长错误与详情",
+      "steps": "触发长消息夹具；展开完整详情、滚动到底、Android 返回",
+      "expected": "正文不丢失，关闭不误退出页面",
+      "status": "通过",
+      "actual": "原生消息服务长消息夹具，浅深色均可展开完整全文、滚动至结尾；Android 返回只关闭详情",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/messages-details-light.png",
+        "/tmp/lightread-k30-full-20261018/messages-details-dark.png"
+      ],
+      "apk": "ecd8b9950fe7933ea5919f43209fb8e62865041bedccac7d008aa24500e43750",
+      "checkedAt": "2026-10-18T10:27:55.969Z"
+    },
+    {
+      "id": "MSG-03",
+      "module": "消息与弹窗",
+      "capability": "确认消息",
+      "steps": "临时书单删除：取消、返回、确认",
+      "expected": "对象明确；取消和返回不删除，确认仅删除临时书单",
+      "status": "通过",
+      "actual": "实际删除临时书单：Android 返回及取消均保留书单，确认才删除，操作对象清楚、原书保留",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/messages-confirm-native.png"
+      ],
+      "apk": "6b547e0d4e61add19821b03642649049b0973085404bf877e94cc8c0a77b1378",
+      "checkedAt": "2026-10-18T10:39:06.606Z"
+    },
+    {
+      "id": "MSG-04",
+      "module": "消息与弹窗",
+      "capability": "键盘与安全区",
+      "steps": "输入时触发校验消息，检查关闭及底部操作区",
+      "expected": "键盘不遮挡消息操作，提示不挡确认按钮",
+      "status": "通过",
+      "actual": "ADB 实际触摸输入框唤起 K30 系统键盘；提示与底部确认区均可见且互不遮挡，关闭提示、收起键盘、取消表单正常",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/messages-keyboard-real.png"
+      ],
+      "apk": "6b547e0d4e61add19821b03642649049b0973085404bf877e94cc8c0a77b1378",
+      "checkedAt": "2026-10-18T10:35:16.640Z"
+    },
+    {
+      "id": "MSG-05",
+      "module": "消息与弹窗",
+      "capability": "浅深色与触控",
+      "steps": "成功／错误／确认在浅深色和实际 K30 屏幕逐项检查",
+      "expected": "可读、无溢出，关闭及操作热区至少 44px",
+      "status": "通过",
+      "actual": "K30 浅深色长错误及确认窗口可读，无横向溢出；关闭至少 44px、确认按钮至少 48px",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/messages-long-light.png",
+        "/tmp/lightread-k30-full-20261018/messages-long-dark.png",
+        "/tmp/lightread-k30-full-20261018/messages-confirm-light.png",
+        "/tmp/lightread-k30-full-20261018/messages-confirm-dark.png"
+      ],
+      "apk": "6b547e0d4e61add19821b03642649049b0973085404bf877e94cc8c0a77b1378",
+      "checkedAt": "2026-10-18T10:39:06.605Z"
+    },
+    {
+      "id": "MSG-06",
+      "module": "消息与弹窗",
+      "capability": "表单弹窗一致性",
+      "steps": "新建、管理、分享、导入、添加来源窗口",
+      "expected": "标题、正文、操作区间距一致，长文与按钮可滚动到达",
+      "status": "通过",
+      "actual": "K30 新建、管理、分享、导入、来源表单逐一打开；无效输入提示与取消路径正常",
+      "evidence": [
+        "/tmp/lightread-k30-full-20261018/booklists-share.png",
+        "/tmp/lightread-k30-full-20261018/messages-import-invalid.png",
+        "/tmp/lightread-k30-full-20261018/messages-source-invalid.png"
+      ],
+      "apk": "6b547e0d4e61add19821b03642649049b0973085404bf877e94cc8c0a77b1378",
+      "checkedAt": "2026-10-18T10:38:20.990Z"
+    }
+  ]
+}

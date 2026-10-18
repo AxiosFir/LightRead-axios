@@ -416,6 +416,7 @@ function onKeydown(e: KeyboardEvent) {
 /* 封面上的操作: 桌面悬停 / 键盘聚焦时显示; 触屏设备常显; 已置顶徽标常显 */
 .actions {
   position: absolute;
+  z-index: 3;
   right: 6px;
   top: 6px;
   display: flex;

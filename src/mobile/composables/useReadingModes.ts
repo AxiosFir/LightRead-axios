@@ -1,3 +1,4 @@
+import { engineDensity } from '../services/dianjingDensity.ts'
 /**
  * 阅读模式与 ReaderView 的对接层 (docs/reading-modes.md, docs/research/reading-modes-landscape.md §4–§6)。
  * 逻辑全部在这里和 services/readingModes/*, ReaderView 只做接线。
@@ -124,7 +125,7 @@ import {
   reminderDue as isReminderDue,
 } from '../../services/readingModes/eyeCare.ts'
 import { WordGuideLayer } from '../../services/readingModes/wordGuideLayer.ts'
-import { guideIntensity } from '../../services/readingModes/wordGuideIntensity.ts'
+import { guideIntensity } from '../services/dianjingIntensity'
 import { normalizeLevel, smartOnFor } from '../../services/dianjing/level.ts'
 import { KeyWordLayer, looksChinese, type KwSmartInput } from '../../services/readingModes/keyWordsLayer.ts'
 import { disposeKeyWordService, keyWordService, type KwBookHost } from '../../services/readingModes/keyWordsClient.ts'
@@ -1064,13 +1065,14 @@ export function useReadingModes(opts: UseReadingModesOptions) {
     return layer
   }
 
-  function kwParams(doc: Document, section: number): { book?: TermBook; level: KwLevel; spoilerSafe: boolean; smart: KwSmartInput | null } {
+  function kwParams(doc: Document, section: number): { book?: TermBook; level: KwLevel; densityAmount: number; spoilerSafe: boolean; smart: KwSmartInput | null } {
     const src = kwSource.value
     const d = settings.dianjing.density
     const level: KwLevel = d === 'low' || d === 'high' ? d : 'normal'
     return {
       book: src?.metadata?.(),
       level,
+      densityAmount: engineDensity(settings.dianjing),
       spoilerSafe: !!src?.fiction(),
       smart: guideKind.value === 'smart' && src ? src.smart(doc, section) : null,
     }
@@ -1159,7 +1161,7 @@ export function useReadingModes(opts: UseReadingModesOptions) {
     },
   )
   // 重点词: 密度档、体裁变了就重新取词
-  watch(() => [settings.dianjing.density, kwSource.value?.fiction()], () => refreshKeyWords())
+  watch(() => [settings.dianjing.density, engineDensity(settings.dianjing), kwSource.value?.fiction()], () => refreshKeyWords())
 
   // =====================================================================
   // 休息提醒 (20-20-20) 与夜间定时

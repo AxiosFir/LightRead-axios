@@ -30,7 +30,31 @@ import {
 
 const settings = useSettings()
 onBeforeUnmount(watchReadingViewport())
+// Apply the App's newly calibrated middle once; subsequent slider choices persist.
+try {
+  if (localStorage.getItem('lightread-app-dianjing-calibration') !== '2') {
+    settings.dianjing.density = 'normal'
+    settings.dianjing.densityFine = { value: 50, preset: 'normal' }
+    settings.readingMode.wordGuide.intensity = 1
+    flushAppSettings()
+    localStorage.setItem('lightread-app-dianjing-calibration', '2')
+  }
+} catch { console.warn('Unable to save App reading calibration') }
 settings.persistOnChange()
+// The normal save is debounced by 300 ms. A quick reload/background transition
+// must not discard the font or other preference the user has just selected.
+function flushAppSettings() {
+  try { localStorage.setItem('lightread-settings', JSON.stringify(settings.$state)) }
+  catch { console.warn('Unable to save App preferences') }
+}
+function flushHiddenSettings() { if (document.visibilityState === 'hidden') flushAppSettings() }
+window.addEventListener('pagehide', flushAppSettings)
+document.addEventListener('visibilitychange', flushHiddenSettings)
+onBeforeUnmount(() => {
+  flushAppSettings()
+  window.removeEventListener('pagehide', flushAppSettings)
+  document.removeEventListener('visibilitychange', flushHiddenSettings)
+})
 useAppearance()
 const route = useRoute()
 const router = useRouter()

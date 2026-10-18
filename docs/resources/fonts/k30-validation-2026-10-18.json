@@ -1,0 +1,111 @@
+{
+  "date": "2026-10-18",
+  "device": "Redmi K30 Pro (lmi), Android 12",
+  "apkSha256": "0385ec91a39e1567a90d0dce9109bf366cb7a9e808295568eb1f80627e2f7c11",
+  "fontChecks": [
+    {
+      "id": "wenkai",
+      "sha256": "2d73eea94ad808999d90c0000c239a84a33b09d4bc6ab6c5b8bbf1eda8a7fc8b",
+      "fontLoaded": true,
+      "license": true,
+      "at": "2026-10-18T12:40:11.502Z"
+    },
+    {
+      "id": "wenkai-screen",
+      "sha256": "cd1a6fa39c4ea42fd8f4e289945789b0e510cf7016435640f8893cdad9b220f3",
+      "fontLoaded": true,
+      "license": true,
+      "at": "2026-10-18T12:40:25.291Z"
+    },
+    {
+      "id": "zhenkai",
+      "sha256": "40876902a7ce25268ab710ad8fe6e2b63bc002aa4b68d22fd45fc1243726ced5",
+      "fontLoaded": true,
+      "license": true,
+      "at": "2026-10-18T12:40:39.128Z"
+    },
+    {
+      "id": "iansui",
+      "sha256": "7f1aa62e9dcbf40d0ce41a5d3f1e5ea602e66c295778ac6fefb6b84d8ed08bd5",
+      "fontLoaded": true,
+      "license": true,
+      "at": "2026-10-18T12:40:52.170Z"
+    },
+    {
+      "id": "zhuque",
+      "sha256": "558c62730844fe54ba220146ed62f859d4e2880188d92d985f8921c6e3743bc4",
+      "fontLoaded": true,
+      "license": true,
+      "at": "2026-10-18T12:41:06.294Z"
+    },
+    {
+      "id": "source-serif",
+      "sha256": "78aa7a328fd974df2d688c8a9fd74a33d8334dfa84ab24d9d11efb2ffc464117",
+      "fontLoaded": true,
+      "license": true,
+      "at": "2026-10-18T12:41:52.172Z"
+    },
+    {
+      "id": "source-sans",
+      "sha256": "f1d8611151880c6c336aabeac4640ef434fa13cbfbf1ffe82d0a71b2a5637256",
+      "fontLoaded": true,
+      "license": true,
+      "at": "2026-10-18T12:42:26.944Z"
+    },
+    {
+      "id": "yozai",
+      "sha256": "25071998a0fe6a72f54c235e714986d259633e5ff670b1a2b5e264387f3316ac",
+      "fontLoaded": true,
+      "license": true,
+      "at": "2026-10-18T12:42:57.673Z"
+    },
+    {
+      "id": "mashanzheng",
+      "sha256": "6d2546bb189c732a8ca29af9e22457b152387d158aa459e4ac2ce1e51788b7fb",
+      "fontLoaded": true,
+      "license": true,
+      "at": "2026-10-18T12:43:17.547Z"
+    },
+    {
+      "id": "smiley",
+      "sha256": "b447d7e781f08bc95c4c9f23ba71ed2b8ebb639aa7184485c71c4ca5afcd25c4",
+      "fontLoaded": true,
+      "license": true,
+      "at": "2026-10-18T12:43:35.260Z"
+    }
+  ],
+  "networkBlockedReload": true,
+  "nestedAndroidBack": true,
+  "memory": {
+    "metric": "App main process PSS, KiB",
+    "beforeChunkedIO": 2254631,
+    "afterSourceSerifDownload": 201640,
+    "additionalSamples": 24,
+    "maxAdditionalSample": 232063,
+    "note": "Not total device memory or the sum of all WebView processes."
+  },
+  "bodyVisualChecks": {
+    "apkSha256": "f81e0842ba4678288b7cd3d0cf4f1bbe2efddeb5f033ee4d6edb0f9d671b76bf",
+    "book": "理想国",
+    "fonts": 10,
+    "bodyAndParagraphComputedFamily": true,
+    "fontFacesLoaded": true,
+    "physicalScreenshots": 10
+  },
+  "manualImport": {
+    "apkSha256": "f81e0842ba4678288b7cd3d0cf4f1bbe2efddeb5f033ee4d6edb0f9d671b76bf",
+    "nativeAndroidPicker": true,
+    "bytes": 25928940,
+    "sha256": "2d73eea94ad808999d90c0000c239a84a33b09d4bc6ab6c5b8bbf1eda8a7fc8b",
+    "filenamePreserved": true,
+    "readerFontLoaded": true,
+    "temporaryFixtureRemoved": true
+  },
+  "cachedApplicationCancellation": {
+    "apkSha256": "6a2079500fca1e14a6fe3be58f2a4e85fb0a06054b3b2396b4b8ba11ca0aa9cc",
+    "nativeCancelButton": true,
+    "nativeBackWhilePreparing": true,
+    "previousReaderAndPreviewFontRetained": true,
+    "preparingStateNoFakeZeroPercent": true
+  }
+}

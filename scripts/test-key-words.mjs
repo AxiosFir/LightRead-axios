@@ -262,3 +262,47 @@ test('样式: 重点词强 (着色 + 浅底) / 弱 (只着色), 随颜色与明�
   assert.notEqual(rule(css(0.7, 'teal'), 'lr-wg-kw-s'), strong, '颜色变化')
   assert.match(rule(css(0.7, 'rose', 'dark'), 'lr-wg-kw-s'), /background-color/)
 })
+
+test('细调密度: 三档结果不变, 档位之间有实际选词变化, 缓存随正文更新', () => {
+  const paras = richChapter(42)
+  const book = new KwBook(lex)
+  const request = { section: 0, paras, level: 'normal', spoilerSafe: false }
+  const baseline = book.pick(request)
+  const words = baseline.slice(0, 24).map((p, i) => [paras[p.para].slice(p.index, p.index + p.len), i % 3 + 1, 2])
+  for (const smart of [null, { words, aiParas: paras.map((_, i) => i % 2) }]) {
+    const req = { ...request, smart }
+    for (const [level, amount] of [['low', 1], ['normal', 50], ['high', 100]]) {
+      assert.deepEqual(book.pick({ ...req, densityAmount: amount }), book.pick({ ...req, level }))
+    }
+    const sizes = new Set()
+    for (const amount of [1, 15, 25, 40, 50, 65, 80, 100]) {
+      const result = book.pick({ ...req, densityAmount: amount })
+      sizes.add(result.length)
+      assert.deepEqual(result, book.pick({ ...req, densityAmount: amount }))
+      for (const pick of result) assert.ok(paras[pick.para].slice(pick.index, pick.index + pick.len).length === pick.len)
+    }
+    assert.ok(sizes.size > 3, `should offer intermediate densities: ${[...sizes]}`)
+  }
+  const changed = richChapter(81)
+  book.addSection(0, changed)
+  const fresh = new KwBook(lex)
+  const req = { ...request, paras: changed, densityAmount: 35 }
+  assert.deepEqual(book.pick(req), fresh.pick(req), 'old fine-density cache must not survive text changes')
+})
+
+test('App extended maximum selects three times the old high with sufficient real-word candidates', () => {
+  const paras = richChapter(7421, 150)
+  const book = new KwBook(lex)
+  const request = { section: 0, paras, level: 'high', spoilerSafe: false }
+  const oldHigh = book.pick(request)
+  assert.deepEqual(book.pick({ ...request, densityAmount: 100 }), oldHigh)
+  const newHigh = book.pick({ ...request, densityAmount: 300 })
+  assert.equal(newHigh.length, oldHigh.length * 3)
+  assert.equal(book.pick({ ...request, densityAmount: 200 }).length, oldHigh.length * 2)
+  for (const [index, pick] of newHigh.entries()) {
+    assert.equal(paras[pick.para].slice(pick.index, pick.index + pick.len), pick.word)
+    assert.ok(!['我们', '就是', '什么', '因为', '所以'].includes(pick.word))
+    const previous = newHigh[index - 1]
+    if (previous?.para === pick.para) assert.ok(pick.index >= previous.index + previous.len)
+  }
+})

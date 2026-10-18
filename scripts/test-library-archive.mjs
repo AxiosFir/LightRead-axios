@@ -8,7 +8,7 @@ import { zipSync, unzipSync, strFromU8, strToU8 } from 'fflate'
 import { parse } from 'yaml'
 import { chromium } from 'playwright'
 
-const port = 4177
+const port = Number(process.env.ARCHIVE_TEST_PORT || 4197)
 const base = `http://127.0.0.1:${port}`
 const temp = await mkdtemp(join(tmpdir(), 'lightread-okf-'))
 const server = spawn(

@@ -286,3 +286,28 @@ test('missing system speech returns no voices and reports an unavailable fallbac
     resetEdgeFailure()
   }
 })
+
+test('native synthesis can play, pause, resume and stop without Web Speech globals', async () => {
+  reset()
+  const speech = globalThis.speechSynthesis
+  const utterance = globalThis.SpeechSynthesisUtterance
+  try {
+    delete globalThis.speechSynthesis
+    delete globalThis.SpeechSynthesisUtterance
+    state.synthesize = async text => new Blob([text])
+    assert.doesNotThrow(() => stopSpeech())
+    assert.equal(await speakText('PDF native narration'), 'end')
+    assert.equal(state.played.length, 1)
+    assert.doesNotThrow(() => pauseSpeech())
+    assert.doesNotThrow(() => resumeSpeech())
+    assert.doesNotThrow(() => stopSpeech())
+    state.settings.ttsEngine = 'system'
+    await assert.rejects(speakText('unsupported system voice'), /tts.systemUnsupported/)
+    assert.equal(state.spoken.length, 0)
+  } finally {
+    globalThis.speechSynthesis = speech
+    globalThis.SpeechSynthesisUtterance = utterance
+    state.settings.ttsEngine = 'local'
+    reset()
+  }
+})

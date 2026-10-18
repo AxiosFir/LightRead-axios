@@ -32,6 +32,25 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 
 class MainActivity : TauriActivity() {
+  // Some Android WebViews keep document.hidden/hasFocus unchanged after Home.
+  @Volatile
+  private var activityResumed = false
+
+  override fun onResume() {
+    super.onResume()
+    activityResumed = true
+  }
+
+  override fun onPause() {
+    activityResumed = false
+    super.onPause()
+  }
+
+  private inner class LifecycleBridge {
+    @JavascriptInterface
+    fun isForeground(): Boolean = activityResumed
+  }
+
   @Volatile
   private var insetsJson = "{\"top\":0,\"right\":0,\"bottom\":0,\"left\":0}"
 
@@ -44,6 +63,7 @@ class MainActivity : TauriActivity() {
   override fun onWebViewCreate(webView: WebView) {
     webView.addJavascriptInterface(InsetsBridge(), "LightReadInsets")
     webView.addJavascriptInterface(UpdaterBridge(), "LightReadUpdater")
+    webView.addJavascriptInterface(LifecycleBridge(), "LightReadLifecycle")
 
     ViewCompat.setOnApplyWindowInsetsListener(webView) { view, insets ->
       val bars = insets.getInsets(

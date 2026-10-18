@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import AppSelect from '../../components/AppSelect.vue'
+import FontCatalog from './FontCatalog.vue'
 /**
  * 「排版」面板 (docs/reader-panels.md §3.1): 书页长什么样 —— 字和颜色的值只在这里调。
  * 桌面为顶栏下的浮层卡片, 手机为底部抽屉 (遮罩由 ReaderView 的 sheet-scrim 提供)。
@@ -44,6 +45,7 @@ const emit = defineEmits<{
 }>()
 
 const settings = useSettings()
+const fontCatalogOpen = ref(false)
 // 读生效值、写显式偏好: 即使选中了当前默认值也记为手动选择。
 const reader = new Proxy({} as ReaderPrefs, {
   get: (_, key: keyof ReaderPrefs) => settings.readerPrefs[key],
@@ -185,7 +187,7 @@ let systemFontsLoading = false
     <!-- 文字 -->
     <section v-show="activeSection === 'text'" class="tp-group" role="tabpanel" id="typo-section-text" aria-labelledby="typo-tab-text" data-section="text" :aria-label="t('reader.groupText')">
       <h3 class="tp-title">{{ t('reader.groupText') }}</h3>
-      <div class="set-row">
+      <div class="set-row font-size-row">
         <span class="tp-label">{{ t('reader.fontSize') }}</span>
         <button type="button" class="step-btn" :title="t('reader.fontSmaller')" :aria-label="t('reader.fontSmaller')" @click="setFontSize(reader.fontSize - 1)">A−</button>
         <input v-model.number="reader.fontSize" type="range" min="8" max="64" step="1" :aria-label="t('reader.fontSize')" />
@@ -224,6 +226,7 @@ let systemFontsLoading = false
           </optgroup>
         </AppSelect>
       </div>
+      <button class="font-catalog-entry" @click="fontCatalogOpen = true">{{ t('fontCatalog.title') }}<span>{{ t('fontCatalog.entryHint') }} ›</span></button>
       <details class="tp-more" :open="more.text" @toggle="onMoreToggle('text', $event)">
         <summary>
           <span>{{ t('reader.more') }}</span>
@@ -344,6 +347,7 @@ let systemFontsLoading = false
       </div>
     </section>
   </section>
+  <FontCatalog v-if="fontCatalogOpen" @close="fontCatalogOpen = false" />
 </template>
 
 <style scoped>
@@ -795,4 +799,21 @@ let systemFontsLoading = false
   .step-btn { width: 36px; flex: 0 0 36px; padding: 0; }
 }
 
+@media (pointer: coarse) {
+  .tp-tabs button { min-height: 44px; }
+  .step-btn { min-width: 44px; }
+}
+@media (max-width: 380px) {
+  .font-size-row { display: grid; grid-template-columns: 44px minmax(0, 1fr) 58px; }
+  .font-size-row .tp-label { grid-column: 1 / 3; grid-row: 1; }
+  .font-size-row .set-num { grid-column: 3; grid-row: 1; width: 100%; }
+  .font-size-row .step-btn { grid-column: 1; grid-row: 2; }
+  .font-size-row .step-btn.big { grid-column: 3; justify-self: end; }
+  .font-size-row input[type='range'] { grid-column: 2; grid-row: 2; width: 100%; }
+}
+</style>
+
+<style scoped>
+.font-catalog-entry { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 6px 12px; width: 100%; min-height: 48px; padding: 8px 0; border: 0; border-top: 1px solid var(--border); background: transparent; color: var(--brand); text-align: left; cursor: pointer; }
+.font-catalog-entry span { color: var(--text-3); font-size: 12px; }
 </style>

@@ -6,6 +6,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } 
 import { useRoute, useRouter } from 'vue-router'
 import { MQ, useMediaQuery } from '../../composables/useMediaQuery.ts'
 import { getStorage, isTauri } from '../../storage/index.ts'
+import { canPickFolder } from '../../services/folderSource.ts'
 import { useSettings } from '../../stores/settings.ts'
 import { useLibrary } from '../../stores/library.ts'
 import {
@@ -460,6 +461,7 @@ const GOAL_PRESETS = [0, 10, 15, 20, 30, 45, 60, 90, 120]
 const goalOptions = computed(() => [...new Set([...GOAL_PRESETS, settings.dailyGoalMinutes])].sort((a, b) => a - b))
 const accountEmail = computed(() => accountState.account?.email ?? '')
 const aiProviderLabel = computed(() => t(`aiProvider.${aiPreset.value.id}`))
+const proxyDisplay = computed(() => settings.httpProxy.replace(/(\/\/[^/@:]+:)[^/@]*(@)/, '$1••••$2'))
 const proxyValue = computed(() => (isTauri() ? settings.httpProxy : settings.corsProxy) ? t('settings.proxyOn') : t('settings.proxyOff'))
 function pickSheet(run: () => void) {
   run()
@@ -777,6 +779,7 @@ async function doCopyLink(url: string) {
 const migrating = ref('')
 
 async function changeLibraryRoot() {
+  if (!isTauri() || !canPickFolder()) return
   const { open } = await import('@tauri-apps/plugin-dialog')
   const picked = await open({ directory: true, title: t('settings.pickLibraryFolder') })
   if (typeof picked !== 'string') return
@@ -812,12 +815,30 @@ async function doExport() {
   busyScope.value = 'local'
   busy.value = t('settings.preparingExport')
   try {
+    const fileName = `lightread-library-${new Date().toISOString().slice(0, 10)}${LIBRARY_ARCHIVE_EXTENSION}`
+    let destination: string | null = null
+    if (isTauri()) {
+      const { save } = await import('@tauri-apps/plugin-dialog')
+      destination = await save({ defaultPath: fileName, filters: [{ name: 'ZIP', extensions: ['zip'] }] })
+      if (!destination) return
+    }
     const blob = await exportBackup(msg => (busy.value = msg))
-    const a = document.createElement('a')
-    a.href = URL.createObjectURL(blob)
-    a.download = `lightread-library-${new Date().toISOString().slice(0, 10)}${LIBRARY_ARCHIVE_EXTENSION}`
-    a.click()
-    URL.revokeObjectURL(a.href)
+    if (destination) {
+      const { writeFile } = await import('@tauri-apps/plugin-fs')
+      // Bound Android IPC payloads: a complete library can be hundreds of MB.
+      const chunkSize = 256 * 1024
+      for (let offset = 0; offset < blob.size; offset += chunkSize) {
+        const bytes = new Uint8Array(await blob.slice(offset, offset + chunkSize).arrayBuffer())
+        await writeFile(destination, bytes, { append: offset > 0 })
+        busy.value = t('settings.savingBackup', { pct: Math.min(100, Math.floor((offset + bytes.length) / blob.size * 100)) })
+      }
+    } else {
+      const a = document.createElement('a')
+      a.href = URL.createObjectURL(blob)
+      a.download = fileName
+      a.click()
+      setTimeout(() => URL.revokeObjectURL(a.href), 1000)
+    }
     toast(t('settings.backupExported'), 'success')
   } catch (e: any) {
     toast(t('settings.exportFailed', { msg: e?.message }), 'error', 5000)
@@ -1457,7 +1478,7 @@ const APPEARANCE_OPTIONS = [
           <div class="row-desc">{{ storageKind === 'filesystem' ? t('settings.storageDesktop') : t('settings.storageWeb') }}</div>
         </div>
       </div>
-      <div v-if="isTauri()" class="row">
+      <div v-if="isTauri() && canPickFolder()" class="row">
         <div class="row-text">
           <div class="row-title">{{ t('settings.storageLocation') }}</div>
           <div class="row-desc">
@@ -1512,7 +1533,7 @@ const APPEARANCE_OPTIONS = [
             {{ testing ? t('settings.testingProxy') : t('settings.testConnection') }}
           </button>
         </div>
-        <div v-if="settings.httpProxy" class="proxy-current">{{ t('common.current') }}: <code>{{ settings.httpProxy }}</code></div>
+        <div v-if="settings.httpProxy" class="proxy-current">{{ t('common.current') }}: <code>{{ proxyDisplay }}</code></div>
         <div v-if="testResult" class="proxy-result">{{ testResult }}</div>
       </template>
       <template v-else>
@@ -1597,7 +1618,7 @@ const APPEARANCE_OPTIONS = [
         </div>
         <div v-if="installing" class="install-progress">
           {{ installing }}
-          <span v-if="settings.httpProxy" class="install-hint">{{ t('update.viaProxy', { proxy: settings.httpProxy }) }}</span>
+          <span v-if="settings.httpProxy" class="install-hint">{{ t('update.viaProxy', { proxy: proxyDisplay }) }}</span>
         </div>
         <div v-else-if="installedPath && isAndroidApp" class="install-done" role="status">
           <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M12 2a10 10 0 1 1 0 20 10 10 0 0 1 0-20zm0 2a8 8 0 1 0 0 16 8 8 0 0 0 0-16zm4.2 5.3a1 1 0 0 1 0 1.4l-4.9 4.9a1 1 0 0 1-1.4 0l-2.1-2.1a1 1 0 1 1 1.4-1.4l1.4 1.4 4.2-4.2a1 1 0 0 1 1.4 0z"/></svg>

@@ -31,9 +31,17 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  app:
+    # Dispatch the existing workflow on Dev; no workflow/code changes on main.
+    if: ${{ github.event_name == 'workflow_dispatch' && startsWith(inputs.tag, 'app-v') }}
+    uses: ./.github/workflows/release-mobile.yml
+    with:
+      tag: ${{ inputs.tag }}
+    secrets: inherit
+
   preflight:
     # 本地发版先设仓库变量 RELEASE_BUILD_MODE=manual；推 tag 不启动重复构建。
-    if: ${{ github.event_name == 'workflow_dispatch' || vars.RELEASE_BUILD_MODE != 'manual' }}
+    if: ${{ !startsWith(inputs.tag, 'app-v') && (github.event_name == 'workflow_dispatch' || vars.RELEASE_BUILD_MODE != 'manual') }}
     runs-on: ubuntu-22.04
     steps:
       # 审核策略来自本次 workflow 的固定 SHA；目标旧 tag 不必自带新版脚本。

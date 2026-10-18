@@ -811,3 +811,17 @@ html, body { overflow-x: clip; }
   :root { --control-h: 44px; --control-h-sm: 44px; --icon-btn: 44px; }
   button, [role=button], summary { touch-action: manipulation; }
 }
+
+/* App popup messages and existing form dialogs share readable spacing and touch sizes. */
+.modal h3 { font-size: 18px; line-height: 1.5; overflow-wrap: anywhere; }
+.modal :is(.modal-description, .share-hint, .confirm-message) { line-height: 1.7; overflow-wrap: anywhere; }
+.modal .form-actions { display: flex; flex-wrap: wrap; gap: var(--space-3); margin-top: var(--space-5); }
+.modal .form-actions > .btn { flex: 1 1 120px; min-height: 48px; justify-content: center; }
+.modal :is(input, textarea) { max-width: 100%; }
+@media (max-width: 720px) {
+  .modal-mask { align-items: flex-end; padding: var(--lr-safe-top) 0 0; }
+  .modal { width: 100%; max-height: calc(90dvh - var(--lr-safe-top)); border-radius: var(--radius-xl) var(--radius-xl) 0 0; padding: var(--space-5) var(--space-5) calc(var(--space-5) + var(--lr-safe-bottom)); }
+}
+.modal .btn { min-height: 44px; font-size: 14px; }
+.modal :is(.share-actions, .import-actions) { gap: var(--space-3); flex-wrap: wrap; }
+.modal :is(.share-actions, .import-actions) > .btn { min-height: 48px; }

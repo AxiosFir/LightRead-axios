@@ -1,7 +1,9 @@
+import { dianjingAppearance } from './dianjingAppearance.ts'
 import songtiUrl from "../assets/fonts/noto-serif-sc.woff2?url"
 import kaitiUrl from "../assets/fonts/lxgw-wenkai.woff2?url"
 import type { ReaderPrefs } from '../../stores/settings.ts'
-import { WORD_GUIDE_DEFAULT, guideAccent, guideTailAlpha } from '../../services/readingModes/wordGuideIntensity.ts'
+import { WORD_GUIDE_DEFAULT } from './dianjingIntensity'
+import { guideTailAlpha } from '../../services/readingModes/wordGuideIntensity.ts'
 import { dianjingCSS, djThemeName } from '../../services/dianjing/theme.ts'
 
 export interface ReaderThemeColors {
@@ -31,7 +33,7 @@ export interface ReaderModeStyle {
   eink?: boolean
   /** 大字: 段距 0.6em、正文字重 500 */
   largeText?: boolean
-  /** 仿生阅读着色强度 (0.4–1) 与配色, 见 readingModes/wordGuideIntensity */
+  /** 仿生阅读着色强度 (App 0.25–3) 与配色, 见 readingModes/wordGuideIntensity */
   wordGuideIntensity?: number
   wordGuideColor?: string
 }
@@ -129,11 +131,12 @@ function withAlpha(hex: string, alpha: number): string {
  */
 function readingModeCSS(colors: ReaderThemeColors, theme: string, style?: ReaderModeStyle): string {
   const ghost = withAlpha(colors.fg, 0.18)
+  // 透明文字不会遮住低优先级高亮的底色；未出字区域用正文底色覆盖，随出字范围一起退去。
   return `
-    ::highlight(lr-tw-hidden) { color: transparent; -webkit-text-fill-color: transparent; text-shadow: none; text-decoration-color: transparent; }
-    ::highlight(lr-tw-ghost) { color: ${ghost}; -webkit-text-fill-color: ${ghost}; text-shadow: none; text-decoration-color: ${ghost}; }
+    ::highlight(lr-tw-hidden) { color: transparent; -webkit-text-fill-color: transparent; background-color: ${colors.bg}; text-shadow: none; text-decoration-color: transparent; }
+    ::highlight(lr-tw-ghost) { color: ${ghost}; -webkit-text-fill-color: ${ghost}; background-color: ${colors.bg}; text-shadow: none; text-decoration-color: ${ghost}; }
     ::highlight(lr-tw-fresh) { color: ${colors.link}; -webkit-text-fill-color: ${colors.link}; }
-    ${lyricAndGuideCSS(colors, theme, style?.wordGuideIntensity, style?.wordGuideColor)}
+    ${lyricAndGuideCSS(colors, theme, style?.wordGuideIntensity, style?.wordGuideColor, !!style?.eink)}
     [data-lr-pending] { visibility: hidden !important; }
   `
 }
@@ -172,42 +175,23 @@ export function listenMarkStyle(theme: ReaderPrefs['theme'], appDark: boolean, s
   return LISTEN_MARKS[name]
 }
 
-/** 两个十六进制色按比例混合 (t 为 b 的占比), 不依赖 color-mix */
-function mixHex(a: string, b: string, t: number): string {
-  const parse = (hex: string) => {
-    const m = /^#?([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(hex.trim())
-    if (!m) return null
-    const h = m[1].length === 3 ? m[1].replace(/./g, c => c + c) : m[1]
-    const n = parseInt(h, 16)
-    return [(n >> 16) & 255, (n >> 8) & 255, n & 255]
-  }
-  const x = parse(a)
-  const y = parse(b)
-  if (!x || !y) return a
-  const c = x.map((v, i) => Math.round(v + (y[i] - v) * t))
-  return `#${c.map(v => v.toString(16).padStart(2, '0')).join('')}`
-}
-
 /**
  * 歌词 (其余行淡显 30% / 隐藏) 与仿生阅读 (中文交替着色: 正文色混入青色, 比例即强度; 西文词尾随强度变淡) 的样式。
  * 只改颜色, 开关模式只增删 Highlight 对象; 拖动强度时整段样式重新下发。
  */
-function lyricAndGuideCSS(colors: ReaderThemeColors, theme: string, intensity = WORD_GUIDE_DEFAULT, color?: string): string {
+function lyricAndGuideCSS(colors: ReaderThemeColors, theme: string, intensity = WORD_GUIDE_DEFAULT, color?: string, eink = false): string {
   const dim = withAlpha(colors.fg, 0.3)
   // 两个高亮名 (旧版轻 / 标准) 用同一颜色, 强度只由 intensity 决定
-  const alt = mixHex(colors.fg, guideAccent(color, theme), Math.min(1, Math.max(0, intensity)))
-  const altLight = alt
-  const altNormal = alt
+  const visual = dianjingAppearance(colors.fg, colors.bg, theme, color, intensity, eink)
+  const altLight = visual.boundary
+  const altNormal = visual.boundary
   const tail = withAlpha(colors.fg, guideTailAlpha(intensity))
-  // 重点词 (点睛阅读): 全书第一次出现强 (着色更足 + 浅底), 之后弱 (只着色); 都随明显程度变化, 只改颜色不重排
-  const t = Math.min(1, Math.max(0, intensity))
-  const accent = guideAccent(color, theme)
-  const kwStrong = mixHex(colors.fg, accent, Math.min(1, t + 0.2))
-  const kwStrongBg = withAlpha(accent, Math.round((0.05 + 0.13 * t) * 1000) / 1000)
-  const kwWeak = mixHex(colors.fg, accent, Math.round(t * 0.75 * 100) / 100)
+  const kwStrong = visual.strong
+  const kwStrongBg = visual.background
+  const kwWeak = visual.weak
   return `
-    ::highlight(lr-ly-dim) { color: ${dim}; -webkit-text-fill-color: ${dim}; text-shadow: none; text-decoration-color: ${dim}; }
-    ::highlight(lr-ly-hide) { color: transparent; -webkit-text-fill-color: transparent; text-shadow: none; text-decoration-color: transparent; }
+    ::highlight(lr-ly-dim) { color: ${dim}; -webkit-text-fill-color: ${dim}; background-color: ${colors.bg}; text-shadow: none; text-decoration-color: ${dim}; }
+    ::highlight(lr-ly-hide) { color: transparent; -webkit-text-fill-color: transparent; background-color: ${colors.bg}; text-shadow: none; text-decoration-color: transparent; }
     ::highlight(lr-wg-alt-l) { color: ${altLight}; -webkit-text-fill-color: ${altLight}; }
     ::highlight(lr-wg-alt-n) { color: ${altNormal}; -webkit-text-fill-color: ${altNormal}; }
     ::highlight(lr-wg-tail) { color: ${tail}; -webkit-text-fill-color: ${tail}; }

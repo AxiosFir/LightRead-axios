@@ -60,6 +60,7 @@ export interface SpeakOptions {
 
 /** 朗读一段文本, 结束 / 出错 / 被取消时 resolve */
 export function speak(text: string, opts: SpeakOptions): Promise<'end' | 'cancelled'> {
+  if (!systemSpeechAvailable()) return Promise.reject(new Error(t('tts.systemUnsupported')))
   return new Promise(resolve => {
     const utterance = new SpeechSynthesisUtterance(text)
     if (opts.voice) {
@@ -75,15 +76,15 @@ export function speak(text: string, opts: SpeakOptions): Promise<'end' | 'cancel
 }
 
 export function stopSpeaking() {
-  speechSynthesis.cancel()
+  if (systemSpeechAvailable()) speechSynthesis.cancel()
 }
 
 export function pauseSpeaking() {
-  speechSynthesis.pause()
+  if (systemSpeechAvailable()) speechSynthesis.pause()
 }
 
 export function resumeSpeaking() {
-  speechSynthesis.resume()
+  if (systemSpeechAvailable()) speechSynthesis.resume()
 }
 
 /** foliate TTS 产出的 SSML → 纯文本 */
