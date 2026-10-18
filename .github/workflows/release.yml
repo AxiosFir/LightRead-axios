@@ -80,6 +80,7 @@ jobs:
           npm run test:epub-compat
           npm run test:tts
           npm run test:updater
+          if [ -f scripts/test-mobile-updater.mjs ]; then node --experimental-strip-types --test scripts/test-mobile-updater.mjs; fi
       - name: 在构建前准备 Release 草稿
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -94,7 +95,7 @@ jobs:
             test "$(cat "$RUNNER_TEMP/release-is-draft")" = true || { echo "::error::该版本已公开，请发布新版本或使用 Android 专项修补"; exit 1; }
           else
             git log -1 --format=%B > "$RUNNER_TEMP/release-notes.txt"
-            gh release create "$RELEASE_TAG" --verify-tag --draft --title "LightRead 轻阅 $RELEASE_TAG" --notes-file "$RUNNER_TEMP/release-notes.txt"
+            gh release create "$RELEASE_TAG" --verify-tag --draft --title "$RELEASE_TAG" --notes-file "$RUNNER_TEMP/release-notes.txt"
           fi
 
   desktop:
@@ -105,12 +106,15 @@ jobs:
       matrix:
         include:
           - platform: macos-latest
+            id: mac-arm64
             args: '--target aarch64-apple-darwin'
             rust-targets: aarch64-apple-darwin
           - platform: macos-latest
+            id: mac-x64
             args: '--target x86_64-apple-darwin'
             rust-targets: x86_64-apple-darwin
           - platform: windows-latest
+            id: windows
             # WiX/MSI 在包含多种文件关联时会稳定失败；NSIS 同样是原生安装器且兼容这些关联。
             args: '--bundles nsis'
             rust-targets: ''
@@ -120,6 +124,28 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.tag || github.ref }}
+      - name: Select audited desktop source
+        id: desktop-source
+        shell: bash
+        run: |
+          if [ -f scripts/desktop-release.json ]; then
+            cp scripts/{prepare-desktop-release,collect-desktop-release}.mjs "$RUNNER_TEMP/"
+            echo "commit=$(node -p "require('./scripts/desktop-release.json').baseCommit")" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/checkout@v4
+        if: steps.desktop-source.outputs.commit != ''
+        with:
+          ref: ${{ steps.desktop-source.outputs.commit }}
+      - uses: actions/setup-node@v4
+        if: steps.desktop-source.outputs.commit != ''
+        with:
+          node-version: 22
+      - name: Apply and audit desktop version metadata only
+        if: steps.desktop-source.outputs.commit != ''
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+        run: node "$RUNNER_TEMP/prepare-desktop-release.mjs"
 
       - uses: actions/setup-node@v4
         with:
@@ -158,12 +184,24 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tagName: ${{ inputs.tag || github.ref_name }}
-          releaseName: 'LightRead 轻阅 ${{ inputs.tag || github.ref_name }}'
+          releaseName: '${{ inputs.tag || github.ref_name }}'
           releaseBody: |
             ${{ github.event.head_commit.message }}
           releaseDraft: true
           prerelease: false
           args: ${{ matrix.args }}
+
+      - name: Verify native desktop versions and publish build provenance
+        if: steps.desktop-source.outputs.commit != ''
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+          RELEASE_WORKFLOW_SHA: ${{ github.workflow_sha }}
+        run: |
+          node "$RUNNER_TEMP/collect-desktop-release.mjs" '${{ matrix.id }}' '${{ matrix.rust-targets }}'
+          gh release upload "$RELEASE_TAG" desktop-assets/* --clobber
 
   # Linux 独立并行构建；最终 publish 仍等待全部平台与 Rust 最低版本检查。
   desktop-linux:
@@ -174,12 +212,34 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.tag || github.ref }}
+      - name: Select audited desktop source
+        id: desktop-source
+        shell: bash
+        run: |
+          if [ -f scripts/desktop-release.json ]; then
+            cp scripts/{prepare-desktop-release,collect-desktop-release}.mjs "$RUNNER_TEMP/"
+            echo "commit=$(node -p "require('./scripts/desktop-release.json').baseCommit")" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/checkout@v4
+        if: steps.desktop-source.outputs.commit != ''
+        with:
+          ref: ${{ steps.desktop-source.outputs.commit }}
+      - uses: actions/setup-node@v4
+        if: steps.desktop-source.outputs.commit != ''
+        with:
+          node-version: 22
+      - name: Apply and audit desktop version metadata only
+        if: steps.desktop-source.outputs.commit != ''
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+        run: node "$RUNNER_TEMP/prepare-desktop-release.mjs"
 
       - name: 安装 Linux 依赖
         run: |
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev \
-            librsvg2-dev patchelf libasound2-dev cmake
+            librsvg2-dev patchelf libasound2-dev cmake rpm
 
       - uses: actions/setup-node@v4
         with:
@@ -201,11 +261,23 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tagName: ${{ inputs.tag || github.ref_name }}
-          releaseName: 'LightRead 轻阅 ${{ inputs.tag || github.ref_name }}'
+          releaseName: '${{ inputs.tag || github.ref_name }}'
           releaseBody: |
             ${{ github.event.head_commit.message }}
           releaseDraft: true
           prerelease: false
+
+      - name: Verify native desktop versions and publish build provenance
+        if: steps.desktop-source.outputs.commit != ''
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+          RELEASE_WORKFLOW_SHA: ${{ github.workflow_sha }}
+        run: |
+          node "$RUNNER_TEMP/collect-desktop-release.mjs" 'linux' ''
+          gh release upload "$RELEASE_TAG" desktop-assets/* --clobber
 
   rust-floor:
     needs: preflight
@@ -215,6 +287,28 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.tag || github.ref }}
+      - name: Select audited desktop source
+        id: desktop-source
+        shell: bash
+        run: |
+          if [ -f scripts/desktop-release.json ]; then
+            cp scripts/{prepare-desktop-release,collect-desktop-release}.mjs "$RUNNER_TEMP/"
+            echo "commit=$(node -p "require('./scripts/desktop-release.json').baseCommit")" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/checkout@v4
+        if: steps.desktop-source.outputs.commit != ''
+        with:
+          ref: ${{ steps.desktop-source.outputs.commit }}
+      - uses: actions/setup-node@v4
+        if: steps.desktop-source.outputs.commit != ''
+        with:
+          node-version: 22
+      - name: Apply and audit desktop version metadata only
+        if: steps.desktop-source.outputs.commit != ''
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+        run: node "$RUNNER_TEMP/prepare-desktop-release.mjs"
       - name: 安装 Linux 依赖
         run: |
           sudo apt-get update
@@ -451,6 +545,22 @@ jobs:
             compgen -G '*.AppImage' >/dev/null
             compgen -G '*.deb' >/dev/null
           fi
+          if [ "$RELEASE_TAG" = v2.0.0 ] && [ "$REPAIR_ANDROID_ONLY" != true ]; then
+            node --input-type=module <<'JS'
+          import assert from 'node:assert/strict';
+          import { readFileSync } from 'node:fs';
+          import { createHash } from 'node:crypto';
+          const hash = name => createHash('sha256').update(readFileSync(name)).digest('hex');
+          for (const id of ['mac-arm64', 'mac-x64', 'windows', 'linux']) {
+            const report = JSON.parse(readFileSync(`desktop-${id}.build.json`, 'utf8'));
+            assert.equal(report.tag, process.env.RELEASE_TAG);
+            assert.equal(report.commit, '1f65e15f447767d01ede13638dcc8d6df4724a0f');
+            assert.match(report.nativeVersion, /^2\.0\.0(?:\.0)?$/);
+            assert.equal(report.versionPatchSha256, hash('desktop-version.patch'));
+            for (const [name, expected] of Object.entries(report.assets)) assert.equal(hash(name), expected, name);
+          }
+          JS
+          fi
           # 不把旧清单包含进新清单，也不删除已上传的安装包。
           rm -f SHA256SUMS
           find . -maxdepth 1 -type f ! -name SHA256SUMS -printf '%f\0' | sort -z | xargs -0 sha256sum > SHA256SUMS
@@ -458,7 +568,7 @@ jobs:
           gh release upload "$RELEASE_TAG" SHA256SUMS --clobber
       - name: 全部平台验证完成后公开 Release
         if: ${{ !inputs.tag || inputs.full_release }}
-        run: gh release edit "$RELEASE_TAG" --draft=false
+        run: gh release edit "$RELEASE_TAG" --draft=false --title "$RELEASE_TAG" --latest
 
   # 国内镜像（GitCode）：仅在 publish 成功后运行，只读 GitHub Release；未配置 GITCODE_TOKEN 时内部跳过。
   # 它在 GitHub Release 公开之后才开始，失败不会撤回或修改 GitHub Release，可在

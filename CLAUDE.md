@@ -7,17 +7,17 @@
 
 - `release/1.20.0`：1.x 全平台最终版封存分支，tag `v1.20.0`；已发布内容不混入 2.0 开发。
 - `Dev`：后续 App 2.0 开发主线，工作目录 `/home/ubuntu/workspace/LightRead-v2`。原 `feat/lightread-2.0` 只保留历史。
-- `main` 保持原有代码；桌面以 1.20.0 收尾，只有版本元数据提升，界面和功能沿用 1.19.4。不要将 App 修改带入桌面。
-- App 2.x 使用独立 tag `app-vX.Y.Z`，Release 标题仍为 `vX.Y.Z`，并保持 GitHub `latest=false`，避免旧桌面更新器误识别 App 更新。App 更新器从正式发布列表选取 App tag；GitCode 镜像保留桌面最终版与字体资源，不按 App tag 清理桌面版本。
+- `main` 保持原有代码；2026-10-18 用户确认桌面和 App 统一升级到 2.0.0。桌面界面与功能保持已发布 1.20.0 的源码基线，只改版本元数据；不能把 App 修改带入桌面。桌面发布用 `scripts/desktop-release.json` 固定基线，并附版本补丁及各平台构建报告。
+- 新版统一使用 `vX.Y.Z` 全平台 Release，完整校验后设为 GitHub latest；GitCode 保留旧版与字体资源（`KEEP_OLD=1`）。历史 `app-v2.0.0` 保留，不能移动或删除；该旧 APK 只识别 `app-v2.x`，首次高于 2.0.0 的后续版本还需发布同 APK 的 `app-vX.Y.Z` 兼容入口（latest=false），供旧 App 迁移到统一更新器。
 - Release 标题仅使用版本号。App 默认在线语音；K30 已将旧离线选择改为在线，后续测试恢复设置时不要改回离线。
 
 ## K30 真机验收（2026-10-18 用户要求）
 
 完整验收先设计测试计划与能力清单，再自顶向下逐项点击每个栏目、窗口、功能和按钮。阅读样本用《理想国》和 K30 已有书籍，不以短合成文本代替长文验收；不为节省耗时省略检查。逐项记录实际结果、证据、缺陷和受阻条件，遵循 [K30 验收约定](docs/testing/k30-ui-acceptance.md)。
 
-## App / 桌面版本边界（2026-10-17 用户确认）
+## App / 桌面版本边界（2026-10-18 用户更新）
 
-桌面与默认 Web/PWA 基础版本为 1.20.0，保持原有界面，只有原生 App 升级 2.0。App 专属代码在 `src/mobile/`，通过构建平台选择，不能用窗口宽度决定产品版本。Android / iOS 的版本分别写在 `src-tauri/tauri.android.conf.json` / `tauri.ios.conf.json`，不要随 App 升级修改桌面 package/Cargo/tauri 基础版本。详见 `src/mobile/README.md`。下述旧的统一版本发版流程仅适用于 1.x；App 2.x 使用上文独立 tag 和 App 校验流程，公开状态以发布页为准。
+桌面、默认 Web/PWA 与 App 的版本元数据统一为 2.0.0；界面仍按平台隔离。App 专属代码在 `src/mobile/`，通过构建平台选择，不能用窗口宽度决定产品界面。Android / iOS 的版本分别写在 `src-tauri/tauri.android.conf.json` / `tauri.ios.conf.json`，与基础版本一致。桌面正式安装包必须按上文固定的已发布基线做版本补丁构建，而非直接带入 Dev 的共享功能修改。详见 `src/mobile/README.md`。
 
 ## 技术栈
 

@@ -154,7 +154,7 @@ async function fetchGithubRelease(ms: number): Promise<UpdateInfo> {
   return info
 }
 
-/** App tags are isolated from the frozen desktop update channel. */
+/** Unified releases and legacy App releases both require a complete Android package. */
 export function parseGithubReleases(list: unknown): UpdateInfo | null {
   if (!Array.isArray(list)) return null
   const data = list.filter(release => isAppRelease(release) && completeAppAssets(release.assets))
@@ -184,8 +184,8 @@ async function fetchMirrorRelease(ms: number): Promise<UpdateInfo> {
   return info
 }
 
-// v1 releases remain valid for migration; v2+ desktop tags are never App updates.
-const RELEASE_TAG = /^(?:app-v\d+|v1)\.\d+\.\d+$/
+// Keep legacy App tags readable while new releases use the shared vX.Y.Z channel.
+const RELEASE_TAG = /^(?:app-)?v\d+\.\d+\.\d+$/
 function isAppRelease(release: any): boolean {
   return RELEASE_TAG.test(String(release?.tag_name ?? '')) && release.draft !== true
     && release.prerelease !== true && release.release_status !== 'pre'

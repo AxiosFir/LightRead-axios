@@ -46,7 +46,7 @@ for k,v in json.load(sys.stdin)["headers"].items(): print(f"-H\n{k}: {v}")')
 # App 的源码在 Dev，不能由 release create 在 main 上隐式生成同名 tag。
 # 只使用已经同步且与 GitHub 相同的 tag；不移动已有 tag。
 TARGET_REF=main
-if [[ $TAG =~ ^app-v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+if [[ $TAG =~ ^(app-)?v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
   TARGET_REF=$(node --input-type=module - "$GH_REPO" "$GC_REPO" "$TAG" <<'JS'
 import assert from 'node:assert/strict';
 import { remoteTagCommit } from './scripts/mirror-gitcode.mjs';
@@ -54,8 +54,8 @@ const [github, gitcode, tag] = process.argv.slice(2);
 const expected = remoteTagCommit(`https://github.com/${github}.git`, tag);
 const actual = remoteTagCommit(`https://gitcode.com/${gitcode}.git`, tag);
 assert.ok(expected, `GitHub tag ${tag} 不存在`);
-assert.ok(actual, `请先将 ${tag} 同步到 GitCode，不能从 main 创建 App tag`);
-assert.equal(actual, expected, 'GitCode App tag 与 GitHub 提交不一致');
+assert.ok(actual, `请先将 ${tag} 同步到 GitCode，不能从 main 创建版本 tag`);
+assert.equal(actual, expected, 'GitCode tag 与 GitHub 提交不一致');
 console.log(actual);
 JS
   )
