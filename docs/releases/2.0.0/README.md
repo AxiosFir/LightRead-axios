@@ -1,5 +1,7 @@
 # 轻阅 App 2.0（桌面保持 1.20.0）
 
+App 2.0.0 已发布：[GitCode 国内下载](https://gitcode.com/langgpt/LightRead/releases/tag/app-v2.0.0) · [GitHub 下载](https://github.com/yzfly/LightRead/releases/tag/app-v2.0.0)。K30 210项记录为201通过、9受阻；[最终验收报告](k30-ui-validation-2026-10-18.md)说明限制和恢复结果。1.x首次升级需手动下载APK。
+
 设计基准是用户在 K30 Chrome 中确认的 [Codex v3 原型](../../prototypes/lightread-mobile-v3.html)。参考微信读书的安静配色、主次层级和阅读体验，将原型接入现有 Vue / Tauri App。没有替换存储、阅读引擎、同步或语音服务。
 
 ## 1.x 基线

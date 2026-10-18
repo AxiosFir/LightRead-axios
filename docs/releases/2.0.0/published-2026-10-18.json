@@ -1,0 +1,74 @@
+{
+  "version": "2.0.0",
+  "tag": "app-v2.0.0",
+  "sourceCommit": "aa603203badf3ca3da5b9585a17ebc3a5e681d44",
+  "publishedAt": "2026-10-18T17:26:24Z",
+  "github": "https://github.com/yzfly/LightRead/releases/tag/app-v2.0.0",
+  "gitcode": "https://gitcode.com/langgpt/LightRead/releases/tag/app-v2.0.0",
+  "workflow": "https://github.com/yzfly/LightRead/actions/runs/39149551645",
+  "workflowConclusion": "success",
+  "apkSha256": "88b932839af3591771acacb77dec36b46a31a2b08c887097a7247beb263f7cd9",
+  "sameBytesAsFullQaCandidateAndInstalledK30": true,
+  "testCases": {
+    "total": 210,
+    "passed": 201,
+    "blocked": 9,
+    "pending": 0,
+    "failed": 0
+  },
+  "githubAnonymousDownloads": {
+    "tag": "app-v2.0.0",
+    "anonymousGet": true,
+    "checksumsSha256": "64a440732889b2cb9f5eda82aa339889978cfdc0dc2f13efd123974a2525bfb6",
+    "files": [
+      {
+        "name": "LightRead_app-v2.0.0_android_arm64.apk",
+        "sha256": "88b932839af3591771acacb77dec36b46a31a2b08c887097a7247beb263f7cd9",
+        "bytes": 98635400,
+        "verified": true
+      },
+      {
+        "name": "LightRead_app-v2.0.0_android_arm64.apk.build.json",
+        "sha256": "625c5660bd30573359ef4ff854ab8c76d41e0f59013ae5f89646aca28390c911",
+        "bytes": 162,
+        "verified": true
+      },
+      {
+        "name": "LightRead_app-v2.0.0_android_arm64.apk.json",
+        "sha256": "bdef20ac347ac08b0b4f6693b670968003e3a9983e67754112073e86e560cf0e",
+        "bytes": 482,
+        "verified": true
+      },
+      {
+        "name": "LightRead_app-v2.0.0_android_arm64.apk.sha256",
+        "sha256": "799a86e19f7e4ff674b77ca87a78d2283475804769a9683d1f24455c4990f32b",
+        "bytes": 105,
+        "verified": true
+      }
+    ]
+  },
+  "gitcodeVerification": {
+    "tag": "app-v2.0.0",
+    "title": "v2.0.0",
+    "assets": [
+      "LightRead_app-v2.0.0_android_arm64.apk",
+      "LightRead_app-v2.0.0_android_arm64.apk.build.json",
+      "LightRead_app-v2.0.0_android_arm64.apk.json",
+      "LightRead_app-v2.0.0_android_arm64.apk.sha256",
+      "SHA256SUMS"
+    ],
+    "anonymousDownloadSha256Verified": true,
+    "preservedFontTag": "reader-fonts-20261018",
+    "preservedFontAssetCount": 14,
+    "preservedDesktopTag": "v1.20.0"
+  },
+  "k30UpdateCheck": {
+    "version": "2.0.0",
+    "hasUpdate": false,
+    "source": "github",
+    "fresh": true
+  },
+  "originalDataAndPreferencesPreserved": true,
+  "desktopGithubLatest": "v1.20.0",
+  "mainUnchanged": "a9694798ae52778f37526798ab3f9ee6f6c4869c"
+}

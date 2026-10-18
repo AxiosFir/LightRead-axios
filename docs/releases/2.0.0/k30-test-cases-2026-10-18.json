@@ -2569,13 +2569,13 @@
       "steps": "版本、更新检查、格式说明",
       "expected": "2.0 版本正确，不误装桌面／旧版",
       "status": "通过",
-      "actual": "新候选App关于页显示v2.0.0，实际检查更新写入独立App缓存并完成；2.0尚未公开时采用已有1.x安装包元数据且不建议降级。正式发布后还需复核2.0可发现性",
+      "actual": "发布后在K30关于页实际点击检查更新，取得新时间戳的2.0.0元数据和App安装包，当前版本不提示重复升级；来源GitHub。独立App缓存生效，检查后34本书的位置/顺序及全部原设置一致",
       "evidence": [
-        "/tmp/lightread-k30-full-20261018/app-updater-native.json",
-        "/tmp/lightread-k30-full-20261018/SET-17-app-channel.png"
+        "/tmp/lightread-k30-full-20261018/released-app-smoke.json",
+        "/tmp/lightread-k30-full-20261018/released-app-updater.png"
       ],
-      "apk": "6d15267ae7417183ee046d539843da47e90446355d86f18c32d1025f9272dbb6",
-      "checkedAt": "2026-10-18T16:23:04.039Z"
+      "apk": "88b932839af3591771acacb77dec36b46a31a2b08c887097a7247beb263f7cd9",
+      "checkedAt": "2026-10-18T17:28:36.320044+00:00"
     },
     {
       "id": "SET-18",
