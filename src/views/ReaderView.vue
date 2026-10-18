@@ -1236,7 +1236,7 @@ const listenPlayer = new ListenPlayer({
     ttsBuffering.value = false
     ttsFailure.value = reason === 'error'
     ttsEnded.value = reason === 'finished'
-    if (reason === 'error') toast(t('tts.error'), 'error')
+    if (reason === 'error' && !ttsPanel.value) toast(t('tts.error'), 'error')
     if (reason === 'finished') toast(t('tts.bookFinished'), 'success')
     if (reason !== 'stopped') finishListenSession()
   },
@@ -2801,7 +2801,7 @@ watch(() => modes.progressActive.value, on => {
 function resetAutoScrollClock() { autoClock.reset() }
 
 watch(() => [panel.value, settingsOpen.value, ttsPanel.value, modes.panelOpen.value, ambientPanel.value], async (_state, _old, cleanup) => {
-  if (!sheetOpen.value || !matchesMQ('(max-width: 720px)')) return
+  if (!sheetOpen.value || !matchesMQ(MQ.phone)) return
   let disposed = false
   const previous = document.activeElement as HTMLElement | null
   const held: Array<[HTMLElement, boolean]> = []
