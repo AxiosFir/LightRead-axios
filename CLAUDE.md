@@ -3,6 +3,13 @@
 开源、本地优先的电子书 / 论文阅读器。桌面 (Tauri 2) + 网页 PWA + Android 实验版。
 产品定位与已定决策见 `docs/产品设计.md`，论文阅读链路见 `docs/paper-reading.md`。
 
+## 分支分工（2026-10-17 用户确认）
+
+- `release/1.20.0`：App 1.x 最终版封存分支，tag `v1.20.0`；已发布内容不混入 2.0 开发。
+- `Dev`：后续 App 2.0 开发主线，工作目录 `/home/ubuntu/workspace/LightRead-v2`。原 `feat/lightread-2.0` 只保留历史。
+- `main` 与桌面版保持 1.19.4 原有代码、界面和安装包。不要将 App 修改带入桌面。
+- Release 标题仅使用版本号。App 默认在线语音；K30 已将旧离线选择改为在线，后续测试恢复设置时不要改回离线。
+
 ## App / 桌面版本边界（2026-10-17 用户确认）
 
 桌面与默认 Web/PWA 保持 1.19.4 原有界面，只有原生 App 升级 2.0。App 专属代码在 `src/mobile/`，通过构建平台选择，不能用窗口宽度决定产品版本。Android / iOS 的版本分别写在 `src-tauri/tauri.android.conf.json` / `tauri.ios.conf.json`，不要随 App 升级修改桌面 package/Cargo/tauri 基础版本。详见 `src/mobile/README.md`。下述旧的统一版本发版流程仅适用于 1.x；App 2.0 尚未公开发布。

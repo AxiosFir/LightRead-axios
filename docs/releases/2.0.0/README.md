@@ -4,7 +4,7 @@
 
 ## 1.x 基线
 
-[v1.20.0](https://github.com/yzfly/LightRead/releases/tag/v1.20.0) 为 App 1.x 最终版，维护分支为 `release/1.x`；桌面继续保持 [v1.19.4](https://github.com/yzfly/LightRead/releases/tag/v1.19.4) 的界面、版本和安装包。2.0 在 `feat/lightread-2.0` 分支开发。Release 标题只用版本号。
+[v1.20.0](https://github.com/yzfly/LightRead/releases/tag/v1.20.0) 为 App 1.x 最终版，封存分支为 `release/1.20.0`；桌面继续保持 [v1.19.4](https://github.com/yzfly/LightRead/releases/tag/v1.19.4) 的界面、版本和安装包。2.0 在 `Dev` 分支开发。Release 标题只用版本号。
 
 ## 实现
 
