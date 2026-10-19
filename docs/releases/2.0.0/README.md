@@ -1,6 +1,8 @@
 # 轻阅 2.0（App 与桌面统一版本）
 
-2026-10-18 首次 App 2.0.0 发布：[GitCode 国内下载](https://gitcode.com/langgpt/LightRead/releases/tag/app-v2.0.0) · [GitHub 下载](https://github.com/yzfly/LightRead/releases/tag/app-v2.0.0)。K30 210项记录为201通过、9受阻；[最终验收报告](k30-ui-validation-2026-10-18.md)说明限制和恢复结果。随后用户确认桌面也统一升级 2.0.0；统一版本的构建与更新兼容验证见 [统一发布记录](unified-release-2026-10-18.md)。
+统一 2.0.0 已发布：[GitCode 国内下载](https://gitcode.com/langgpt/LightRead/releases/tag/v2.0.0) · [GitHub 下载](https://github.com/yzfly/LightRead/releases/tag/v2.0.0)。Android、Windows、macOS 与 Linux 版本均为 2.0.0；桌面保持原有界面与功能，仅更新版本元数据。旧 1.20.x 的更新入口已修复。
+
+原 App 的 K30 210 项记录为 201 通过、9 受阻；[完整验收报告](k30-ui-validation-2026-10-18.md)保留原 APK 的能力边界。本次版本统一、公开下载、旧更新器及 K30 覆盖保留检查全部通过，详见 [统一发布记录](unified-release-2026-10-18.md)。历史 `app-v2.0.0` 的标签和资产保留。下文为开发过程记录，当前发布状态以本段和统一发布记录为准。
 
 设计基准是用户在 K30 Chrome 中确认的 [Codex v3 原型](../../prototypes/lightread-mobile-v3.html)。参考微信读书的安静配色、主次层级和阅读体验，将原型接入现有 Vue / Tauri App。没有替换存储、阅读引擎、同步或语音服务。
 
@@ -44,7 +46,7 @@ node --test scripts/test-platform-boundary.mjs scripts/test-mobile-tts.mjs scrip
 
 `e2e-v2` 验证真实导入、字体在章节文档加载、排版标签、听书设置与四种宽度。其余回归覆盖阅读引擎、PDF、排版持久化和窄屏触控。
 
-Android 延续已有实验性 arm64 debug 安装形式及固定签名，包名保持 `com.yzfly.lightread.debug`，版本为 2.0.0 / 2000000，minSdk 24、targetSdk 36。正式公开的稳定 Release 暂时仍为 1.x 全平台最终版；桌面继续保持此版本。
+Android 延续已有实验性 arm64 debug 安装形式及固定签名，包名保持 `com.yzfly.lightread.debug`，版本为 2.0.0 / 2000000，minSdk 24、targetSdk 36。此处为发布前阶段记录；当前 App 与桌面版本已统一为 2.0.0，公开状态以顶部链接为准。
 
 ## 语音故障定位与平台分离复验
 
@@ -79,7 +81,7 @@ App 合成请求增加 30 秒总超时。K30 WebView 不提供 Web Speech API，
 
 当时K30包为 `LightRead-2.0.0-Dev-lifecycle-manual.apk`，SHA-256 `124798cf070a21769bc4081abc874110a481b3608b1f092d69c6a086137714d6`。新增修复背景音缓存启动丢失、Android后台阅读误计时及手册跨章锚点，均已真机复验。此阶段163项通过、39待测、8受阻；继续剩余验收，实时结果以逐项清单为准。用户已授权完成验证和修复后发布App版本，桌面版本保持不变。
 
-App 2.x 发布使用 `app-vX.Y.Z` 独立 tag，显示标题仍为 `vX.Y.Z`，GitHub `latest=false`。App 更新器读取正式发布列表及独立缓存，旧桌面镜像解析器忽略 App tag；更新器及版本门禁36项测试通过。App更新器、PDF笔记清空、弹窗返回及代理密码隐藏随后均已完成K30专项复验；当时未提前公开。
+首次独立 App 2.0 发布使用 `app-vX.Y.Z` 独立 tag，显示标题仍为 `vX.Y.Z`，GitHub `latest=false`。App 更新器读取正式发布列表及独立缓存，旧桌面镜像解析器忽略 App tag；更新器及版本门禁36项测试通过。App更新器、PDF笔记清空、弹窗返回及代理密码隐藏随后均已完成K30专项复验；当时未提前公开。
 
 1.x Android 使用旧更新通道，不会自动发现 `app-v2.0.0`；首次升级到2.0需从App发布页手动下载APK。固定签名一致时支持覆盖安装，历史随机签名安装按已有备份迁移说明处理。2.x 后续版本使用新的App更新通道。
 

@@ -1,0 +1,151 @@
+{
+  "version": "2.0.0",
+  "tag": "v2.0.0",
+  "publishedAt": "2026-10-19T00:14:54Z",
+  "githubUrl": "https://github.com/yzfly/LightRead/releases/tag/v2.0.0",
+  "gitcodeUrl": "https://gitcode.com/langgpt/LightRead/releases/tag/v2.0.0",
+  "workflow": {
+    "id": 39178627798,
+    "conclusion": "success",
+    "url": "https://github.com/yzfly/LightRead/actions/runs/39178627798"
+  },
+  "androidBuild": {
+    "tag": "v2.0.0",
+    "commit": "27883366011ce81152e6cc192ef309cdcaae84da",
+    "sha256": "4d7df528630908cfbfabe313baaa719fe1b0f77d78e7183065bc6d50926ea772"
+  },
+  "androidPackage": {
+    "file": "LightRead_v2.0.0_android_arm64.apk",
+    "packageName": "com.yzfly.lightread.debug",
+    "versionName": "2.0.0",
+    "versionCode": 2000000,
+    "minSdk": 24,
+    "targetSdk": 36,
+    "abis": [
+      "arm64-v8a"
+    ],
+    "certificateSha256": "56103db2e518cf800db66d148d45f886e93c12b1afc8944ec668713636c7bada",
+    "layout": {
+      "entries": 943,
+      "unindexedBytes": 4096,
+      "largestGap": 4096
+    },
+    "sha256": "4d7df528630908cfbfabe313baaa719fe1b0f77d78e7183065bc6d50926ea772"
+  },
+  "desktopBuilds": {
+    "desktop-linux.build": {
+      "tag": "v2.0.0",
+      "sourcePolicy": "published desktop baseline plus version-only patch",
+      "commit": "1f65e15f447767d01ede13638dcc8d6df4724a0f",
+      "workflowCommit": "27883366011ce81152e6cc192ef309cdcaae84da",
+      "nativeVersion": "2.0.0",
+      "versionPatchSha256": "1f245449cb8572f3765fba6131fd3de51cfa2872f9fe57173e3c86887f753793",
+      "assets": {
+        "LightRead-2.0.0-1.x86_64.rpm": "c984ae007563ac2b61c1a68828a2da71025d4082de81b2ec8741a6b7477e2488",
+        "LightRead_2.0.0_amd64.AppImage": "5096dae04ffe0ef7d85e5c9eba55fe6ac776baac5627d2f5f9219d3f15251033",
+        "LightRead_2.0.0_amd64.deb": "482b901fd4b102de3033f8aa032e5b973e6896c5b701a814d666eb1354b042b3"
+      }
+    },
+    "desktop-mac-arm64.build": {
+      "tag": "v2.0.0",
+      "sourcePolicy": "published desktop baseline plus version-only patch",
+      "commit": "1f65e15f447767d01ede13638dcc8d6df4724a0f",
+      "workflowCommit": "27883366011ce81152e6cc192ef309cdcaae84da",
+      "nativeVersion": "2.0.0",
+      "versionPatchSha256": "1f245449cb8572f3765fba6131fd3de51cfa2872f9fe57173e3c86887f753793",
+      "assets": {
+        "LightRead_2.0.0_aarch64.dmg": "42423852ea59966536bf6d147487bb18ff6cf47e57d88f8ce6ebb0d615c17a18",
+        "LightRead_aarch64.app.tar.gz": "ea885f769a956e4df85983e98846b639ce90da8ebad580204e420f326433282c"
+      }
+    },
+    "desktop-mac-x64.build": {
+      "tag": "v2.0.0",
+      "sourcePolicy": "published desktop baseline plus version-only patch",
+      "commit": "1f65e15f447767d01ede13638dcc8d6df4724a0f",
+      "workflowCommit": "27883366011ce81152e6cc192ef309cdcaae84da",
+      "nativeVersion": "2.0.0",
+      "versionPatchSha256": "1f245449cb8572f3765fba6131fd3de51cfa2872f9fe57173e3c86887f753793",
+      "assets": {
+        "LightRead_2.0.0_x64.dmg": "ca9a5e6563e75156bc4ff577a99a6d244ef9cfad04c2991e9b1b73ee2e03e90c",
+        "LightRead_x64.app.tar.gz": "5dd253f8914b48ede7a5cb45b0fc93e62067c921fea06a41a6d3e2dcc67c3008"
+      }
+    },
+    "desktop-windows.build": {
+      "tag": "v2.0.0",
+      "sourcePolicy": "published desktop baseline plus version-only patch",
+      "commit": "1f65e15f447767d01ede13638dcc8d6df4724a0f",
+      "workflowCommit": "27883366011ce81152e6cc192ef309cdcaae84da",
+      "nativeVersion": "2.0.0",
+      "versionPatchSha256": "1f245449cb8572f3765fba6131fd3de51cfa2872f9fe57173e3c86887f753793",
+      "assets": {
+        "LightRead_2.0.0_x64-setup.exe": "4900e58fddd1c351e7e854042a1053a995bcfffb3aeffd4da8ca3ba55c4a16e8"
+      }
+    }
+  },
+  "publicAssets": {
+    "githubLatest": "v2.0.0",
+    "gitcodeStatus": "latest",
+    "assetCount": 18,
+    "checksumFiles": 17,
+    "checksumsIdentical": true,
+    "previousReleasesPreserved": 24,
+    "fontAssetsPreserved": 14,
+    "checksums": {
+      "LightRead-2.0.0-1.x86_64.rpm": "c984ae007563ac2b61c1a68828a2da71025d4082de81b2ec8741a6b7477e2488",
+      "LightRead_2.0.0_aarch64.dmg": "42423852ea59966536bf6d147487bb18ff6cf47e57d88f8ce6ebb0d615c17a18",
+      "LightRead_2.0.0_amd64.AppImage": "5096dae04ffe0ef7d85e5c9eba55fe6ac776baac5627d2f5f9219d3f15251033",
+      "LightRead_2.0.0_amd64.deb": "482b901fd4b102de3033f8aa032e5b973e6896c5b701a814d666eb1354b042b3",
+      "LightRead_2.0.0_x64-setup.exe": "4900e58fddd1c351e7e854042a1053a995bcfffb3aeffd4da8ca3ba55c4a16e8",
+      "LightRead_2.0.0_x64.dmg": "ca9a5e6563e75156bc4ff577a99a6d244ef9cfad04c2991e9b1b73ee2e03e90c",
+      "LightRead_aarch64.app.tar.gz": "ea885f769a956e4df85983e98846b639ce90da8ebad580204e420f326433282c",
+      "LightRead_v2.0.0_android_arm64.apk": "4d7df528630908cfbfabe313baaa719fe1b0f77d78e7183065bc6d50926ea772",
+      "LightRead_v2.0.0_android_arm64.apk.build.json": "bf24ecca7310cab420a2e0d65073de99dbf71ec64b3aa45b8b8c83afa3f55275",
+      "LightRead_v2.0.0_android_arm64.apk.json": "c75e0b1d9c970c1c4535762733967ec458070417064d6b1f5b5290128a5cac17",
+      "LightRead_v2.0.0_android_arm64.apk.sha256": "2295654cc172b1128ab215686d26e1946a09b74691004f645969d87291ce5057",
+      "LightRead_x64.app.tar.gz": "5dd253f8914b48ede7a5cb45b0fc93e62067c921fea06a41a6d3e2dcc67c3008",
+      "desktop-linux.build.json": "fff76bf970a38c06946511e18865d2dbec2ae2b388594595f2ed54b68e2427fe",
+      "desktop-mac-arm64.build.json": "fe23bab8f33c5b8f7371cd0f87582f7b7761a7d998d8fa51bc262c82de9817fe",
+      "desktop-mac-x64.build.json": "a75aa6d789a7361da22ad2a4afe35184db146306058c0657a44b32b886c80f57",
+      "desktop-version.patch": "1f245449cb8572f3765fba6131fd3de51cfa2872f9fe57173e3c86887f753793",
+      "desktop-windows.build.json": "e2c588178fa11405fc064fc8a57672b8f5b7cb95571e9150bdb34eb6a675a57e"
+    }
+  },
+  "anonymousGithubApkDownload": {
+    "latest": "v2.0.0",
+    "assetCount": 18,
+    "apkSha256": "4d7df528630908cfbfabe313baaa719fe1b0f77d78e7183065bc6d50926ea772",
+    "apkBytes": 98635728,
+    "anonymousDownload": true
+  },
+  "legacyUpdaterChecks": [
+    {
+      "installed": "v1.20.1",
+      "mode": "public releases",
+      "github": "2.0.0",
+      "gitcode": "2.0.0",
+      "hasUpdate": true
+    },
+    {
+      "installed": "v1.20.0",
+      "mode": "public releases",
+      "github": "2.0.0",
+      "gitcode": "2.0.0",
+      "hasUpdate": true
+    }
+  ],
+  "k30": {
+    "books": 34,
+    "fonts": 10,
+    "settingsPreserved": true,
+    "positionsPreserved": true,
+    "checkedAt": "2026-10-19T00:20:01.003Z",
+    "update": {
+      "version": "2.0.0",
+      "source": "github",
+      "hasUpdate": false,
+      "unifiedTag": true,
+      "fresh": true
+    },
+    "pageErrors": []
+  }
+}
