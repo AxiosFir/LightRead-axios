@@ -80,7 +80,6 @@ jobs:
           npm run test:epub-compat
           npm run test:tts
           npm run test:updater
-          npm run test:pdf-reflow
           if [ -f scripts/test-mobile-updater.mjs ]; then node --experimental-strip-types --test scripts/test-mobile-updater.mjs; fi
       - name: 在构建前准备 Release 草稿
         env:
@@ -546,7 +545,7 @@ jobs:
             compgen -G '*.AppImage' >/dev/null
             compgen -G '*.deb' >/dev/null
           fi
-          if [ "$RELEASE_TAG" = v2.1.0 ] && [ "$REPAIR_ANDROID_ONLY" != true ]; then
+          if [ "$RELEASE_TAG" = v2.0.0 ] && [ "$REPAIR_ANDROID_ONLY" != true ]; then
             node --input-type=module <<'JS'
           import assert from 'node:assert/strict';
           import { readFileSync } from 'node:fs';
@@ -555,8 +554,8 @@ jobs:
           for (const id of ['mac-arm64', 'mac-x64', 'windows', 'linux']) {
             const report = JSON.parse(readFileSync(`desktop-${id}.build.json`, 'utf8'));
             assert.equal(report.tag, process.env.RELEASE_TAG);
-            assert.equal(report.commit, 'ef05a36c3da912635c824789ab07c280752a03d0');
-            assert.match(report.nativeVersion, /^2\.1\.0(?:\.0)?$/);
+            assert.equal(report.commit, '1f65e15f447767d01ede13638dcc8d6df4724a0f');
+            assert.match(report.nativeVersion, /^2\.0\.0(?:\.0)?$/);
             assert.equal(report.versionPatchSha256, hash('desktop-version.patch'));
             for (const [name, expected] of Object.entries(report.assets)) assert.equal(hash(name), expected, name);
           }

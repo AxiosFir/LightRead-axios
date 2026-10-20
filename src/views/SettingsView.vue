@@ -454,7 +454,7 @@ function closePhonePage() {
 }
 watch(phonePage, () => nextTick(() => scroller?.scrollTo({ top: 0 })))
 
-const phoneSheet = ref<'' | 'appearance' | 'language' | 'goal' | 'pdf' | 'pdfOpen' | 'backup'>('')
+const phoneSheet = ref<'' | 'appearance' | 'language' | 'goal' | 'pdf' | 'backup'>('')
 const appearanceLabel = computed(() => t(APPEARANCE_OPTIONS.find(o => o.value === settings.appearance)?.labelKey ?? 'settings.appearanceSystem'))
 const GOAL_PRESETS = [0, 10, 15, 20, 30, 45, 60, 90, 120]
 const goalOptions = computed(() => [...new Set([...GOAL_PRESETS, settings.dailyGoalMinutes])].sort((a, b) => a - b))
@@ -935,11 +935,6 @@ const APPEARANCE_OPTIONS = [
           <span class="pl-text"><span class="pl-title">{{ t('settings.pdfRenderer') }}</span><span class="pl-desc">{{ t('settings.pdfRendererDesc') }}</span></span>
           <span class="pl-value">{{ settings.pdf.renderer === 'pdfium' ? 'PDFium' : 'MuPDF' }}</span><svg class="pl-chev" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="m9 6 6 6-6 6"/></svg>
         </button>
-        <button type="button" class="pl-row" @click="phoneSheet = 'pdfOpen'">
-          <span class="pl-ico tone-brand" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5.5A1.5 1.5 0 0 1 5.5 4H11v16H5.5A1.5 1.5 0 0 1 4 18.5zM13 4h5.5A1.5 1.5 0 0 1 20 5.5v13a1.5 1.5 0 0 1-1.5 1.5H13M15.5 8h2M15.5 12h2M15.5 16h2"/></svg></span>
-          <span class="pl-text"><span class="pl-title">{{ t('settings.pdfOpenAs') }}</span></span>
-          <span class="pl-value">{{ settings.pdfReflowDefault === 'original' ? t('settings.pdfOpenOriginal') : t('settings.pdfOpenAuto') }}</span><svg class="pl-chev" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="m9 6 6 6-6 6"/></svg>
-        </button>
         <button type="button" class="pl-row" @click="resetTypographyConfirmed">
           <span class="pl-ico tone-gray" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12a8 8 0 1 0 2.3-5.6M4 4v4h4"/></svg></span>
           <span class="pl-text"><span class="pl-title">{{ t('settings.resetTypography') }}</span><span class="pl-desc">{{ t('settings.resetTypographyDesc') }}</span></span>
@@ -1306,16 +1301,6 @@ const APPEARANCE_OPTIONS = [
         <div class="segmented" role="group" :aria-label="t('settings.pdfRenderer')">
           <button :aria-pressed="settings.pdf.renderer === 'mupdf'" :class="{ active: settings.pdf.renderer === 'mupdf' }" @click="settings.pdf.renderer = 'mupdf'">MuPDF</button>
           <button :aria-pressed="settings.pdf.renderer === 'pdfium'" :class="{ active: settings.pdf.renderer === 'pdfium' }" @click="settings.pdf.renderer = 'pdfium'">PDFium</button>
-        </div>
-      </div>
-      <div class="row">
-        <div class="row-text">
-          <div class="row-title">{{ t('settings.pdfOpenAs') }}</div>
-          <div class="row-desc">{{ t('settings.pdfOpenAsDesc') }}</div>
-        </div>
-        <div class="segmented" role="group" :aria-label="t('settings.pdfOpenAs')">
-          <button :aria-pressed="settings.pdfReflowDefault === 'auto'" :class="{ active: settings.pdfReflowDefault === 'auto' }" @click="settings.pdfReflowDefault = 'auto'">{{ t('settings.pdfOpenAuto') }}</button>
-          <button :aria-pressed="settings.pdfReflowDefault === 'original'" :class="{ active: settings.pdfReflowDefault === 'original' }" @click="settings.pdfReflowDefault = 'original'">{{ t('settings.pdfOpenOriginal') }}</button>
         </div>
       </div>
       <div class="row row-inline">
@@ -1709,20 +1694,6 @@ const APPEARANCE_OPTIONS = [
           :aria-checked="settings.pdf.renderer === opt"
           @click="pickSheet(() => (settings.pdf.renderer = opt))"
         ><span class="ps-label">{{ opt === 'mupdf' ? 'MuPDF' : 'PDFium' }}</span><svg class="ps-tick" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" d="m5 12.5 4.5 4.5L19 7.5"/></svg></button>
-      </div>
-    </AppModal>
-    <AppModal v-if="phoneSheet === 'pdfOpen'" :title="t('settings.pdfOpenAs')" :description="t('settings.pdfOpenAsDesc')" @close="phoneSheet = ''">
-      <div class="ps-list" role="radiogroup" :aria-label="t('settings.pdfOpenAs')">
-        <button
-          v-for="opt in (['auto', 'original'] as const)"
-          :key="opt"
-          type="button"
-          role="radio"
-          class="ps-row"
-          :class="{ on: settings.pdfReflowDefault === opt }"
-          :aria-checked="settings.pdfReflowDefault === opt"
-          @click="pickSheet(() => (settings.pdfReflowDefault = opt))"
-        ><span class="ps-label">{{ opt === 'auto' ? t('settings.pdfOpenAuto') : t('settings.pdfOpenOriginal') }}</span><svg class="ps-tick" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" d="m5 12.5 4.5 4.5L19 7.5"/></svg></button>
       </div>
     </AppModal>
     <AppModal v-if="phoneSheet === 'goal'" :title="t('settings.dailyGoal')" :description="t('stats.goalHint')" @close="phoneSheet = ''">

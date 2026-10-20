@@ -45,6 +45,8 @@ jobs:
       - uses: android-actions/setup-android@v3
         with:
           packages: build-tools;35.0.0
+      - run: npm ci
+      - run: npm run test:pdf-reflow
       - name: Verify source, platform version, APK identity, fixed signature and ZIP layout
         env:
           AAPT: ${{ env.ANDROID_SDK_ROOT }}/build-tools/35.0.0/aapt

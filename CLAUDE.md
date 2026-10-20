@@ -7,9 +7,16 @@
 
 - `release/1.20.0`：1.x 全平台最终版封存分支，tag `v1.20.0`；已发布内容不混入 2.0 开发。
 - `Dev`：后续 App 2.0 开发主线，工作目录 `/home/ubuntu/workspace/LightRead-v2`。原 `feat/lightread-2.0` 只保留历史。
-- `main` 保留桌面／默认 Web 主线，PDF 双形态功能提交为 `ef05a36`。本次用户要求发布 PDF 功能，v2.1.0 桌面基线更新到该提交；App 在 `Dev` 的独立阅读页接入同一引擎，保留现有 App 界面。桌面发布用 `scripts/desktop-release.json` 固定基线，并附版本补丁及各平台构建报告，不能把 App 界面带入桌面。
+- `main` 保持原有代码；2026-10-18 用户确认桌面和 App 统一升级到 2.0.0。桌面界面与功能保持已发布 1.20.0 的源码基线，只改版本元数据；不能把 App 修改带入桌面。桌面发布用 `scripts/desktop-release.json` 固定基线，并附版本补丁及各平台构建报告。
 - 新版统一使用 `vX.Y.Z` 全平台 Release，完整校验后设为 GitHub latest；GitCode 保留旧版与字体资源（`KEEP_OLD=1`）。历史 `app-v2.0.0` 保留，不能移动或删除；该旧 APK 只识别 `app-v2.x`，首次高于 2.0.0 的后续版本还需发布同 APK 的 `app-vX.Y.Z` 兼容入口（latest=false），供旧 App 迁移到统一更新器。
 - Release 标题仅使用版本号。App 默认在线语音；K30 已将旧离线选择改为在线，后续测试恢复设置时不要改回离线。
+
+## 本次 App PDF 发布（2026-10-20 用户确认）
+
+- PDF 双形态阅读仅属于 App，正式版本 `app-v2.1.0`；桌面和默认 Web 保持原版 PDF 路由，桌面 latest 保持 `v2.0.0`。
+- App 入口在 `src/mobile/views/`，PDF 路由由 `src/mobile/services/readerRoute.ts` 经覆盖清单启用；引擎可放共享服务，但不能把 App 的入口带入桌面。
+- 基础／桌面版本为 2.0.0，Android／iOS 配置版本为 2.1.0。`scripts/desktop-release.json` 继续固定旧桌面基线，本次不更新桌面。误建的统一 `v2.1.0` Release 已撤回为草稿，不能重新公开。
+- K30 覆盖升级与数据保留已验证；用户明确同意注明安全锁屏导致的前台交互验收限制并继续发布，不把受阻项计为通过。
 
 ## K30 真机验收（2026-10-18 用户要求）
 
@@ -60,8 +67,8 @@ npm run test:opds-library / test:library-upload   # 自建书库: 连接信息�
 npm run test:folder-pick / e2e:folder-pick   # 选择文件夹导入 / 上传: 递归找书 + 按格式推荐度去重
 npm run e2e:continuous-scroll   # 跨章连续滚动: 逐帧触摸 + 惯性跨章, 无回跳 / 预载 / 插入上方不跳 (设计见 docs/continuous-scroll.md)
 npm run test:plain-text      # 通用纯文本: 源码/配置/日志/无扩展名文件识别 · 内容嗅探 · 代码视图 (行号/分块), 按 txt 入库 (src/services/plainText.ts)
+npm run test:pdf-reflow / e2e:pdf-reflow # App PDF 重排契约／双形态浏览器测试（App 预览加 E2E_MOBILE=1）
 npm run test:convert-epub    # 格式转换: MOBI/AZW3/FB2/TXT → EPUB 3 (OPF/nav/资源改写)
-npm run test:pdf-reflow      # PDF 电子书形态: 折行≠段落 / 跨页续段 / 页眉页码 / 标题·列表·代码·图表·公式 / 文字版·扫描版判定 / 切章与页码锚点 / 打开方式; 含 MuPDF 生成的真实 PDF (设计见 docs/plans/pdf-reflow.md)
 npm run test:transfer / test:qr   # 互传: 三种通道 (账号 / WebDAV / 取件码) 纯逻辑; 无依赖二维码编码
 npm run test:booklists / e2e:booklists   # 书单: 待找匹配·自动归入·分享导入·推荐书单校验; 浏览→找书→加入→分享→导入 (node scripts/build-booklists.mjs 用 Wikidata 重建奖项书单)
 npm run e2e:transfer         # 互传端到端: 本地 wrangler sync-server + 内嵌 WebDAV, 预览默认 4186 (E2E_BASE 可改)

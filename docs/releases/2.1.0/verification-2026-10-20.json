@@ -1,0 +1,87 @@
+{
+  "version": "2.1.0",
+  "androidSourceCommit": "4caa8478c3157df4da4fd255e8357df3e2cd4218",
+  "android": {
+    "file": "LightRead_app-v2.1.0_android_arm64.apk",
+    "packageName": "com.yzfly.lightread.debug",
+    "versionName": "2.1.0",
+    "versionCode": 2001000,
+    "minSdk": 24,
+    "targetSdk": 36,
+    "abis": [
+      "arm64-v8a"
+    ],
+    "certificateSha256": "56103db2e518cf800db66d148d45f886e93c12b1afc8944ec668713636c7bada",
+    "layout": {
+      "entries": 943,
+      "unindexedBytes": 4096,
+      "largestGap": 4096
+    },
+    "sha256": "3bc1c9b01bb554945feb2f2a4a4b7ed07696170ba7e11eb99c4979085c65759a"
+  },
+  "device": {
+    "model": "Redmi K30 Pro",
+    "api": 31,
+    "abi": "arm64-v8a",
+    "webview": "155.0.8059.43",
+    "upgrade": {
+      "installed": true,
+      "booksPreserved": 34,
+      "customFontsPreserved": 10,
+      "allPriorSettingsPreserved": true,
+      "readingLocationsProgressAndLastReadAtPreserved": true,
+      "testFixtureRemoved": true
+    },
+    "pdfForegroundInteraction": {
+      "status": "blocked",
+      "reason": "Secure keyguard active; RAF-based browser interaction cannot run in the background. No native reading or performance pass is claimed."
+    },
+    "installedApkSha256": "3bc1c9b01bb554945feb2f2a4a4b7ed07696170ba7e11eb99c4979085c65759a"
+  },
+  "browserPdfE2E": {
+    "desktop": "passed with self-generated text/scanned PDFs",
+    "appPreview": "passed with 313-page public text PDF and generated scanned PDF",
+    "checks": [
+      "automatic view selection",
+      "progress navigation",
+      "original/ebook switching",
+      "view choice after reload",
+      "scanned PDF fallback",
+      "no page errors"
+    ]
+  },
+  "github": {
+    "url": "https://github.com/yzfly/LightRead/releases/tag/app-v2.1.0",
+    "workflow": "https://github.com/yzfly/LightRead/actions/runs/39398441203",
+    "workflowResult": "success",
+    "assetCount": 5,
+    "checksummedFileCount": 4,
+    "apkSha256": "3bc1c9b01bb554945feb2f2a4a4b7ed07696170ba7e11eb99c4979085c65759a"
+  },
+  "scope": {
+    "appOnly": true,
+    "desktopLatest": "v2.0.0",
+    "mainRestoredCommit": "d46774e",
+    "withdrawnUnifiedRelease": "v2.1.0 remains a private draft; its GitCode attachment files were removed and the entry marked prerelease.",
+    "desktopSourcePolicyUnchanged": true
+  },
+  "publicUpdateChannels": {
+    "desktop": {
+      "github": "2.0.0",
+      "gitcode": "2.0.0",
+      "hasUpdate": false
+    },
+    "appFrom2_0_0": {
+      "github": "2.1.0",
+      "gitcode": "2.1.0",
+      "hasUpdate": true
+    },
+    "withdrawnUnifiedReleaseIgnored": true
+  },
+  "gitcode": {
+    "url": "https://gitcode.com/langgpt/LightRead/releases/tag/app-v2.1.0",
+    "assetCount": 5,
+    "roundTripSha256Verified": true,
+    "oldReleasesAndFontsPreserved": true
+  }
+}

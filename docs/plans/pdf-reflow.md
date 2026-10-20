@@ -233,8 +233,8 @@ OCR 结果按行带 bbox 进入同一个 IR，后续管线不变。竖排繁体�
 
 已知限制：竖排、扫描版（OCR 在 P3）；复杂图示里少数标签仍会漏成短段落；表格、公式整块成图；样本《深入理解 AI Agent》443 个标题里约 12 个误判。
 
-### 发布接入（v2.1.0）
+### App 发布接入（app-v2.1.0）
 
-`main` 的桌面／默认 Web 实现为提交 `ef05a36`。App 2.0 在 `Dev` 使用 `src/mobile/` 独立覆盖页面，发布时同步接入了三处阅读／设置页面、中英文案及删书缓存清理；阅读引擎与设置同步仍共用。桌面安装包从 `ef05a36` 构建，仅补丁修改版本号，App 从统一版本标签构建。
+2026-10-20 用户确认本功能仅属于 App，与桌面无关。App 使用 `src/mobile/` 的阅读／设置页面和中英文案，PDF 路由由 `src/mobile/services/readerRoute.ts` 经覆盖清单启用，缓存删除在 App 的书库 store 中处理；引擎与设置 schema 可共用。桌面／默认 Web 的阅读页、设置页与 PDF 路由恢复原样，桌面发布基线及 latest 继续为 v2.0.0。
 
-`npm run e2e:pdf-reflow` 覆盖文字版自动打开、进度跳转、双形态往返、刷新记忆及扫描版原版回退，可分别在桌面与 App 预览运行；默认生成自制 PDF，`PDF_FIXTURE` 可指定本机公开授权长书，App 预览加 `E2E_MOBILE=1`。完整发布记录见 `docs/releases/2.1.0/README.md`。
+`npm run e2e:pdf-reflow` 覆盖文字版自动打开、进度跳转、双形态往返、刷新记忆及扫描版原版回退；默认生成自制 PDF，`PDF_FIXTURE` 可指定本机公开授权长书，在 App 预览加 `E2E_MOBILE=1`。发布记录见 `docs/releases/2.1.0/README.md`。

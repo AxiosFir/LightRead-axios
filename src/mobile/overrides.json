@@ -21,6 +21,7 @@
   "services/dianjing/theme.ts",
   "services/fonts.ts",
   "services/localTts.ts",
+  "services/readerRoute.ts",
   "services/readerTheme.ts",
   "services/toast.ts",
   "services/tts.ts",
