@@ -9,18 +9,6 @@ declare module 'foliate-js/view.js' {
   export class UnsupportedTypeError extends Error {}
 }
 
-declare module 'foliate-js/epub.js' {
-  export class EPUB {
-    constructor(loader: {
-      loadText: (name: string) => Promise<string | null> | string | null
-      loadBlob: (name: string, type?: string) => Promise<Blob | null> | Blob | null
-      getSize: (name: string) => number
-      sha1?: (s: string) => Promise<Uint8Array>
-    })
-    init(): Promise<any>
-  }
-}
-
 declare module 'foliate-js/overlayer.js' {
   export class Overlayer {
     static highlight: unknown

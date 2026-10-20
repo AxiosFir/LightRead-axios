@@ -61,9 +61,6 @@ import {
 } from '../services/readerPages'
 import { countSpeechChars, recordPace, paceCps, humanizeDuration, finishClock, type SpeechPace } from '../services/listenEta'
 import { sendSelectionToDevices } from '../services/transfer'
-import { pdfOpenView, setPdfViewChoice } from '../services/pdfReflow/viewMode'
-import { anchorForPage } from '../services/pdfReflow/book'
-import type { ReflowBook } from '../services/pdfReflow/client'
 
 const route = useRoute()
 const router = useRouter()
@@ -347,102 +344,8 @@ let autoTimer: ReturnType<typeof setInterval> | undefined
 let view: any = null
 let Overlayer: any = null
 let saveTimer: ReturnType<typeof setTimeout> | undefined
-/** 节流中待保存的最新进度 (cfi 字段是要写进 location 的位置: PDF 的电子书形态写原版页码) */
+/** 节流中待保存的最新进度 */
 let pendingProgress: { cfi: string; frac: number } | null = null
-
-// ---- PDF 的电子书形态 (重排, docs/plans/pdf-reflow.md) ----
-const isPdf = computed(() => meta.value?.format === 'pdf')
-/** 首次转换的进度 0-1; null 表示没在转换 */
-const convertFraction = ref<number | null>(null)
-let reflow: ReflowBook | null = null
-let reflowAbort: AbortController | null = null
-/** 当前读到的原版位置 (页码从 1 起, y 为页内比例) */
-let pdfPos: { page: number; y: number } | null = null
-const reflowLocKey = `lightread-pdf-reflow-loc:${bookId}`
-
-/** 电子书里某处对应的原版页码与页内高度 (块上的 data-p / data-y) */
-function pdfPosOfRange(range: Range | undefined): { page: number; y: number } | null {
-  const node = range?.startContainer
-  const el = (node && node.nodeType === 1 ? node : node?.parentElement) as Element | null | undefined
-  let block = el?.closest?.('[data-p]') as HTMLElement | null | undefined
-  if (!block && el) {
-    // 落在块之间 (章节开头的空白): 取本章后面第一个块
-    const all = el.ownerDocument?.querySelectorAll<HTMLElement>('[data-p]')
-    block = all?.length ? Array.from(all).find(b => range!.comparePoint(b, 0) >= 0) ?? all[all.length - 1] : null
-  }
-  if (!block) return null
-  const page = Number(block.dataset.p)
-  if (!Number.isFinite(page)) return null
-  return { page: page + 1, y: Number(block.dataset.y) || 0 }
-}
-
-function readReflowLoc(): { cfi: string; page: number } | null {
-  try {
-    const v = JSON.parse(localStorage.getItem(reflowLocKey) ?? 'null')
-    return v && typeof v.cfi === 'string' && Number.isFinite(v.page) ? v : null
-  } catch {
-    return null
-  }
-}
-
-/** 电子书形态的起点: 刚从原版切过来时对齐到那一段; 否则本机记的 CFI 与同步来的页码一致就用 CFI, 不一致按页码定位 */
-function reflowStart(): { cfi?: string; href?: string } {
-  const qPage = Number(route.query.pdfPage)
-  const qY = Number(route.query.pdfY)
-  const savedPage = parseInt(meta.value?.location ?? '', 10)
-  if (!Number.isFinite(qPage)) {
-    const local = readReflowLoc()
-    if (local && (!Number.isFinite(savedPage) || local.page === savedPage)) return { cfi: local.cfi }
-  }
-  const page = Number.isFinite(qPage) ? qPage : Number.isFinite(savedPage) ? savedPage : 1
-  const y = Number.isFinite(qY) ? qY : 0
-  if (page <= 1 && y <= 0) return {}
-  const href = reflow ? anchorForPage(reflow.pkg.anchors, page - 1, y) : undefined
-  return href ? { href: `OEBPS/${href}` } : {}
-}
-
-/** 转换 / 读取重排包; 失败或没有文字时退回原版并记下, 返回 null */
-async function openPdfEbook(blob: Blob): Promise<ReflowBook | null> {
-  const { openReflowBook, ReflowEmptyError } = await import('../services/pdfReflow/client')
-  reflowAbort = new AbortController()
-  try {
-    reflow = await openReflowBook({
-      bookId,
-      file: blob,
-      meta: { bookId, title: meta.value!.title, author: meta.value!.author, language: meta.value!.language },
-      onProgress: p => { convertFraction.value = p.fraction },
-      signal: reflowAbort.signal,
-    })
-    return reflow
-  } catch (e: any) {
-    if (e?.name === 'AbortError') return null
-    console.warn('[pdf-reflow]', e)
-    setPdfViewChoice(bookId, 'original')
-    toast(e instanceof ReflowEmptyError ? t('reader.pdfNoText') : t('reader.pdfConvertFailed'))
-    void router.replace(`/read-paper/${bookId}`)
-    return null
-  } finally {
-    convertFraction.value = null
-  }
-}
-
-/** 转换中: 先看原版 (记为原版, 下次也按原版打开) */
-function viewOriginalNow() {
-  reflowAbort?.abort()
-  setPdfViewChoice(bookId, 'original')
-  void router.replace(`/read-paper/${bookId}`)
-}
-
-/** 切换为原版 PDF: 落在当前段落所在的页与高度 */
-async function switchToOriginal() {
-  setPdfViewChoice(bookId, 'original')
-  const pos = pdfPosOfRange(view?.lastLocation?.range) ?? pdfPos
-  clearTimeout(saveTimer)
-  saveTimer = undefined
-  pendingProgress = null
-  if (pos) await library.saveProgress(bookId, String(pos.page), fraction.value)
-  void router.replace({ path: `/read-paper/${bookId}`, query: pos ? { pdfY: pos.y.toFixed(3) } : {} })
-}
 
 const appDark = computed(() => resolvedTheme.value === 'dark')
 // 自动预设先与手动偏好合并; 页码、手势等统一读取生效版式。
@@ -574,17 +477,8 @@ function onRelocate(e: CustomEvent) {
   if (tocAuto.value) syncSmartTocPosition()
   updatePages(e.detail)
   updateMarginals()
-  // PDF 的电子书形态: location 存原版页码 (原版阅读页与其它设备都认), 精确的 CFI 记在本机
-  let loc = cfi
-  if (isPdf.value && cfi) {
-    pdfPos = pdfPosOfRange(e.detail.range) ?? pdfPos
-    loc = pdfPos ? String(pdfPos.page) : ''
-    if (pdfPos) {
-      try { localStorage.setItem(reflowLocKey, JSON.stringify({ cfi, page: pdfPos.page })) } catch { /* 忽略 */ }
-    }
-  }
   // 节流而非防抖: 连续 / 自动滚动时 relocate 每 250ms 一次, 防抖会一直等到停下才保存
-  if (loc) pendingProgress = { cfi: loc, frac: frac ?? 0 }
+  if (cfi) pendingProgress = { cfi, frac: frac ?? 0 }
   if (!saveTimer) {
     saveTimer = setTimeout(() => {
       saveTimer = undefined
@@ -2889,8 +2783,7 @@ onMounted(async () => {
       error.value = t('reader.bookNotFound')
       return
     }
-    // PDF: 原版走 PDF 阅读器; 电子书形态在这里打开重排包
-    if (meta.value.format === 'pdf' && pdfOpenView(meta.value, settings.pdfReflowDefault) === 'original') {
+    if (meta.value.format === 'pdf') {
       router.replace(`/read-paper/${bookId}`)
       return
     }
@@ -2898,17 +2791,11 @@ onMounted(async () => {
       router.replace(`/read-djvu/${bookId}`)
       return
     }
-    // PDF 的原版批注 (页内坐标) 与电子书划线 (CFI) 各自显示
-    const stored = await storage.listAnnotations(bookId)
-    annotations.value = meta.value.format === 'pdf' ? stored.filter(a => a.cfi.startsWith('epubcfi(')) : stored
+    annotations.value = await storage.listAnnotations(bookId)
 
     const blob = await storage.getBookFile(bookId)
-    let file: File | null = null
-    let pdfBook: ReflowBook | null = null
-    if (meta.value.format === 'pdf') {
-      pdfBook = await openPdfEbook(blob)
-      if (!pdfBook) return
-    } else if (isTextLike(meta.value.format)) {
+    let file: File
+    if (isTextLike(meta.value.format)) {
       const { epub } = await convertToEpub(blob, meta.value.fileName, meta.value.format as 'txt' | 'md' | 'html')
       file = new File([epub], `${meta.value.title}.epub`, { type: 'application/epub+zip' })
     } else if (meta.value.format === 'cbr') {
@@ -2948,12 +2835,8 @@ onMounted(async () => {
       }
     })
 
-    if (pdfBook) {
-      await view.open(pdfBook.book)
-    } else {
-      const { makeFoliateBook } = await import('../services/foliateBook')
-      await view.open(await makeFoliateBook(file!))
-    }
+    const { makeFoliateBook } = await import('../services/foliateBook')
+    await view.open(await makeFoliateBook(file))
     // 跨章连续滚动的渲染器事件 (view 不转发): 主章切换、远处分节卸载。旧版渲染器不会派发
     view.renderer?.addEventListener?.('section-change', onRendererSectionChange)
     view.renderer?.addEventListener?.('unload', onRendererUnload)
@@ -2970,12 +2853,8 @@ onMounted(async () => {
     if (isTextLike(meta.value.format) && meta.value.location) {
       try { staleTextLocation = localStorage.getItem(layoutKey) !== TEXT_EPUB_LAYOUT } catch { /* 存储不可用时按新版式处理 */ }
     }
-    if (pdfBook) {
-      const start = reflowStart()
-      await view.init(start.cfi ? { lastLocation: start.cfi } : {})
-      if (start.href) await view.goTo(start.href)
     // 只有进度比例、没有位置的书 (如由 MOBI 等转换来的 EPUB): 按比例定位
-    } else if (staleTextLocation || (!meta.value.location && meta.value.progress)) {
+    if (staleTextLocation || (!meta.value.location && meta.value.progress)) {
       await view.init({})
       if (meta.value.progress) await view.goToFraction(meta.value.progress)
     } else {
@@ -3023,9 +2902,6 @@ onBeforeUnmount(() => {
   ambient.setPauseWhenHidden(null)
   view?.close?.()
   view?.remove()
-  reflowAbort?.abort()
-  reflow?.dispose()
-  reflow = null
 })
 </script>
 
@@ -3074,11 +2950,6 @@ onBeforeUnmount(() => {
         </button>
       </div>
       <div class="bar-actions">
-        <button v-if="isPdf" class="pdf-switch" :title="t('reader.pdfToOriginalTitle')" :aria-label="t('reader.pdfToOriginal')" @click="switchToOriginal">
-          <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8zM14 3v5h5"/></svg>
-          <span class="pdf-switch-long">{{ t('reader.pdfToOriginal') }}</span>
-          <span class="pdf-switch-short">{{ t('reader.pdfToOriginalShort') }}</span>
-        </button>
         <button class="icon-btn desk-only" :title="t('reader.toc')" @click="togglePanel('toc')">
           <svg viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M4 6a1 1 0 0 1 1-1h1a1 1 0 0 1 0 2H5a1 1 0 0 1-1-1zm5 0a1 1 0 0 1 1-1h9a1 1 0 1 1 0 2h-9a1 1 0 0 1-1-1zM4 12a1 1 0 0 1 1-1h1a1 1 0 1 1 0 2H5a1 1 0 0 1-1-1zm5 0a1 1 0 0 1 1-1h9a1 1 0 1 1 0 2h-9a1 1 0 0 1-1-1zM4 18a1 1 0 0 1 1-1h1a1 1 0 1 1 0 2H5a1 1 0 0 1-1-1zm5 0a1 1 0 0 1 1-1h9a1 1 0 1 1 0 2h-9a1 1 0 0 1-1-1z"/></svg>
         </button>
@@ -3137,17 +3008,7 @@ onBeforeUnmount(() => {
     <!-- 正文 -->
     <div ref="container" class="content" />
 
-    <div v-if="loading" class="state">
-      <template v-if="convertFraction !== null">
-        <p class="convert-text">{{ t('reader.pdfConverting', { pct: Math.round(convertFraction * 100) }) }}</p>
-        <div class="convert-bar" role="progressbar" :aria-valuenow="Math.round(convertFraction * 100)" aria-valuemin="0" aria-valuemax="100">
-          <span :style="{ width: `${Math.round(convertFraction * 100)}%` }" />
-        </div>
-        <p class="convert-hint">{{ t('reader.pdfConvertHint') }}</p>
-        <button class="btn" @click="viewOriginalNow">{{ t('reader.pdfViewOriginalNow') }}</button>
-      </template>
-      <template v-else>{{ t('reader.opening') }}</template>
-    </div>
+    <div v-if="loading" class="state">{{ t('reader.opening') }}</div>
     <div v-if="error" class="state">
       <p>{{ error }}</p>
       <button class="btn" @click="router.push('/library')">{{ t('reader.backToLibrary') }}</button>
@@ -3779,54 +3640,6 @@ onBeforeUnmount(() => {
 .bar-actions {
   display: flex;
   gap: 4px;
-}
-.pdf-switch {
-  flex: 0 0 auto;
-  align-self: center;
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  height: 30px;
-  margin-right: 4px;
-  padding: 0 11px;
-  border: 1px solid color-mix(in srgb, currentColor 22%, transparent);
-  border-radius: 999px;
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  font-size: 13px;
-  white-space: nowrap;
-  cursor: pointer;
-}
-.pdf-switch:hover {
-  background: color-mix(in srgb, currentColor 8%, transparent);
-}
-.pdf-switch-short {
-  display: none;
-}
-.convert-text {
-  margin: 0;
-  color: var(--text-2);
-  font-variant-numeric: tabular-nums;
-}
-.convert-bar {
-  width: min(260px, 70vw);
-  height: 4px;
-  border-radius: 2px;
-  background: color-mix(in srgb, currentColor 14%, transparent);
-  overflow: hidden;
-}
-.convert-bar span {
-  display: block;
-  height: 100%;
-  background: var(--brand);
-  transition: width 0.2s ease;
-}
-.convert-hint {
-  margin: 0;
-  max-width: 300px;
-  font-size: 12.5px;
-  text-align: center;
 }
 .icon-btn {
   width: var(--icon-btn);
@@ -4763,15 +4576,6 @@ onBeforeUnmount(() => {
 }
 
 @media (max-width: 720px) {
-  .pdf-switch {
-    padding: 0 9px;
-  }
-  .pdf-switch-long {
-    display: none;
-  }
-  .pdf-switch-short {
-    display: inline;
-  }
   /* 手机页眉留白较窄 (见 applyPrefs 的 margin) */
   .tts-mini {
     --head-band: 36px;

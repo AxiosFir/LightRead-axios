@@ -45,7 +45,6 @@ npm run test:folder-pick / e2e:folder-pick   # 选择文件夹导入 / 上传: �
 npm run e2e:continuous-scroll   # 跨章连续滚动: 逐帧触摸 + 惯性跨章, 无回跳 / 预载 / 插入上方不跳 (设计见 docs/continuous-scroll.md)
 npm run test:plain-text      # 通用纯文本: 源码/配置/日志/无扩展名文件识别 · 内容嗅探 · 代码视图 (行号/分块), 按 txt 入库 (src/services/plainText.ts)
 npm run test:convert-epub    # 格式转换: MOBI/AZW3/FB2/TXT → EPUB 3 (OPF/nav/资源改写)
-npm run test:pdf-reflow      # PDF 电子书形态: 折行≠段落 / 跨页续段 / 页眉页码 / 标题·列表·代码·图表·公式 / 文字版·扫描版判定 / 切章与页码锚点 / 打开方式; 含 MuPDF 生成的真实 PDF (设计见 docs/plans/pdf-reflow.md)
 npm run test:transfer / test:qr   # 互传: 三种通道 (账号 / WebDAV / 取件码) 纯逻辑; 无依赖二维码编码
 npm run test:booklists / e2e:booklists   # 书单: 待找匹配·自动归入·分享导入·推荐书单校验; 浏览→找书→加入→分享→导入 (node scripts/build-booklists.mjs 用 Wikidata 重建奖项书单)
 npm run e2e:transfer         # 互传端到端: 本地 wrangler sync-server + 内嵌 WebDAV, 预览默认 4186 (E2E_BASE 可改)
