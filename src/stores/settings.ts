@@ -207,6 +207,8 @@ interface SettingsState {
   githubBookRepos: string[]
   /** 自动阅读速度: 秒/页 (EPUB 与 PDF 共用) */
   autoReadSeconds: number
+  /** PDF 打开方式: auto 文字版用电子书 (重排) 打开、扫描版与论文用原版; original 总是原版. 见 services/pdfReflow/viewMode.ts */
+  pdfReflowDefault: 'auto' | 'original'
   /** 听书引擎: edge 在线神经音色 / local 本地离线神经音色 / system 系统语音 */
   ttsEngine: 'edge' | 'local' | 'system'
   /** 听书语速 (0.5 - 2) */
@@ -292,6 +294,7 @@ const defaults: SettingsState = {
     spreadMode: 'single',
   },
   autoReadSeconds: 15,
+  pdfReflowDefault: 'auto',
   ttsEngine: 'edge',
   ttsRate: 1,
   ttsVoice: '',
