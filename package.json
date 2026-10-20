@@ -16,6 +16,7 @@
     "test:app-boundary": "node --experimental-strip-types --test scripts/test-platform-boundary.mjs scripts/test-mobile-tts.mjs scripts/test-apk-layout.mjs",
     "test:plain-text": "node --experimental-strip-types --test scripts/test-plain-text.mjs",
     "test:convert-epub": "node --experimental-strip-types --test scripts/test-convert-epub.mjs",
+    "test:pdf-reflow": "node --experimental-strip-types --test scripts/test-pdf-reflow.mjs",
     "e2e:convert-epub": "node scripts/e2e-convert-epub.mjs",
     "test:opds-library": "node --experimental-strip-types --test scripts/test-opds-library.mjs",
     "test:folder-pick": "node --experimental-strip-types --test scripts/test-folder-pick.mjs",

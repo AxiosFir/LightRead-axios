@@ -4,6 +4,7 @@ import { getStorage, newId } from '../storage'
 import { planAutoLink, planListImport, type BooklistEntry } from '../services/booklists'
 import { recordReading } from '../services/readingLog.ts'
 import { activeAgentTurn, cleanupAgentPaper, paperAgentRuntimeAvailable, stopAgentTurn } from '../services/paperAgent.ts'
+import { forgetPdfView } from '../services/pdfReflow/viewMode'
 
 export const useLibrary = defineStore('library', {
   state: () => ({
@@ -73,7 +74,13 @@ export const useLibrary = defineStore('library', {
         }
         await cleanupAgentPaper(id)
       }
+      const removed = this.books.find(b => b.id === id)
       await storage.deleteBook(id)
+      if (removed?.format === 'pdf') {
+        // PDF 的电子书形态: 重排缓存与本机记住的打开方式一并清掉
+        forgetPdfView(id)
+        void import('../services/pdfReflow/cache').then(m => m.dropReflowCache(id)).catch(() => {})
+      }
       this.books = this.books.filter(b => b.id !== id)
       for (const booklistId of Object.keys(this.booklistBookIds)) {
         this.booklistBookIds[booklistId] =
