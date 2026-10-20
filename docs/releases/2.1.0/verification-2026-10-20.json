@@ -56,14 +56,16 @@
     "workflowResult": "success",
     "assetCount": 5,
     "checksummedFileCount": 4,
-    "apkSha256": "3bc1c9b01bb554945feb2f2a4a4b7ed07696170ba7e11eb99c4979085c65759a"
+    "apkSha256": "3bc1c9b01bb554945feb2f2a4a4b7ed07696170ba7e11eb99c4979085c65759a",
+    "anonymousAppApkDownloadVerified": true
   },
   "scope": {
     "appOnly": true,
     "desktopLatest": "v2.0.0",
     "mainRestoredCommit": "d46774e",
     "withdrawnUnifiedRelease": "v2.1.0 remains a private draft; its GitCode attachment files were removed and the entry marked prerelease.",
-    "desktopSourcePolicyUnchanged": true
+    "desktopSourcePolicyUnchanged": true,
+    "appBoundaryCommit": "ef76369"
   },
   "publicUpdateChannels": {
     "desktop": {
@@ -82,6 +84,7 @@
     "url": "https://gitcode.com/langgpt/LightRead/releases/tag/app-v2.1.0",
     "assetCount": 5,
     "roundTripSha256Verified": true,
-    "oldReleasesAndFontsPreserved": true
+    "oldReleasesAndFontsPreserved": true,
+    "checksumManifestMatchesGithub": true
   }
 }

@@ -4,7 +4,7 @@
 
 App 入口位于 `src/mobile/`，共享引擎在 `src/services/pdfReflow/`。App 路由通过 `src/mobile/services/readerRoute.ts` 覆盖启用；桌面／默认 Web 的阅读页、设置页和 PDF 路由保持原样。基础元数据为 2.0.0，移动平台配置为 2.1.0，桌面发布仍沿用原固定源码基线。
 
-已发布 APK 从 `app-v2.1.0` 的源码提交 `4caa8478c3157df4da4fd255e8357df3e2cd4218` 构建，沿用固定签名、`com.yzfly.lightread.debug`、arm64、API 24/36，版本、签名及 ZIP 布局检查通过。[App 发布门禁](https://github.com/yzfly/LightRead/actions/runs/39398441203)通过，APK SHA256 为 `3bc1c9b01bb554945feb2f2a4a4b7ed07696170ba7e11eb99c4979085c65759a`。
+已发布 APK 从 `app-v2.1.0` 的源码提交 `4caa8478c3157df4da4fd255e8357df3e2cd4218` 构建，沿用固定签名、`com.yzfly.lightread.debug`、arm64、API 24/36，版本、签名及 ZIP 布局检查通过。[App 发布门禁](https://github.com/yzfly/LightRead/actions/runs/39398441203)通过，APK SHA256 为 `3bc1c9b01bb554945feb2f2a4a4b7ed07696170ba7e11eb99c4979085c65759a`。发布后的 `ef76369` 将相同 App 路由逻辑移入覆盖层、恢复桌面源码与版本策略；App 行为回归通过，已发布 APK 与 tag 保持不变。
 
 验证包括 18 项 PDF 契约、设置同步／合并、更新器与平台边界测试、App 生产构建，以及 App 浏览器预览中 313 页公开 PDF 的进度跳转、形态往返、刷新记忆与扫描版回退；浏览器无页面错误。公开原书仅在本机缓存，不随源码发布。
 
