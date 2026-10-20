@@ -90,6 +90,8 @@ import {
 import TocList, { type TocItem } from '../../components/TocList.vue'
 import PaperAgentSidebar from '../../components/PaperAgentSidebar.vue'
 import { paperAgentRuntimeAvailable } from '../../services/paperAgent.ts'
+import { cachedPdfKind, defaultPdfView, pdfOpenView, setPdfViewChoice } from '../../services/pdfReflow/viewMode'
+import { canReflow } from '../../services/pdfReflow/classify'
 import { t } from '../../i18n'
 
 const route = useRoute()
@@ -150,6 +152,9 @@ const aiReady = computed(() => aiConfigured())
 /** 归属: 论文/藏书 (藏书 PDF 也走本阅读器, 返回目标随归属) */
 // kind 缺省是历史藏书记录；只有显式标记为 paper 才进入论文功能集。
 const isPaper = computed(() => meta.value?.kind === 'paper')
+/** 自动判定的 PDF 类型: 扫描版不能切换为电子书 */
+const pdfKind = ref(cachedPdfKind(bookId))
+const ebookSwitchable = computed(() => canReflow(pdfKind.value))
 const backTarget = computed(() => (isPaper.value ? '/papers' : '/library'))
 const backLabel = computed(() => (isPaper.value ? t('paper.backToPapers') : t('reader.backToLibrary')))
 /** 幻灯片放映 (整页翻页 + 全屏); 放映时不受竖屏单页滚动约束 */
@@ -889,6 +894,26 @@ async function onPdfOpenPicked(event: Event) {
   } finally {
     openingPdf = false
   }
+}
+
+/** 当前页内阅读到的高度 (占页高的比例), 供切到电子书形态时对齐到段 */
+function currentPageYFraction(): number {
+  const el = scroller.value
+  if (!el || bookPaged.value) return 0
+  const page = currentPage.value
+  const h = (pageDims.value[page - 1]?.h ?? 0) * curScale.value
+  if (!h) return 0
+  return Math.min(1, Math.max(0, (el.scrollTop - pageTop(page)) / h))
+}
+
+/** 切换为电子书形态 (重排), 按书记住 */
+async function switchToEbook() {
+  if (!ebookSwitchable.value) return
+  setPdfViewChoice(bookId, 'reflow')
+  const page = currentPage.value
+  const y = currentPageYFraction()
+  if (pageCount.value) await library.saveProgress(bookId, String(page), page / pageCount.value)
+  void router.replace({ path: `/read/${bookId}`, query: { pdfPage: String(page), pdfY: y.toFixed(3) } })
 }
 
 async function openDocumentFolder() {
@@ -3571,11 +3596,30 @@ onMounted(async () => {
       error.value = t('reader.bookNotFound')
       return
     }
+    // 打开方式: 用户选过电子书、或已判定为文字版的书直接转去电子书形态 (services/pdfReflow/viewMode.ts)
+    const openView = pdfOpenView(meta.value, settings.pdfReflowDefault)
+    if (openView === 'reflow') {
+      void router.replace(`/read/${bookId}`)
+      return
+    }
     const storedAnnotations = await storage.listAnnotations(bookId)
     annotations.value = storedAnnotations.filter(a => decodeLoc(a.cfi))
     const blob = await storage.getBookFile(bookId)
     sourcePdfBlob = blob.slice(0, blob.size, 'application/pdf')
     const fileData = await blob.arrayBuffer()
+    if (!openView && !pdfKind.value) {
+      // 第一次打开: 抽样判定文字版 / 扫描版 (只看文本层, 几页而已), 文字版默认用电子书形态
+      try {
+        const { detectPdfKind } = await import('../../services/pdfReflow/client')
+        pdfKind.value = await detectPdfKind(bookId, new Uint8Array(fileData.slice(0)))
+        if (defaultPdfView(meta.value, settings.pdfReflowDefault, pdfKind.value) === 'reflow') {
+          void router.replace(`/read/${bookId}`)
+          return
+        }
+      } catch (e) {
+        console.warn('[pdf-reflow] detect', e)
+      }
+    }
     sourcePdfVersion.value = new TextDecoder('latin1')
       .decode(fileData.slice(0, 16))
       .match(/%PDF-(\d\.\d)/)?.[1] ?? ''
@@ -3605,7 +3649,12 @@ onMounted(async () => {
       curScale.value = typeof zoom.value === 'number' ? fixedZoomScale(zoom.value) : fitScale(zoom.value)
       attachScrollListener()
       await nextTick()
-      if (currentPage.value > 1) scrollGoto(currentPage.value)
+      // 从电子书形态切回来时带着页内位置 (段落所在高度)
+      const fromY = Number(route.query.pdfY)
+      const yOffset = Number.isFinite(fromY) && fromY > 0
+        ? Math.max(0, fromY * (pageDims.value[currentPage.value - 1]?.h ?? 0) * curScale.value - 24)
+        : 0
+      if (currentPage.value > 1 || yOffset) scrollGoto(currentPage.value, false, yOffset)
       updateViewport()
     }
     markLaidOut()
@@ -3703,6 +3752,15 @@ onBeforeUnmount(() => {
         </div>
 
         <div class="paper-context-actions">
+          <button
+            class="btn btn-sm context-action pdf-view-switch"
+            :title="ebookSwitchable ? t('reader.pdfToEbookTitle') : t('reader.pdfScanNoEbook')"
+            :disabled="!pageCount || !ebookSwitchable"
+            @click="switchToEbook"
+          >
+            <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M4 5.5A1.5 1.5 0 0 1 5.5 4H11v16H5.5A1.5 1.5 0 0 1 4 18.5zM13 4h5.5A1.5 1.5 0 0 1 20 5.5v13a1.5 1.5 0 0 1-1.5 1.5H13M15.5 8h2M15.5 12h2M15.5 16h2"/></svg>
+            <span>{{ t('reader.pdfToEbook') }}</span>
+          </button>
           <template v-if="isPaper">
             <button
               class="btn btn-sm context-action"
@@ -4941,6 +4999,14 @@ onBeforeUnmount(() => {
   border-color: color-mix(in srgb, var(--brand) 16%, transparent);
   background: color-mix(in srgb, var(--brand) 8%, var(--card));
   color: var(--brand);
+}
+.pdf-view-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.pdf-view-switch svg {
+  flex: 0 0 auto;
 }
 .change-document {
   flex: 0 0 auto;

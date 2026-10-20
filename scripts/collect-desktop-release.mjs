@@ -10,7 +10,7 @@ const base = join('src-tauri/target', target, 'release')
 const bundle = join(base, 'bundle')
 const out = 'desktop-assets'
 mkdirSync(out, { recursive: true })
-const expected = id === 'linux' ? ['LightRead_2.0.0_amd64.AppImage', 'LightRead_2.0.0_amd64.deb', 'LightRead-2.0.0-1.x86_64.rpm'] : id === 'windows' ? ['LightRead_2.0.0_x64-setup.exe'] : [`LightRead_2.0.0_${id === 'mac-arm64' ? 'aarch64' : 'x64'}.dmg`]
+const expected = id === 'linux' ? ['LightRead_2.1.0_amd64.AppImage', 'LightRead_2.1.0_amd64.deb', 'LightRead-2.1.0-1.x86_64.rpm'] : id === 'windows' ? ['LightRead_2.1.0_x64-setup.exe'] : [`LightRead_2.1.0_${id === 'mac-arm64' ? 'aarch64' : 'x64'}.dmg`]
 function walk(dir) { return readdirSync(dir, { withFileTypes: true }).flatMap(e => e.isDirectory() ? walk(join(dir, e.name)) : [join(dir, e.name)]) }
 const found = walk(bundle)
 for (const name of expected) {
@@ -28,14 +28,14 @@ if (id.startsWith('mac-')) {
 } else if (id === 'linux') {
   nativeVersion = run('dpkg-deb', ['-f', join(out, expected[1]), 'Version'])
   assert.equal(run('dpkg-deb', ['-f', join(out, expected[1]), 'Architecture']), 'amd64')
-  assert.equal(run('rpm', ['-qp', '--qf', '%{VERSION}-%{ARCH}', join(out, expected[2])]), '2.0.0-x86_64')
+  assert.equal(run('rpm', ['-qp', '--qf', '%{VERSION}-%{ARCH}', join(out, expected[2])]), '2.1.0-x86_64')
 } else {
   const exe = join(base, 'lightread.exe').replaceAll("'", "''")
   nativeVersion = run('pwsh', ['-NoProfile', '-Command', `(Get-Item '${exe}').VersionInfo.ProductVersion`])
 }
-assert.match(nativeVersion, /^2\.0\.0(?:\.0)?$/)
+assert.match(nativeVersion, /^2\.1\.0(?:\.0)?$/)
 const hash = file => createHash('sha256').update(readFileSync(file)).digest('hex')
 const assets = Object.fromEntries(readdirSync(out).map(name => [name, hash(join(out, name))]))
-writeFileSync(join(out, `desktop-${id}.build.json`), JSON.stringify({ tag: 'v2.0.0', sourcePolicy: 'published desktop baseline plus version-only patch', commit: run('git', ['rev-parse', 'HEAD']), workflowCommit: process.env.RELEASE_WORKFLOW_SHA, nativeVersion, versionPatchSha256: hash('desktop-version.patch'), assets }, null, 2) + '\n')
+writeFileSync(join(out, `desktop-${id}.build.json`), JSON.stringify({ tag: 'v2.1.0', sourcePolicy: 'PDF reflow desktop baseline plus version-only patch', commit: run('git', ['rev-parse', 'HEAD']), workflowCommit: process.env.RELEASE_WORKFLOW_SHA, nativeVersion, versionPatchSha256: hash('desktop-version.patch'), assets }, null, 2) + '\n')
 if (id === 'linux') copyFileSync('desktop-version.patch', join(out, 'desktop-version.patch'))
 console.log(JSON.stringify({ id, nativeVersion, assets }, null, 2))

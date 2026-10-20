@@ -7,7 +7,7 @@
 
 - `release/1.20.0`：1.x 全平台最终版封存分支，tag `v1.20.0`；已发布内容不混入 2.0 开发。
 - `Dev`：后续 App 2.0 开发主线，工作目录 `/home/ubuntu/workspace/LightRead-v2`。原 `feat/lightread-2.0` 只保留历史。
-- `main` 保持原有代码；2026-10-18 用户确认桌面和 App 统一升级到 2.0.0。桌面界面与功能保持已发布 1.20.0 的源码基线，只改版本元数据；不能把 App 修改带入桌面。桌面发布用 `scripts/desktop-release.json` 固定基线，并附版本补丁及各平台构建报告。
+- `main` 保留桌面／默认 Web 主线，PDF 双形态功能提交为 `ef05a36`。本次用户要求发布 PDF 功能，v2.1.0 桌面基线更新到该提交；App 在 `Dev` 的独立阅读页接入同一引擎，保留现有 App 界面。桌面发布用 `scripts/desktop-release.json` 固定基线，并附版本补丁及各平台构建报告，不能把 App 界面带入桌面。
 - 新版统一使用 `vX.Y.Z` 全平台 Release，完整校验后设为 GitHub latest；GitCode 保留旧版与字体资源（`KEEP_OLD=1`）。历史 `app-v2.0.0` 保留，不能移动或删除；该旧 APK 只识别 `app-v2.x`，首次高于 2.0.0 的后续版本还需发布同 APK 的 `app-vX.Y.Z` 兼容入口（latest=false），供旧 App 迁移到统一更新器。
 - Release 标题仅使用版本号。App 默认在线语音；K30 已将旧离线选择改为在线，后续测试恢复设置时不要改回离线。
 

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { registerHooks } from 'node:module'
 import { after, beforeEach, test } from 'node:test'
 import { execFileSync } from 'node:child_process'
+import { readFileSync } from 'node:fs'
 const mobileUrl = new URL('../src/mobile/services/updater.ts', import.meta.url).href
 const desktopUrl = new URL('../src/services/updater.ts', import.meta.url).href
 const store = new Map(), calls = []
@@ -64,9 +65,10 @@ test('App tags survive checksum/download mirror routing exactly', () => {
   assert.equal(mobile.compareVersions('app-v2.0.1', 'v2.0.0'), 1)
 })
 test('release gates accept App platform tags and reject them for desktop', () => {
-  execFileSync(process.execPath, ['scripts/check-release.mjs', '--platform', 'android', '--tag', 'app-v2.0.0'])
-  execFileSync(process.execPath, ['scripts/check-release.mjs', '--platform', 'android', '--tag', 'v2.0.0'])
-  assert.throws(() => execFileSync(process.execPath, ['scripts/check-release.mjs', '--platform', 'desktop', '--tag', 'app-v2.0.0'], { stdio: 'pipe' }))
+  const { version } = JSON.parse(readFileSync(new URL('../src-tauri/tauri.android.conf.json', import.meta.url), 'utf8'))
+  execFileSync(process.execPath, ['scripts/check-release.mjs', '--platform', 'android', '--tag', `app-v${version}`])
+  execFileSync(process.execPath, ['scripts/check-release.mjs', '--platform', 'android', '--tag', `v${version}`])
+  assert.throws(() => execFileSync(process.execPath, ['scripts/check-release.mjs', '--platform', 'desktop', '--tag', `app-v${version}`], { stdio: 'pipe' }))
 })
 
 test('App accepts unified v2+ Android releases from both sources', () => {
