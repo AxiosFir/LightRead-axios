@@ -24,6 +24,8 @@ fn app() -> WebviewWindow<MockRuntime> {
       crate::http_upload::http_upload_file,
       crate::folder_scan::folder_scan,
       crate::comic::comic_cbr_cache,
+      crate::txt_epub::txt_epub_cache,
+      library_files::library_file_remove_derived,
       backup_zip::library_files_describe,
       backup_zip::backup_write_zip,
       backup_zip::backup_open,
@@ -246,5 +248,38 @@ fn comic_cbr_cache_matches_frontend_payload() {
   std::fs::write(base.join("books/c1.cbr.cbz"), b"cached").unwrap();
   assert_eq!(json_of(call(&w, "comic_cbr_cache", json!({ "root": root, "rel": "books/c1.cbr", "cacheRel": "books/c1.cbr.cbz" }))), json!(6));
   assert!(call(&w, "comic_cbr_cache", json!({ "root": root, "rel": "books/c1.cbr", "cacheRel": "../x.cbz" })).is_err());
+  std::fs::remove_dir_all(&base).unwrap();
+}
+
+/// 桌面 TXT 原生 EPUB 缓存 (getTextEpub) + 删书清理派生缓存 (deleteBook)
+#[test]
+fn txt_epub_cache_and_remove_derived() {
+  let base: PathBuf = std::env::temp_dir().join(format!("lr-ipc-txt-{}", std::process::id()));
+  let _ = std::fs::remove_dir_all(&base);
+  library(&base, b"x");
+  std::fs::write(base.join("books/t1.txt"), "第一章 开始\n正文\n".as_bytes()).unwrap();
+  std::fs::write(base.join("books/t1.txt.v1.epub"), b"old layout").unwrap();
+  let w = app();
+  let root = base.to_str().unwrap();
+  let args = json!({ "root": root, "rel": "books/t1.txt", "fileName": "我的书.txt" });
+  let rel = json_of(call(&w, "txt_epub_cache", args.clone()));
+  let want = format!("books/t1.txt.v{}.epub", crate::txt_epub::LAYOUT);
+  assert_eq!(rel, json!(want));
+  assert!(!base.join("books/t1.txt.v1.epub").exists(), "旧版式缓存应删掉");
+  let epub = std::fs::read(base.join(&want)).unwrap();
+  let mut f = std::io::Cursor::new(epub);
+  let names: Vec<String> = crate::backup_zip::read_central(&mut f).unwrap().into_iter().map(|e| e.name).collect();
+  assert_eq!(names[0], "mimetype");
+  assert!(names.contains(&"OEBPS/s0.xhtml".to_string()));
+  // 再次调用复用缓存 (不改写)
+  let before = std::fs::metadata(base.join(&want)).unwrap().modified().unwrap();
+  assert_eq!(json_of(call(&w, "txt_epub_cache", args)), json!(want));
+  assert_eq!(std::fs::metadata(base.join(&want)).unwrap().modified().unwrap(), before);
+  // 删书: 派生缓存全删, 原书与别的书不动
+  std::fs::write(base.join("books/t1.txt.cbz"), b"x").unwrap();
+  std::fs::write(base.join("books/t10.txt"), b"other").unwrap();
+  assert_eq!(json_of(call(&w, "library_file_remove_derived", json!({ "root": root, "rel": "books/t1.txt" }))), json!(2));
+  assert!(base.join("books/t1.txt").exists() && base.join("books/t10.txt").exists());
+  assert!(!base.join(&want).exists());
   std::fs::remove_dir_all(&base).unwrap();
 }

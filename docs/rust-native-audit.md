@@ -14,6 +14,7 @@
 | **上传 (同步 / 互传)** | `http_upload.rs` | 从磁盘流式上传, 显式 Content-Length, `http_upload_file` 带进度 |
 | **选择文件夹扫描** | `folder_scan.rs` | 一次 IPC 递归遍历 + 大小 / 修改时间 |
 | **CBR → CBZ (桌面)** | `comic.rs` | 导入时 UnRAR 原生解包一次 (顺带取封面), store CBZ 缓存在 `books/<id>.cbr.cbz`, 打开直接读缓存; 删书一并删除; 移动端 / 网页仍用 unrar wasm |
+| **TXT (正文) → EPUB (桌面)** | `txt_epub.rs` | 解码 / 分章 / 段落还原 / XHTML / 打包与前端 `convertToEpub` 逐字节一致 (`testdata/txt-epub-golden.json` 10 组样本, `scripts/gen-txt-epub-golden.mjs` 重新生成); 转换一次缓存为 `<书文件>.v<版式>.epub`, 版式变化自动失效; 代码视图 TXT / Markdown / HTML 仍在前端 (marked / DOMParser) |
 | **在线语音 Sec-MS-GEC v2** | `edge_tts.rs` + `mobile/edge_gec.rs` | 桌面与 App 共用 (v1 已被 403) |
 | 指纹 / 下载 / 分块写盘 | `library_files.rs` | 同步与导入 (issue #14) |
 | 更新包下载与校验 | `app_update.rs` | 流式 SHA-256 |
@@ -25,7 +26,7 @@
 |---|---|---|
 | 阅读引擎 (foliate EPUB/MOBI/AZW3/FB2/CBZ, MuPDF / PDFium wasm, djvu.js) | 渲染在 WebView 内, 必须拿到字节; 原生只会多一次 IPC | 留在 JS |
 | PDF 原生渲染 | 账本: 每页成本 clear ~5 ms、MuPDF run ~15 ms、putImageData ~16 ms、合成 Commit ~80 ms。原生只能替代「run」, 却要把 DPR 2 下 ~20 MB RGBA/页经 IPC 送回再 putImageData | 收益上限 <15 ms/页且很可能为负; 真正的方向是 Worker + OffscreenCanvas, 不是 Rust |
-| TXT/MD/HTML → EPUB (每次打开) | 浏览器实测 2.5 MB 95 ms / 10 MB 238 ms / 30 MB 618 ms | 不做; 字节仍要交给 foliate |
+| Markdown / HTML / 代码视图 TXT → EPUB | 依赖 marked 与 DOMParser 生成良构 XHTML; 正文 TXT 已原生 (见上) | 留在 JS |
 | 导入元数据 EPUB | foliate 取元数据 + 封面: 2.8 MB 70 ms / 11 MB 44 ms / 33 MB 98 ms | 不做 |
 | 导入元数据 PDF | PDFium wasm 打开 69 MB / 600 页: 热 112–118 ms (首次含 wasm 初始化 ~500 ms) + 封面 6–14 ms | 不做 |
 | 书源 / 链接下载 | 桌面 `fetchRemote` 已是 plugin-http (Rust reqwest); 元数据仍需字节 | 不做 |

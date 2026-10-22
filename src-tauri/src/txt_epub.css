@@ -1,0 +1,31 @@
+
+html { font-family: inherit; line-height: 1.8; }
+/* 一个分节装多章: 翻页模式每章另起一页, 滚动模式章间留白 */
+.chapter + .chapter { break-before: column; margin-top: 3em; }
+p { margin: 0 0 0.8em; text-indent: 2em; }
+h1, h2, h3 { line-height: 1.4; }
+img { max-width: 100%; }
+pre { white-space: pre-wrap; background: #f5f6f7; padding: 0.8em; border-radius: 6px; }
+
+ol.code {
+  margin: 0;
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", "Noto Sans Mono CJK SC", monospace;
+  font-size: 0.86em;
+  tab-size: 4;
+  -moz-tab-size: 4;
+}
+ol.code > li {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: normal;
+  line-height: 1.6 !important;
+  text-align: left !important;
+  text-indent: 0;
+  -webkit-hyphens: manual !important;
+  hyphens: manual !important;
+  min-height: 1.6em;
+}
+ol.code > li::marker {
+  font-size: 0.85em;
+  opacity: 0.4;
+}

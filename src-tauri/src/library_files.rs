@@ -150,6 +150,23 @@ pub fn library_file_rename<R: tauri::Runtime>(app: tauri::AppHandle<R>, root: St
   std::fs::rename(&from, &to).map_err(|e| format!("file: {e}"))
 }
 
+/// 删除由书文件派生的缓存 (`<文件名>.<后缀>`, 如 CBR 的 `.cbz`、TXT 的 `.v3.epub`), 删书时调用
+#[tauri::command]
+pub fn library_file_remove_derived<R: tauri::Runtime>(app: tauri::AppHandle<R>, root: String, rel: String) -> Result<u32, String> {
+  let path = library_path(&app, root, rel)?;
+  let (Some(dir), Some(name)) = (path.parent(), path.file_name().and_then(|n| n.to_str())) else { return Ok(0) };
+  let prefix = format!("{name}.");
+  let mut removed = 0;
+  for entry in std::fs::read_dir(dir).into_iter().flatten().flatten() {
+    if entry.file_name().to_string_lossy().starts_with(&prefix) && entry.file_type().is_ok_and(|t| t.is_file()) {
+      if std::fs::remove_file(entry.path()).is_ok() {
+        removed += 1;
+      }
+    }
+  }
+  Ok(removed)
+}
+
 /// 书库文件的字节数 (只读元数据, 不读内容)
 #[tauri::command]
 pub fn library_file_size<R: tauri::Runtime>(app: tauri::AppHandle<R>, root: String, rel: String) -> Result<u64, String> {

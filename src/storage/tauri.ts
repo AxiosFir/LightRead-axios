@@ -349,10 +349,8 @@ export class TauriStorage implements LibraryStorage {
         const [coverPath, coverOpts] = this.loc(this.coverPath(id))
         await this.fs.remove(coverPath, coverOpts).catch(() => { /* 同上 */ })
       }
-      if (meta.format === 'cbr') {
-        const [cachePath, cacheOpts] = this.loc(this.comicCachePath(id))
-        await this.fs.remove(cachePath, cacheOpts).catch(() => { /* 没打开过就没有缓存 */ })
-      }
+      // 原生派生缓存 (CBR 的 .cbz、TXT 的 .v*.epub): 没打开过就没有
+      await this.libraryFile('library_file_remove_derived', { rel: this.bookPath(id, meta.fileName) }).catch(() => { /* 尽力清理 */ })
     }
     const url = this.coverUrls.get(id)
     if (url) {
@@ -380,15 +378,27 @@ export class TauriStorage implements LibraryStorage {
     }
   }
 
-  /** CBZ 缓存与原书同目录, 删书时一并删除 */
-  private comicCachePath = (id: string) => `books/${id}.cbr.cbz`
+  /** 派生缓存与原书同目录, 名字是 `<书文件名>.<后缀>`; 删书时一并删除 */
+  private comicCachePath = (id: string, fileName: string) => `${this.bookPath(id, fileName)}.cbz`
+
+  async getTextEpub(id: string): Promise<Blob | undefined> {
+    const meta = await this.getBook(id)
+    if (meta?.format !== 'txt') return undefined
+    try {
+      const cacheRel = await this.libraryFile<string>('txt_epub_cache', { rel: this.bookPath(id, meta.fileName), fileName: meta.fileName })
+      return await this.readRel(cacheRel)
+    } catch (e) {
+      console.info('[txt] native EPUB cache unavailable', e)
+      return undefined
+    }
+  }
 
   async getComicCbz(id: string): Promise<Blob | undefined> {
     const meta = await this.getBook(id)
     if (meta?.format !== 'cbr') return undefined
     try {
-      await this.libraryFile('comic_cbr_cache', { rel: this.bookPath(id, meta.fileName), cacheRel: this.comicCachePath(id) })
-      return await this.readRel(this.comicCachePath(id))
+      await this.libraryFile('comic_cbr_cache', { rel: this.bookPath(id, meta.fileName), cacheRel: this.comicCachePath(id, meta.fileName) })
+      return await this.readRel(this.comicCachePath(id, meta.fileName))
     } catch (e) {
       // 移动端没有原生解包 / 加密或无图片: 交给前端 unrar wasm, 由它给出原有提示
       console.info('[comic] native CBR cache unavailable', e)

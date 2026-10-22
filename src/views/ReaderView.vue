@@ -10,6 +10,7 @@ import { useSettings } from '../stores/settings'
 import { useLibrary } from '../stores/library'
 import { isTextLike } from '../services/format'
 import { convertToEpub, TEXT_EPUB_LAYOUT } from '../services/textToEpub'
+import { textViewForBook } from '../services/plainText'
 import { tapZone } from '../services/readerTapZone'
 import { getReaderCSS, resolveReaderColors, resolveReaderTheme, HIGHLIGHT_COLORS, listenMarkStyle, type ListenMarkStyle } from '../services/readerTheme'
 import { resolvedTheme } from '../services/appearance'
@@ -2795,8 +2796,12 @@ onMounted(async () => {
 
     let file: File
     if (isTextLike(meta.value.format)) {
-      const blob = await storage.getBookFile(bookId)
-      const { epub } = await convertToEpub(blob, meta.value.fileName, meta.value.format as 'txt' | 'md' | 'html')
+      // 桌面正文类 TXT: 原生转换一次并缓存 (src-tauri/src/txt_epub.rs, 与 convertToEpub 逐字节一致);
+      // 代码视图 TXT、Markdown、HTML 与其它平台在前端转换
+      const native = meta.value.format === 'txt' && textViewForBook(meta.value.fileName) === 'prose'
+        ? await storage.getTextEpub?.(bookId)
+        : undefined
+      const epub = native ?? (await convertToEpub(await storage.getBookFile(bookId), meta.value.fileName, meta.value.format as 'txt' | 'md' | 'html')).epub
       file = new File([epub], `${meta.value.title}.epub`, { type: 'application/epub+zip' })
     } else if (meta.value.format === 'cbr') {
       // 桌面: 原生解包一次并缓存 CBZ (src-tauri/src/comic.rs); 其余平台 / 失败时用 unrar wasm 现场转换

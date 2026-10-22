@@ -17,6 +17,7 @@ mod ipc_contract_tests;
 mod library_files;
 mod local_tts;
 mod tts_device;
+mod txt_epub;
 
 use std::{collections::HashSet, path::Path, sync::Mutex};
 use tauri::{Emitter, Manager};
@@ -177,6 +178,7 @@ pub fn run() {
       library_files::library_file_rename,
       library_files::library_file_remove,
       library_files::library_file_size,
+      library_files::library_file_remove_derived,
       library_files::library_file_write_chunk,
       library_files::library_migrate,
       backup_zip::library_files_describe,
@@ -189,6 +191,7 @@ pub fn run() {
       app_update::update_finish,
       calibre::calibre_list_books,
       comic::comic_cbr_cache,
+      txt_epub::txt_epub_cache,
       calibre::calibre_read_file,
       local_tts::local_tts_status,
       local_tts::local_tts_download,

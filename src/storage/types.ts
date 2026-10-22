@@ -126,6 +126,8 @@ export interface LibraryStorage {
   getBookFileRef?(id: string): Promise<LocalFileRef | undefined>
   /** 桌面: CBR 由原生层转成 CBZ 并缓存在书库, 返回缓存内容; 不支持 / 失败时 undefined (调用方退回 JS 转换) */
   getComicCbz?(id: string): Promise<Blob | undefined>
+  /** 桌面: 正文类 TXT 由原生层转成 EPUB 并缓存 (与前端 convertToEpub 逐字节一致), 返回缓存; 不支持 / 失败时 undefined */
+  getTextEpub?(id: string): Promise<Blob | undefined>
   /** 补设封面 (导入后由原生缓存取封面时用) */
   setCover?(id: string, cover: Blob): Promise<void>
   /** 书籍文件的 SHA-256 (同步指纹). 桌面 / 安卓由原生层读盘计算, 书的内容不进 JS; 缺省时由同步层分块计算 */
