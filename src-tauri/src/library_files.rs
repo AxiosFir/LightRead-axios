@@ -150,6 +150,13 @@ pub fn library_file_rename<R: tauri::Runtime>(app: tauri::AppHandle<R>, root: St
   std::fs::rename(&from, &to).map_err(|e| format!("file: {e}"))
 }
 
+/// 书库文件的字节数 (只读元数据, 不读内容)
+#[tauri::command]
+pub fn library_file_size<R: tauri::Runtime>(app: tauri::AppHandle<R>, root: String, rel: String) -> Result<u64, String> {
+  let path = library_path(&app, root, rel)?;
+  std::fs::metadata(&path).map(|m| m.len()).map_err(|e| format!("file: {e}"))
+}
+
 #[tauri::command]
 pub fn library_file_remove(app: tauri::AppHandle, root: String, rel: String) -> Result<(), String> {
   let path = library_path(&app, root, rel)?;

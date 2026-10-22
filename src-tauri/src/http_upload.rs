@@ -2,7 +2,8 @@
 //!
 //! `@tauri-apps/plugin-http` 的 JS 端把请求体转成数字数组再 JSON 序列化走 IPC,
 //! 上传整本书 (几 MB 到几十 MB) 极慢且内存暴涨. 这里改为:
-//!  - 书库里的文件 (`x-lr-file`): 由 Rust 直接从磁盘读取, 书的内容不经过 WebView;
+//!  - 书库里的文件 (`x-lr-file`): 由 Rust 从磁盘流式读取上传 (带 Content-Length, 不用分块编码),
+//!    书的内容不经过 WebView, 内存占用与文件大小无关;
 //!  - 其他二进制 (封面等): 走 Tauri 2 的原始二进制 IPC (`InvokeBody::Raw`).
 //!    Android 上 Tauri 只能走 postMessage, 原始体会变成 JSON 数字数组, 这里同样兼容.
 //!
@@ -149,11 +150,10 @@ pub(crate) fn build_client(spec: &UploadSpec, timeout: Duration) -> Result<reqwe
   builder.build().map_err(|e| format!("request: {e}"))
 }
 
-/// 发出请求 (与 Tauri 无关, 便于单测)
-pub async fn send(spec: UploadSpec, body: Vec<u8>, timeout: Duration) -> Result<UploadResult, String> {
+fn build_request(spec: &UploadSpec, timeout: Duration) -> Result<reqwest::RequestBuilder, String> {
   let method = reqwest::Method::from_bytes(spec.method.as_bytes())
     .map_err(|_| format!("request: 非法的方法 {}", spec.method))?;
-  let client = build_client(&spec, timeout)?;
+  let client = build_client(spec, timeout)?;
   let mut req = client.request(method, &spec.url);
   for (name, value) in &spec.headers {
     let name = reqwest::header::HeaderName::from_bytes(name.as_bytes())
@@ -162,11 +162,44 @@ pub async fn send(spec: UploadSpec, body: Vec<u8>, timeout: Duration) -> Result<
       .map_err(|_| format!("request: 请求头 {name} 的值非法"))?;
     req = req.header(name, value);
   }
-  let res = req.body(body).send().await.map_err(map_err)?;
+  Ok(req)
+}
+
+async fn finish(req: reqwest::RequestBuilder) -> Result<UploadResult, String> {
+  let res = req.send().await.map_err(map_err)?;
   let status = res.status().as_u16();
   let text = res.text().await.unwrap_or_default();
   let body = text.chars().take(MAX_BODY_CHARS).collect();
   Ok(UploadResult { status, body })
+}
+
+/// 发出请求 (与 Tauri 无关, 便于单测)
+pub async fn send(spec: UploadSpec, body: Vec<u8>, timeout: Duration) -> Result<UploadResult, String> {
+  finish(build_request(&spec, timeout)?.body(body)).await
+}
+
+/// 从磁盘流式上传文件, 每读出一块回调 `progress(已发送, 总长)` (与 Tauri 无关, 便于单测).
+/// 显式带 Content-Length: 部分 WebDAV (如坚果云) 不接受分块编码的 PUT.
+pub async fn send_file(
+  spec: UploadSpec,
+  path: PathBuf,
+  progress: impl Fn(u64, u64) + Send + Sync + 'static,
+) -> Result<UploadResult, String> {
+  use futures_util::StreamExt;
+  let file = tokio::fs::File::open(&path).await.map_err(|e| format!("file: 读取 {} 失败: {e}", path.display()))?;
+  let total = file.metadata().await.map_err(|e| format!("file: {e}"))?.len();
+  let mut sent = 0u64;
+  let stream = tokio_util::io::ReaderStream::with_capacity(file, 256 * 1024).map(move |chunk| {
+    if let Ok(bytes) = &chunk {
+      sent += bytes.len() as u64;
+      progress(sent, total);
+    }
+    chunk
+  });
+  let req = build_request(&spec, upload_timeout(total))?
+    .header(reqwest::header::CONTENT_LENGTH, total)
+    .body(reqwest::Body::wrap_stream(stream));
+  finish(req).await
 }
 
 pub(crate) fn map_err(e: reqwest::Error) -> String {
@@ -210,18 +243,37 @@ pub async fn http_upload(
   request: tauri::ipc::Request<'_>,
 ) -> Result<UploadResult, String> {
   let (spec, file) = parse_spec(request.headers())?;
-  let body = match file {
-    Some(file) => {
-      let path = resolve_library_file(app.path().app_data_dir().ok(), &file)?;
-      tauri::async_runtime::spawn_blocking(move || std::fs::read(&path))
-        .await
-        .map_err(|e| format!("file: {e}"))?
-        .map_err(|e| format!("file: 读取 {} 失败: {e}", file.rel))?
-    }
-    None => body_bytes(request.body())?,
-  };
+  if let Some(file) = file {
+    let path = resolve_library_file(app.path().app_data_dir().ok(), &file)?;
+    return send_file(spec, path, |_, _| {}).await;
+  }
+  let body = body_bytes(request.body())?;
   let timeout = upload_timeout(body.len() as u64);
   send(spec, body, timeout).await
+}
+
+/// 上传书库文件并经 Channel 回报进度 (0–1, 约每 1% 一次); 互传发送书籍用
+#[tauri::command]
+pub async fn http_upload_file<R: tauri::Runtime>(
+  app: tauri::AppHandle<R>,
+  url: String,
+  method: Option<String>,
+  headers: std::collections::BTreeMap<String, String>,
+  proxy: Option<String>,
+  root: String,
+  rel: String,
+  on_progress: tauri::ipc::Channel<f64>,
+) -> Result<UploadResult, String> {
+  let path = resolve_library_file(app.path().app_data_dir().ok(), &FileRef { root, rel })?;
+  let spec = UploadSpec { url, method: method.unwrap_or_else(|| "PUT".into()), headers: headers.into_iter().collect(), proxy, no_redirect: false };
+  let last = std::sync::atomic::AtomicU64::new(u64::MAX);
+  send_file(spec, path, move |sent, total| {
+    let step = if total == 0 { 100 } else { sent * 100 / total };
+    if last.swap(step, std::sync::atomic::Ordering::Relaxed) != step {
+      let _ = on_progress.send(if total == 0 { 1.0 } else { sent as f64 / total as f64 });
+    }
+  })
+  .await
 }
 
 #[cfg(test)]
@@ -300,6 +352,29 @@ mod tests {
     assert!(lower.contains("content-type: application/octet-stream"), "{head}");
     assert!(lower.contains("content-length: 300000"), "{head}");
     assert_eq!(got, body);
+  }
+
+  #[tokio::test]
+  async fn streams_files_with_content_length_and_progress() {
+    let (base, rx) = serve_once(true);
+    let path = std::env::temp_dir().join(format!("lr-upload-stream-{}", std::process::id()));
+    let body: Vec<u8> = (0..(3 * 1024 * 1024 + 7)).map(|i| (i % 249) as u8).collect();
+    std::fs::write(&path, &body).unwrap();
+    let seen = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+    let log = seen.clone();
+    let res = send_file(spec(format!("{base}/dav/big.epub")), path.clone(), move |sent, total| log.lock().unwrap().push((sent, total)))
+      .await
+      .unwrap();
+    assert_eq!(res.status, 201);
+    let (head, got) = rx.recv().unwrap();
+    let lower = head.to_ascii_lowercase();
+    assert!(lower.contains(&format!("content-length: {}", body.len())), "{head}");
+    assert!(!lower.contains("transfer-encoding: chunked"), "{head}");
+    assert_eq!(got, body);
+    let seen = seen.lock().unwrap();
+    assert!(seen.len() > 1, "应分块回报进度");
+    assert_eq!(*seen.last().unwrap(), (body.len() as u64, body.len() as u64));
+    std::fs::remove_file(path).unwrap();
   }
 
   #[tokio::test]

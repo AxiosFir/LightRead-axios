@@ -4,6 +4,8 @@
  * 本模块不依赖 vue / pinia, 可在 node 里测试.
  */
 
+import type { LocalFileRef } from '../../storage/types.ts'
+
 export type TransferKind = 'text' | 'link' | 'file'
 export type ChannelId = 'account' | 'webdav' | 'drop'
 
@@ -45,7 +47,8 @@ export interface SendInput {
   title?: string
   text?: string
   url?: string
-  file?: Blob
+  /** 书库里的书在桌面 / 安卓上传 LocalFileRef: 由原生层从磁盘流式上传, 不读进 WebView */
+  file?: TransferFile
   filename?: string
   mime?: string
   /** 仅取件码: 有效期 (毫秒), 10 分钟或 1 小时 */
@@ -110,3 +113,6 @@ export class TransferError extends Error {
     if (retryAfter !== undefined) this.retryAfter = retryAfter
   }
 }
+
+/** 待发送的文件: 内存里的 Blob, 或带大小的书库文件引用 */
+export type TransferFile = Blob | (LocalFileRef & { size: number })

@@ -19,7 +19,9 @@ fn app() -> WebviewWindow<MockRuntime> {
   let app = mock_builder()
     .invoke_handler(tauri::generate_handler![
       library_files::library_file_rename,
+      library_files::library_file_size,
       library_files::library_migrate,
+      crate::http_upload::http_upload_file,
       backup_zip::library_files_describe,
       backup_zip::backup_write_zip,
       backup_zip::backup_open,
@@ -149,5 +151,53 @@ fn backup_export_import_migrate_and_rename_roundtrip() {
   assert_eq!(std::fs::read(moved.join("lightread.db")).unwrap(), b"sqlite");
   assert!(call(&w, "library_migrate", json!({ "fromRoot": root, "toRoot": "relative/path", "onProgress": CHANNEL })).is_err());
 
+  std::fs::remove_dir_all(&base).unwrap();
+}
+
+/// 互传发送书籍 (src/services/transfer/http.ts nativeFileUpload) + 取大小 (sendBookToDevices)
+#[test]
+fn transfer_uploads_library_file_natively() {
+  use std::io::{Read, Write};
+  let base: PathBuf = std::env::temp_dir().join(format!("lr-ipc-up-{}", std::process::id()));
+  let _ = std::fs::remove_dir_all(&base);
+  let book: Vec<u8> = (0..700_000u32).map(|i| (i % 241) as u8).collect();
+  library(&base, &book);
+  let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+  let addr = listener.local_addr().unwrap();
+  let server = std::thread::spawn(move || {
+    let (mut s, _) = listener.accept().unwrap();
+    let mut buf = Vec::new();
+    let mut chunk = [0u8; 65536];
+    loop {
+      let n = s.read(&mut chunk).unwrap();
+      buf.extend_from_slice(&chunk[..n]);
+      if let Some(i) = buf.windows(4).position(|w| w == b"\r\n\r\n") {
+        if buf.len() >= i + 4 + 700_000 || n == 0 {
+          s.write_all(b"HTTP/1.1 204 No Content\r\nConnection: close\r\n\r\n").unwrap();
+          return (String::from_utf8_lossy(&buf[..i]).to_string(), buf[i + 4..].to_vec());
+        }
+      }
+    }
+  });
+  let root = base.to_str().unwrap();
+  let w = app();
+  assert_eq!(json_of(call(&w, "library_file_size", json!({ "root": root, "rel": "books/b1.epub" }))), json!(book.len()));
+  let res = json_of(call(&w, "http_upload_file", json!({
+    "url": format!("http://{addr}/v1/transfers/t1/blob"),
+    "method": "PUT",
+    "headers": { "content-type": "application/octet-stream", "authorization": "Bearer x" },
+    "proxy": null,
+    "root": root,
+    "rel": "books/b1.epub",
+    "onProgress": CHANNEL,
+  })));
+  assert_eq!(res["status"], json!(204));
+  let (head, body) = server.join().unwrap();
+  assert!(head.to_ascii_lowercase().contains("authorization: bearer x"), "{head}");
+  assert_eq!(body, book);
+  // 书库外的路径一律拒绝
+  assert!(call(&w, "http_upload_file", json!({
+    "url": "http://127.0.0.1:9/", "headers": {}, "root": root, "rel": "../secret", "onProgress": CHANNEL,
+  })).is_err());
   std::fs::remove_dir_all(&base).unwrap();
 }

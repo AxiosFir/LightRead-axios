@@ -18,7 +18,7 @@ import { createDropChannel, type DropChannel } from './dropChannel'
 import {
   findNew, groupBySender, isIncomingFor, itemKey, mergeItems, rememberSeen, safeFilename, textFileName,
 } from './model'
-import { TransferError, type ChannelId, type ProgressFn, type SendInput, type TransferChannel, type TransferDevice, type TransferItem } from './types'
+import { TransferError, type ChannelId, type ProgressFn, type SendInput, type TransferChannel, type TransferDevice, type TransferFile, type TransferItem } from './types'
 
 export type DeviceChannelId = Exclude<ChannelId, 'drop'>
 
@@ -361,9 +361,16 @@ export async function sendBookToDevices(bookId: string): Promise<boolean> {
   const storage = await getStorage()
   const book = await storage.getBook(bookId)
   if (!book) return false
-  let file: Blob
+  let file: TransferFile
   try {
-    file = await storage.getBookFile(bookId)
+    // 桌面 / 安卓: 只传书库文件引用 + 大小, 由原生层流式上传; 网页版读成 Blob
+    const ref = await storage.getBookFileRef?.(bookId)
+    if (ref) {
+      const { invoke } = await import('@tauri-apps/api/core')
+      file = { ...ref, size: await invoke<number>('library_file_size', { root: ref.root, rel: ref.rel }) }
+    } else {
+      file = await storage.getBookFile(bookId)
+    }
   } catch (err) {
     toast(t('transfer.sendFailed', { msg: err instanceof Error ? err.message : String(err) }), 'error', 6000)
     return false

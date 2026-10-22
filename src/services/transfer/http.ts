@@ -4,7 +4,8 @@
  *  - 上传走 XMLHttpRequest: 只有它能报告上传进度; 大文件不阻塞界面
  *  - 下载走 fetch 流式读取, 按 content-length 报告进度
  */
-import { TransferError, type ProgressFn, type TranslateFn } from './types.ts'
+import { TransferError, type ProgressFn, type TransferFile, type TranslateFn } from './types.ts'
+import { isLocalFileRef, isTauri, type LocalFileRef } from '../../storage/types.ts'
 
 export type FetchFn = (url: string, init: {
   method: string
@@ -16,7 +17,7 @@ export type FetchFn = (url: string, init: {
 export type UploadFn = (url: string, init: {
   method: 'PUT'
   headers: Record<string, string>
-  body: Blob
+  body: Blob | LocalFileRef
   onProgress?: ProgressFn
   signal?: AbortSignal
 }) => Promise<{ status: number; text: string }>
@@ -35,7 +36,25 @@ export interface Transport {
 
 const defaultFetch: FetchFn = (url, init) => fetch(url, init)
 
-const xhrUpload: UploadFn = (url, init) => new Promise((resolve, reject) => {
+/** 书库文件: 桌面 / 安卓由原生层从磁盘流式上传并回报进度 (src-tauri/src/http_upload.rs), 不读进 WebView */
+async function nativeFileUpload(url: string, init: Parameters<UploadFn>[1], ref: LocalFileRef) {
+  const { invoke, Channel } = await import('@tauri-apps/api/core')
+  if (init.signal?.aborted) throw new DOMException('aborted', 'AbortError')
+  const progress = new Channel<number>()
+  progress.onmessage = fraction => init.onProgress?.(fraction)
+  const res = await invoke<{ status: number; body: string }>('http_upload_file', {
+    url, method: init.method, headers: init.headers, proxy: null, root: ref.root, rel: ref.rel, onProgress: progress,
+  })
+  return { status: res.status, text: res.body }
+}
+
+const defaultUpload: UploadFn = async (url, init) => {
+  if (!isLocalFileRef(init.body)) return xhrUpload(url, { ...init, body: init.body })
+  if (isTauri()) return nativeFileUpload(url, init, init.body)
+  return xhrUpload(url, { ...init, body: await init.body.blob() })
+}
+
+const xhrUpload = (url: string, init: Parameters<UploadFn>[1] & { body: Blob }): Promise<{ status: number; text: string }> => new Promise((resolve, reject) => {
   if (typeof XMLHttpRequest === 'undefined') {
     // 没有 XHR (理论上不会发生): 退回 fetch, 进度未知
     init.onProgress?.(null)
@@ -80,7 +99,7 @@ const fetchDownload: DownloadFn = async (url, init) => {
   return { status: res.status, blob: new Blob(chunks, { type }), text: '' }
 }
 
-export const defaultTransport: Transport = { fetch: defaultFetch, upload: xhrUpload, download: fetchDownload }
+export const defaultTransport: Transport = { fetch: defaultFetch, upload: defaultUpload, download: fetchDownload }
 
 async function loadTranslate(translate?: TranslateFn): Promise<TranslateFn> {
   if (translate) return translate
@@ -177,7 +196,7 @@ export async function jsonCall<T>(
 /** 上传文件本体; 非 2xx 抛出 TransferError */
 export async function uploadBlob(
   url: string,
-  blob: Blob,
+  blob: TransferFile,
   headers: Record<string, string>,
   transport: Pick<Transport, 'upload'>,
   opts: { onProgress?: ProgressFn; signal?: AbortSignal },
