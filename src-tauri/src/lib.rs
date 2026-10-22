@@ -5,6 +5,7 @@ mod backup_zip;
 mod babeldoc;
 mod calibre;
 mod edge_tts;
+mod folder_scan;
 mod fonts;
 mod http_upload;
 // 不在 Windows 编译: mock 运行时会链接菜单代码, 它导入 Common Controls v6 的函数, 而测试 exe 没有应用清单,
@@ -167,6 +168,7 @@ pub fn run() {
       agent::worksheet::agent_worksheet_commit_human,
       edge_tts::edge_tts_synthesize,
       fonts::list_system_fonts,
+      folder_scan::folder_scan,
       http_upload::http_upload,
       http_upload::http_upload_file,
       library_files::library_file_sha256,

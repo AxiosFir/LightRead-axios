@@ -59,7 +59,8 @@ export function formatRank(format: BookFormat | null | undefined): number {
   return format ? RANK[format] ?? FORMAT_PREFERENCE.length : FORMAT_PREFERENCE.length
 }
 
-const IGNORED_DIRS = new Set(['__macosx', '$recycle.bin', 'system volume information', '@eadir'])
+/** 静默跳过的目录名 (小写); 桌面原生扫描 (folder_scan.rs) 也用这份 */
+export const IGNORED_DIRS = new Set(['__macosx', '$recycle.bin', 'system volume information', '@eadir'])
 const IGNORED_NAMES = new Set(['thumbs.db', 'desktop.ini', 'ehthumbs.db'])
 const TEMP_EXTS = new Set(['part', 'crdownload', 'tmp', 'download', 'partial', 'opdownload'])
 

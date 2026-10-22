@@ -22,6 +22,7 @@ fn app() -> WebviewWindow<MockRuntime> {
       library_files::library_file_size,
       library_files::library_migrate,
       crate::http_upload::http_upload_file,
+      crate::folder_scan::folder_scan,
       backup_zip::library_files_describe,
       backup_zip::backup_write_zip,
       backup_zip::backup_open,
@@ -199,5 +200,30 @@ fn transfer_uploads_library_file_natively() {
   assert!(call(&w, "http_upload_file", json!({
     "url": "http://127.0.0.1:9/", "headers": {}, "root": root, "rel": "../secret", "onProgress": CHANNEL,
   })).is_err());
+  std::fs::remove_dir_all(&base).unwrap();
+}
+
+/// 选择文件夹导入 (src/services/folderSource.ts scanNativeFolder)
+#[test]
+fn folder_scan_matches_frontend_payload() {
+  let base: PathBuf = std::env::temp_dir().join(format!("lr-ipc-scan-{}", std::process::id()));
+  let _ = std::fs::remove_dir_all(&base);
+  for rel in ["书/a.epub", "@eaDir/t.jpg", ".hidden/x.pdf"] {
+    let p = base.join(rel);
+    std::fs::create_dir_all(p.parent().unwrap()).unwrap();
+    std::fs::write(p, b"abc").unwrap();
+  }
+  let w = app();
+  let r = json_of(call(&w, "folder_scan", json!({
+    "root": base.to_str().unwrap(), "maxFiles": 5000, "maxDepth": 8, "skipDirs": ["__macosx", "@eadir"],
+  })));
+  assert_eq!(r["truncated"], json!(false));
+  let entries = r["entries"].as_array().unwrap();
+  assert_eq!(entries.len(), 1, "{r}");
+  assert_eq!(entries[0]["path"], json!("书/a.epub"));
+  assert_eq!(entries[0]["size"], json!(3));
+  assert!(entries[0]["absPath"].as_str().unwrap().ends_with("a.epub"));
+  assert!(entries[0]["lastModified"].is_u64());
+  assert!(call(&w, "folder_scan", json!({ "root": "relative", "maxFiles": 1, "maxDepth": 1, "skipDirs": [] })).is_err());
   std::fs::remove_dir_all(&base).unwrap();
 }
