@@ -1,0 +1,5 @@
+# Windows MSVC: 预编译的 sherpa-onnx (离线语音) 是静态 CRT (/MT); 用 cc 现编的 C++ (unrar_sys, 桌面 CBR 解包)
+# 默认 /MD, MSVC 的 C++ 运行库检查 (detect_mismatch) 会让链接直接失败 (LNK2038)。让现编 C++ 也用 /MT 与之一致。
+# 放在仓库根目录: 从根目录 (`cargo test --manifest-path src-tauri/Cargo.toml`) 或 src-tauri 里调用都能读到。
+[env]
+CXXFLAGS_x86_64_pc_windows_msvc = "/MT"
