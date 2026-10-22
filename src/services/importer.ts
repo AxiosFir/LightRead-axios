@@ -4,6 +4,9 @@ import { detectFormat, isFoliateNative, isTextLike } from './format'
 import { detectReadableFormat, looksLikeText } from './plainText'
 import { convertToEpub } from './textToEpub'
 import { makeFoliateBook } from './foliateBook'
+import { isTauri } from '../storage/types'
+
+const isMobileUa = () => typeof navigator !== 'undefined' && /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
 
 /** foliate 的 metadata 字段可能是字符串 / 对象 / 数组, 统一压平为字符串 */
 function flattenMeta(value: any): string {
@@ -105,6 +108,9 @@ export async function importFile(
     source,
   }
   let cover: Blob | undefined
+  const storage = await getStorage()
+  // 桌面 CBR: 先入库, 再由原生层解包成 CBZ 缓存 (顺带预热首次打开) 并从缓存取封面; 不行再退回 unrar wasm
+  const nativeCbr = format === 'cbr' && !!storage.getComicCbz && !!storage.setCover && isTauri() && !isMobileUa()
 
   try {
     if (isFoliateNative(format)) {
@@ -119,7 +125,7 @@ export async function importFile(
       if (m.title) meta.title = m.title
       meta.author = m.author
       cover = m.cover
-    } else if (format === 'cbr') {
+    } else if (format === 'cbr' && !nativeCbr) {
       // 转成 CBZ 后走 foliate 漫画解析取封面
       const { cbrToCbz } = await import('./comic')
       const cbz = await cbrToCbz(file)
@@ -145,8 +151,21 @@ export async function importFile(
   if (overrides?.description) meta.description = overrides.description
   meta.kind = overrides?.kind ?? 'book'
 
-  const storage = await getStorage()
   const bookId = await storage.addBook(meta, file, cover)
+  if (nativeCbr) {
+    try {
+      const cbz = (await storage.getComicCbz!(bookId))
+        ?? await (await import('./comic')).cbrToCbz(file)
+      const m = await extractFoliateMeta(new File([cbz], baseName + '.cbz'))
+      if (m.title && !overrides?.title) await storage.updateBook(bookId, { title: m.title })
+      if (m.cover) await storage.setCover!(bookId, m.cover)
+    } catch (e) {
+      // 原生与 wasm 都打不开 (加密 / 无图片): 撤回入库, 与原来一样报解析失败
+      console.warn('[import]', file.name, e)
+      await storage.deleteBook(bookId).catch(() => { /* 尽力撤回 */ })
+      return { ok: false, fileName: file.name, error: t('library.importParseFailed') }
+    }
+  }
   return { ok: true, fileName: file.name, bookId }
 }
 

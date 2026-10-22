@@ -2793,16 +2793,22 @@ onMounted(async () => {
     }
     annotations.value = await storage.listAnnotations(bookId)
 
-    const blob = await storage.getBookFile(bookId)
     let file: File
     if (isTextLike(meta.value.format)) {
+      const blob = await storage.getBookFile(bookId)
       const { epub } = await convertToEpub(blob, meta.value.fileName, meta.value.format as 'txt' | 'md' | 'html')
       file = new File([epub], `${meta.value.title}.epub`, { type: 'application/epub+zip' })
     } else if (meta.value.format === 'cbr') {
-      const { cbrToCbz } = await import('../services/comic')
-      file = new File([await cbrToCbz(blob)], `${meta.value.title}.cbz`)
+      // 桌面: 原生解包一次并缓存 CBZ (src-tauri/src/comic.rs); 其余平台 / 失败时用 unrar wasm 现场转换
+      const cached = await storage.getComicCbz?.(bookId)
+      if (cached) {
+        file = new File([cached], `${meta.value.title}.cbz`)
+      } else {
+        const { cbrToCbz } = await import('../services/comic')
+        file = new File([await cbrToCbz(await storage.getBookFile(bookId))], `${meta.value.title}.cbz`)
+      }
     } else {
-      file = new File([blob], meta.value.fileName)
+      file = new File([await storage.getBookFile(bookId)], meta.value.fileName)
     }
 
     await import('foliate-js/view.js')

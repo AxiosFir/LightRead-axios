@@ -349,6 +349,10 @@ export class TauriStorage implements LibraryStorage {
         const [coverPath, coverOpts] = this.loc(this.coverPath(id))
         await this.fs.remove(coverPath, coverOpts).catch(() => { /* 同上 */ })
       }
+      if (meta.format === 'cbr') {
+        const [cachePath, cacheOpts] = this.loc(this.comicCachePath(id))
+        await this.fs.remove(cachePath, cacheOpts).catch(() => { /* 没打开过就没有缓存 */ })
+      }
     }
     const url = this.coverUrls.get(id)
     if (url) {
@@ -363,6 +367,33 @@ export class TauriStorage implements LibraryStorage {
     const [path, opts] = this.loc(this.bookPath(id, meta.fileName))
     const bytes = await this.fs.readFile(path, opts)
     return new Blob([bytes.buffer as ArrayBuffer])
+  }
+
+  async setCover(id: string, cover: Blob) {
+    const [path, opts] = this.loc(this.coverPath(id))
+    await this.fs.writeFile(path, new Uint8Array(await cover.arrayBuffer()), opts)
+    await this.db.execute('UPDATE books SET has_cover = 1 WHERE id = $1', [id])
+    const url = this.coverUrls.get(id)
+    if (url) {
+      URL.revokeObjectURL(url)
+      this.coverUrls.delete(id)
+    }
+  }
+
+  /** CBZ 缓存与原书同目录, 删书时一并删除 */
+  private comicCachePath = (id: string) => `books/${id}.cbr.cbz`
+
+  async getComicCbz(id: string): Promise<Blob | undefined> {
+    const meta = await this.getBook(id)
+    if (meta?.format !== 'cbr') return undefined
+    try {
+      await this.libraryFile('comic_cbr_cache', { rel: this.bookPath(id, meta.fileName), cacheRel: this.comicCachePath(id) })
+      return await this.readRel(this.comicCachePath(id))
+    } catch (e) {
+      // 移动端没有原生解包 / 加密或无图片: 交给前端 unrar wasm, 由它给出原有提示
+      console.info('[comic] native CBR cache unavailable', e)
+      return undefined
+    }
   }
 
   async getBookFileRef(id: string): Promise<LocalFileRef | undefined> {

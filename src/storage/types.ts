@@ -124,6 +124,10 @@ export interface LibraryStorage {
   getBookFile(id: string): Promise<Blob>
   /** 书籍文件的本地路径引用 (仅文件系统后端); 不支持时为 undefined */
   getBookFileRef?(id: string): Promise<LocalFileRef | undefined>
+  /** 桌面: CBR 由原生层转成 CBZ 并缓存在书库, 返回缓存内容; 不支持 / 失败时 undefined (调用方退回 JS 转换) */
+  getComicCbz?(id: string): Promise<Blob | undefined>
+  /** 补设封面 (导入后由原生缓存取封面时用) */
+  setCover?(id: string, cover: Blob): Promise<void>
   /** 书籍文件的 SHA-256 (同步指纹). 桌面 / 安卓由原生层读盘计算, 书的内容不进 JS; 缺省时由同步层分块计算 */
   hashBookFile?(id: string): Promise<string>
   /**

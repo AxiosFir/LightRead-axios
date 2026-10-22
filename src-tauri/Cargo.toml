@@ -52,6 +52,8 @@ cargo_metadata = { path = "vendor/cargo_metadata" }
 # 本地离线语音仅桌面平台 (sherpa-onnx 无移动端预编译库)
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 sherpa-onnx = "1.13.3"
+# CBR → CBZ 桌面原生解包 (comic.rs); UnRAR 与前端 node-unrar-js 同源, 许可随包分发
+unrar = "0.5"
 ureq = "2"
 bzip2 = "0.5.2"
 tar = "0.4.46"

@@ -1,4 +1,4 @@
-# 原生化 (Rust) 盘点 — 2026-10-22, v2.2.1
+# 原生化 (Rust) 盘点 — 2026-10-22, v2.2.1 起
 
 原则 (CLAUDE.md「能用 Rust 就用 Rust」): 文件读写、哈希、下载、格式解析等重活放 `src-tauri/src/`; 前端只做界面和编排。
 判断标准: 书的字节是否**只为搬运**经过 WebView, 以及实测的耗时 / 内存是否落在用户能感知的路径上。
@@ -13,6 +13,7 @@
 | **改名 / 文件大小** | `library_file_rename` `library_file_size` | 同步改文件名不再整本读写 |
 | **上传 (同步 / 互传)** | `http_upload.rs` | 从磁盘流式上传, 显式 Content-Length, `http_upload_file` 带进度 |
 | **选择文件夹扫描** | `folder_scan.rs` | 一次 IPC 递归遍历 + 大小 / 修改时间 |
+| **CBR → CBZ (桌面)** | `comic.rs` | 导入时 UnRAR 原生解包一次 (顺带取封面), store CBZ 缓存在 `books/<id>.cbr.cbz`, 打开直接读缓存; 删书一并删除; 移动端 / 网页仍用 unrar wasm |
 | **在线语音 Sec-MS-GEC v2** | `edge_tts.rs` + `mobile/edge_gec.rs` | 桌面与 App 共用 (v1 已被 403) |
 | 指纹 / 下载 / 分块写盘 | `library_files.rs` | 同步与导入 (issue #14) |
 | 更新包下载与校验 | `app_update.rs` | 流式 SHA-256 |
@@ -36,5 +37,4 @@
 
 ## 已知待办
 
-- **CBR 每次打开都 unrar (wasm) 全包 + 重打包 CBZ**: 浪费确实存在。原生 RAR 需要 C++ unrar 库 (各平台含 Android NDK 都要编) 或尚不成熟的纯 Rust 解码器; 本机没有 rar 工具做测试样本。更稳的第一步是导入时转换一次并缓存 CBZ, 再看是否值得原生解码。
 - PDF 打开仍是唯一实测瓶颈, 方向见上表。

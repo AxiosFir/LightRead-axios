@@ -4,6 +4,7 @@ mod background_process;
 mod backup_zip;
 mod babeldoc;
 mod calibre;
+mod comic;
 mod edge_tts;
 mod folder_scan;
 mod fonts;
@@ -187,6 +188,7 @@ pub fn run() {
       app_update::update_download,
       app_update::update_finish,
       calibre::calibre_list_books,
+      comic::comic_cbr_cache,
       calibre::calibre_read_file,
       local_tts::local_tts_status,
       local_tts::local_tts_download,

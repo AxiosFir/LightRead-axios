@@ -23,6 +23,7 @@ fn app() -> WebviewWindow<MockRuntime> {
       library_files::library_migrate,
       crate::http_upload::http_upload_file,
       crate::folder_scan::folder_scan,
+      crate::comic::comic_cbr_cache,
       backup_zip::library_files_describe,
       backup_zip::backup_write_zip,
       backup_zip::backup_open,
@@ -225,5 +226,25 @@ fn folder_scan_matches_frontend_payload() {
   assert!(entries[0]["absPath"].as_str().unwrap().ends_with("a.epub"));
   assert!(entries[0]["lastModified"].is_u64());
   assert!(call(&w, "folder_scan", json!({ "root": "relative", "maxFiles": 1, "maxDepth": 1, "skipDirs": [] })).is_err());
+  std::fs::remove_dir_all(&base).unwrap();
+}
+
+/// 桌面 CBR 原生缓存 (src/storage/tauri.ts getComicCbz): 参数映射、缓存复用、失败不留文件
+#[test]
+fn comic_cbr_cache_matches_frontend_payload() {
+  let base: PathBuf = std::env::temp_dir().join(format!("lr-ipc-cbr-{}", std::process::id()));
+  let _ = std::fs::remove_dir_all(&base);
+  library(&base, b"x");
+  // 样本里没有图片 → 走 "无可用文件" 的报错路径; 前端据此退回 unrar wasm
+  std::fs::write(base.join("books/c1.cbr"), include_bytes!("testdata/unrar-solid.rar")).unwrap();
+  let w = app();
+  let root = base.to_str().unwrap();
+  let err = call(&w, "comic_cbr_cache", json!({ "root": root, "rel": "books/c1.cbr", "cacheRel": "books/c1.cbr.cbz" })).unwrap_err();
+  assert!(err.as_str().unwrap().starts_with("archive:"), "{err}");
+  assert!(!base.join("books/c1.cbr.cbz").exists() && !base.join("books/c1.cbr.cbz.part").exists());
+  // 已有不旧于原书的缓存: 直接复用, 不再解包
+  std::fs::write(base.join("books/c1.cbr.cbz"), b"cached").unwrap();
+  assert_eq!(json_of(call(&w, "comic_cbr_cache", json!({ "root": root, "rel": "books/c1.cbr", "cacheRel": "books/c1.cbr.cbz" }))), json!(6));
+  assert!(call(&w, "comic_cbr_cache", json!({ "root": root, "rel": "books/c1.cbr", "cacheRel": "../x.cbz" })).is_err());
   std::fs::remove_dir_all(&base).unwrap();
 }
