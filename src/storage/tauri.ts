@@ -381,6 +381,25 @@ export class TauriStorage implements LibraryStorage {
   /** 派生缓存与原书同目录, 名字是 `<书文件名>.<后缀>`; 删书时一并删除 */
   private comicCachePath = (id: string, fileName: string) => `${this.bookPath(id, fileName)}.cbz`
 
+  async getEpubMeta(id: string) {
+    const meta = await this.getBook(id)
+    if (meta?.format !== 'epub') return undefined
+    const rel = this.bookPath(id, meta.fileName)
+    try {
+      const m = await this.libraryFile<{ title: string; author: string; description: string; language: string; coverHref?: string; coverMediaType?: string }>(
+        'epub_metadata', { rel })
+      let cover: Blob | undefined
+      if (m.coverHref) {
+        const bytes = await this.libraryFile<ArrayBuffer>('epub_read_entry', { rel, path: m.coverHref })
+        cover = new Blob([bytes], { type: m.coverMediaType ?? '' })
+      }
+      return { title: m.title, author: m.author, description: m.description, language: m.language, cover }
+    } catch (e) {
+      console.info('[epub] native metadata unavailable', e)
+      return undefined
+    }
+  }
+
   async getTextEpub(id: string): Promise<Blob | undefined> {
     const meta = await this.getBook(id)
     if (meta?.format !== 'txt') return undefined

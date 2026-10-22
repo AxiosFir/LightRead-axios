@@ -25,6 +25,8 @@ fn app() -> WebviewWindow<MockRuntime> {
       crate::folder_scan::folder_scan,
       crate::comic::comic_cbr_cache,
       crate::txt_epub::txt_epub_cache,
+      crate::epub_meta::epub_metadata,
+      crate::epub_meta::epub_read_entry,
       library_files::library_file_remove_derived,
       backup_zip::library_files_describe,
       backup_zip::backup_write_zip,
@@ -281,5 +283,33 @@ fn txt_epub_cache_and_remove_derived() {
   assert_eq!(json_of(call(&w, "library_file_remove_derived", json!({ "root": root, "rel": "books/t1.txt" }))), json!(2));
   assert!(base.join("books/t1.txt").exists() && base.join("books/t10.txt").exists());
   assert!(!base.join(&want).exists());
+  std::fs::remove_dir_all(&base).unwrap();
+}
+
+/// 桌面导入 EPUB 原生取元数据与封面 (src/storage/tauri.ts getEpubMeta)
+#[test]
+fn epub_metadata_and_cover_match_frontend_payload() {
+  use base64::Engine as _;
+  let golden: Value = serde_json::from_str(include_str!("testdata/epub-meta-golden.json")).unwrap();
+  let case = golden["cases"].as_array().unwrap().iter().find(|c| c["name"] == "epub3-basic").unwrap();
+  let epub = base64::engine::general_purpose::STANDARD.decode(case["epubBase64"].as_str().unwrap()).unwrap();
+  let base: PathBuf = std::env::temp_dir().join(format!("lr-ipc-epub-{}", std::process::id()));
+  let _ = std::fs::remove_dir_all(&base);
+  library(&base, b"x");
+  std::fs::write(base.join("books/e1.epub"), &epub).unwrap();
+  let w = app();
+  let root = base.to_str().unwrap();
+  let m = json_of(call(&w, "epub_metadata", json!({ "root": root, "rel": "books/e1.epub" })));
+  assert_eq!(m["title"], case["expected"]["title"]);
+  assert_eq!(m["author"], case["expected"]["author"]);
+  assert_eq!(m["coverHref"], case["expected"]["coverHref"]);
+  assert_eq!(m["coverMediaType"], case["expected"]["coverType"]);
+  match call(&w, "epub_read_entry", json!({ "root": root, "rel": "books/e1.epub", "path": m["coverHref"] })).unwrap() {
+    InvokeResponseBody::Raw(bytes) => assert!(bytes.starts_with(b"\x89PNG"), "封面应是 PNG"),
+    other => panic!("封面应以二进制返回: {other:?}"),
+  }
+  // 不是 EPUB: 报错 (前端退回 foliate)
+  std::fs::write(base.join("books/bad.epub"), b"not a zip").unwrap();
+  assert!(call(&w, "epub_metadata", json!({ "root": root, "rel": "books/bad.epub" })).is_err());
   std::fs::remove_dir_all(&base).unwrap();
 }

@@ -6,6 +6,7 @@ mod babeldoc;
 mod calibre;
 mod comic;
 mod edge_tts;
+mod epub_meta;
 mod folder_scan;
 mod fonts;
 mod http_upload;
@@ -192,6 +193,8 @@ pub fn run() {
       calibre::calibre_list_books,
       comic::comic_cbr_cache,
       txt_epub::txt_epub_cache,
+      epub_meta::epub_metadata,
+      epub_meta::epub_read_entry,
       calibre::calibre_read_file,
       local_tts::local_tts_status,
       local_tts::local_tts_download,

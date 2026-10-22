@@ -8,8 +8,8 @@ import { isTauri } from '../storage/types'
 
 const isMobileUa = () => typeof navigator !== 'undefined' && /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
 
-/** foliate 的 metadata 字段可能是字符串 / 对象 / 数组, 统一压平为字符串 */
-function flattenMeta(value: any): string {
+/** foliate 的 metadata 字段可能是字符串 / 对象 / 数组, 统一压平为字符串 (原生 epub_meta.rs 按同一规则对齐) */
+export function flattenMeta(value: any): string {
   if (!value) return ''
   if (typeof value === 'string') return value
   if (Array.isArray(value)) return value.map(flattenMeta).filter(Boolean).join(', ')
@@ -111,9 +111,11 @@ export async function importFile(
   const storage = await getStorage()
   // 桌面 CBR: 先入库, 再由原生层解包成 CBZ 缓存 (顺带预热首次打开) 并从缓存取封面; 不行再退回 unrar wasm
   const nativeCbr = format === 'cbr' && !!storage.getComicCbz && !!storage.setCover && isTauri() && !isMobileUa()
+  // 桌面 EPUB: 先入库, 再由原生层从书库文件读元数据与封面 (src-tauri/src/epub_meta.rs), 不必整本交给 foliate
+  const nativeEpub = format === 'epub' && !!storage.getEpubMeta && !!storage.setCover && isTauri() && !isMobileUa()
 
   try {
-    if (isFoliateNative(format)) {
+    if (isFoliateNative(format) && !nativeEpub) {
       const m = await extractFoliateMeta(file)
       if (m.title) meta.title = m.title
       meta.author = m.author
@@ -152,6 +154,22 @@ export async function importFile(
   meta.kind = overrides?.kind ?? 'book'
 
   const bookId = await storage.addBook(meta, file, cover)
+  if (nativeEpub) {
+    try {
+      const m = (await storage.getEpubMeta!(bookId)) ?? await extractFoliateMeta(file)
+      await storage.updateBook(bookId, {
+        title: overrides?.title || m.title || meta.title,
+        author: overrides?.author || m.author,
+        description: overrides?.description || m.description || undefined,
+        language: m.language || undefined,
+      })
+      if (m.cover) await storage.setCover!(bookId, m.cover)
+    } catch (e) {
+      console.warn('[import]', file.name, e)
+      await storage.deleteBook(bookId).catch(() => { /* 尽力撤回 */ })
+      return { ok: false, fileName: file.name, error: t('library.importParseFailed') }
+    }
+  }
   if (nativeCbr) {
     try {
       const cbz = (await storage.getComicCbz!(bookId))
