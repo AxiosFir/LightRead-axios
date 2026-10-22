@@ -7,7 +7,7 @@
 
 - `release/1.20.0`：1.x 全平台最终版封存分支，tag `v1.20.0`；已发布内容不混入 2.0 开发。
 - `Dev`：后续 App 2.0 开发主线，工作目录 `/home/ubuntu/workspace/LightRead-v2`。原 `feat/lightread-2.0` 只保留历史。
-- `main` 保持原有代码；2026-10-18 用户确认桌面和 App 统一升级到 2.0.0。桌面界面与功能保持已发布 1.20.0 的源码基线，只改版本元数据；不能把 App 修改带入桌面。桌面发布用 `scripts/desktop-release.json` 固定基线，并附版本补丁及各平台构建报告。
+- `main` 保持原有代码。**2026-10-22 用户确认：桌面与 App 对齐，从 v2.2.0 起同一分支 (`Dev`)、同一提交、同一版本号发布全平台 `vX.Y.Z`**；桌面直接从 tag 源码构建，不再用 `scripts/desktop-release.json` 固定旧基线 (已删除；workflow 只在该文件存在时走基线补丁)。不维护桌面 / App 两条分支：共享层 (存储、同步、阅读引擎、全部 Rust) 一处修复两端生效，界面差异仍由 `src/mobile/` 覆盖清单隔离。
 - 新版统一使用 `vX.Y.Z` 全平台 Release，完整校验后设为 GitHub latest；GitCode 保留旧版与字体资源（`KEEP_OLD=1`）。历史 `app-v2.0.0` 保留，不能移动或删除；该旧 APK 只识别 `app-v2.x`，首次高于 2.0.0 的后续版本还需发布同 APK 的 `app-vX.Y.Z` 兼容入口（latest=false），供旧 App 迁移到统一更新器。
 - Release 标题仅使用版本号。App 默认在线语音；K30 已将旧离线选择改为在线，后续测试恢复设置时不要改回离线。
 
@@ -15,16 +15,16 @@
 
 - PDF 双形态阅读仅属于 App，正式版本 `app-v2.1.0`；桌面和默认 Web 保持原版 PDF 路由，桌面 latest 保持 `v2.0.0`。
 - App 入口在 `src/mobile/views/`，PDF 路由由 `src/mobile/services/readerRoute.ts` 经覆盖清单启用；引擎可放共享服务，但不能把 App 的入口带入桌面。
-- 基础／桌面版本为 2.0.0，Android／iOS 配置版本为 2.1.0。`scripts/desktop-release.json` 继续固定旧桌面基线，本次不更新桌面。误建的统一 `v2.1.0` Release 已撤回为草稿，不能重新公开。
+- (历史) 当时基础／桌面版本为 2.0.0，Android／iOS 为 2.1.0，桌面固定旧基线。误建的统一 `v2.1.0` Release 已撤回为草稿，不能重新公开；2.2.0 起版本对齐，见上文分支分工。
 - K30 覆盖升级与数据保留已验证；用户明确同意注明安全锁屏导致的前台交互验收限制并继续发布，不把受阻项计为通过。
 
 ## K30 真机验收（2026-10-18 用户要求）
 
 完整验收先设计测试计划与能力清单，再自顶向下逐项点击每个栏目、窗口、功能和按钮。阅读样本用《理想国》和 K30 已有书籍，不以短合成文本代替长文验收；不为节省耗时省略检查。逐项记录实际结果、证据、缺陷和受阻条件，遵循 [K30 验收约定](docs/testing/k30-ui-acceptance.md)。
 
-## App / 桌面版本边界（2026-10-18 用户更新）
+## App / 桌面版本边界（2026-10-22 用户更新）
 
-桌面、默认 Web/PWA 与 App 的版本元数据统一为 2.0.0；界面仍按平台隔离。App 专属代码在 `src/mobile/`，通过构建平台选择，不能用窗口宽度决定产品界面。Android / iOS 的版本分别写在 `src-tauri/tauri.android.conf.json` / `tauri.ios.conf.json`，与基础版本一致。桌面正式安装包必须按上文固定的已发布基线做版本补丁构建，而非直接带入 Dev 的共享功能修改。详见 `src/mobile/README.md`。
+桌面、默认 Web/PWA 与 App 版本一致 (`package.json`、`tauri.conf.json`、`tauri.android.conf.json`、`tauri.ios.conf.json`、Cargo 同步修改，`scripts/test-platform-boundary.mjs` 校验)；界面仍按平台隔离。App 专属界面在 `src/mobile/`，通过构建平台选择，不能用窗口宽度决定产品界面。能复用的能力放共享层：桌面借鉴 App 的设计 (配色令牌、生成封面、继续阅读、论文状态筛选、Sec-MS-GEC v2 语音) 时改桌面自己的文件，不直接引用 `src/mobile/`。详见 `src/mobile/README.md`。
 
 ## 技术栈
 

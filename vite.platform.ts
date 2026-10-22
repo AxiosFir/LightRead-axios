@@ -49,6 +49,7 @@ export function nativeLicenses(root = fileURLToPath(new URL('.', import.meta.url
       // 桌面界面的展示字体子集 (src/assets/fonts); App 构建由 mobileUi 分发同一份许可
       if (desktopFonts) {
         this.emitFile({ type: 'asset', fileName: 'fonts/WenKai-LICENSE.txt', source: readFileSync(resolve(root, 'src/assets/fonts/WenKai-LICENSE.txt')) })
+        this.emitFile({ type: 'asset', fileName: 'fonts/Inter-LICENSE.txt', source: readFileSync(resolve(root, 'src/assets/fonts/Inter-LICENSE.txt')) })
       }
     },
   }

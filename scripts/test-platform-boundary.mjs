@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { execFileSync } from 'node:child_process'
+import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { uiTarget, mobileUi } from '../vite.platform.ts'
 const root = fileURLToPath(new URL('../', import.meta.url)).replace(/\/$/, '')
@@ -25,11 +26,13 @@ test('App overrides reach shared imports and leave shared engines untouched', ()
   assert.equal(resolve('../storage/types',root+'/src/services/edgeTts.ts'),null)
   assert.equal(resolve('./views/ReaderView.vue',root+'/src/mobile/App.vue'),null)
 })
-test('App release versions remain independent from the desktop version', () => {
+// 2026-10-22 起桌面与 App 版本对齐: 同一提交、同一版本号, 统一 vX.Y.Z (App 兼容入口仍可用 app-vX.Y.Z)
+test('desktop and App release the same aligned version', () => {
   const check = (...args) => execFileSync(process.execPath,['scripts/check-release.mjs',...args],{cwd:root,stdio:'pipe'}).toString()
-  assert.match(check('--tag','v2.0.0'),/2.0.0/)
-  for (const platform of ['android','ios']) assert.match(check('--platform',platform,'--tag','app-v2.1.0'),/2.1.0/)
-  assert.throws(()=>check('--tag','app-v2.0.0'))
+  const { version } = JSON.parse(readFileSync(root+'/package.json','utf8'))
+  for (const platform of ['desktop','android','ios']) assert.match(check('--platform',platform,'--tag',`v${version}`),new RegExp(version.replaceAll('.','\\.')))
+  for (const platform of ['android','ios']) assert.match(check('--platform',platform,'--tag',`app-v${version}`),new RegExp(version.replaceAll('.','\\.')))
+  assert.throws(()=>check('--tag',`app-v${version}`))
   assert.throws(()=>check('--platform','android','--tag','v1.20.0'))
   assert.throws(()=>check('--platform','unknown'))
 })
