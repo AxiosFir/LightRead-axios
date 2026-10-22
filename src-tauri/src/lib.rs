@@ -7,7 +7,10 @@ mod calibre;
 mod edge_tts;
 mod fonts;
 mod http_upload;
-#[cfg(test)]
+// 不在 Windows 编译: mock 运行时会链接菜单代码, 它导入 Common Controls v6 的函数, 而测试 exe 没有应用清单,
+// 加载时绑定到系统的 comctl32 v5, 整个测试程序以 STATUS_ENTRYPOINT_NOT_FOUND 启动失败 (v2.2.0 CI 实测)。
+// 契约只校验 IPC 参数映射, 与平台无关, Linux / macOS 覆盖即可。
+#[cfg(all(test, not(windows)))]
 mod ipc_contract_tests;
 mod library_files;
 mod local_tts;
