@@ -7,6 +7,8 @@
 //!    前端比对后再 `library_file_rename` 成正式文件, 不通过则 `library_file_remove`.
 //!  - `library_file_write_chunk`: 导入时 WebView 里的书 (只有 File 对象, 没有路径) 分块以 base64 传入
 //!    追加写盘. 一次性 `writeFile` 会把整本书变成 JSON 数字数组, 40 MB 的 PDF 就能让平板卡死闪退 (issue #14).
+//!  - `library_migrate`: 换书库文件夹时整库复制 (数据库 + 书 + 封面), 用 `std::fs::copy`
+//!    (系统可用 copy_file_range / clonefile), 只经 Channel 回报进度, 字节不进 WebView.
 //! 路径规则与上传命令相同 (见 http_upload.rs 的 `resolve_library_file`): 只能是书库的
 //! `books/<文件名>` / `covers/<文件名>`. 错误字符串以 `timeout:` / `network:` / `file:` / `request:` 前缀区分.
 
@@ -22,6 +24,7 @@ use sha2::{Digest, Sha256};
 use tauri::Manager;
 
 use crate::http_upload::{build_client, map_err, resolve_library_file, FileRef, UploadSpec};
+use tauri::ipc::Channel;
 
 /// 下载整体上限 (与前端 DOWNLOAD_TIMEOUT_MS 一致)
 const DOWNLOAD_TIMEOUT: Duration = Duration::from_secs(15 * 60);
@@ -108,7 +111,7 @@ pub fn write_chunk(path: &Path, offset: u64, bytes: &[u8]) -> Result<u64, String
   Ok(offset + bytes.len() as u64)
 }
 
-fn library_path(app: &tauri::AppHandle, root: String, rel: String) -> Result<std::path::PathBuf, String> {
+fn library_path<R: tauri::Runtime>(app: &tauri::AppHandle<R>, root: String, rel: String) -> Result<std::path::PathBuf, String> {
   resolve_library_file(app.path().app_data_dir().ok(), &FileRef { root, rel })
 }
 
@@ -141,7 +144,7 @@ pub async fn library_file_download(
 }
 
 #[tauri::command]
-pub fn library_file_rename(app: tauri::AppHandle, root: String, from: String, to: String) -> Result<(), String> {
+pub fn library_file_rename<R: tauri::Runtime>(app: tauri::AppHandle<R>, root: String, from: String, to: String) -> Result<(), String> {
   let from = library_path(&app, root.clone(), from)?;
   let to = library_path(&app, root, to)?;
   std::fs::rename(&from, &to).map_err(|e| format!("file: {e}"))
@@ -171,6 +174,93 @@ pub async fn library_file_write_chunk(
       .decode(data.as_bytes())
       .map_err(|e| format!("request: base64 无效: {e}"))?;
     write_chunk(&path, offset, &bytes)
+  })
+  .await
+  .map_err(|e| format!("file: {e}"))?
+}
+
+/// 换书库文件夹的复制进度: `stage` 为 `db` / `books` / `covers`, `done`/`total` 为该阶段的文件数
+#[derive(Clone, Debug, Serialize, PartialEq)]
+pub struct MigrateProgress {
+  pub stage: &'static str,
+  pub done: usize,
+  pub total: usize,
+}
+
+const DB_FILES: [&str; 3] = ["lightread.db", "lightread.db-wal", "lightread.db-shm"];
+const LIBRARY_DIRS: [&str; 2] = ["books", "covers"];
+
+/// 把书库复制到 `dest`: `db_dir` 里的 SQLite 主库 (含 WAL), `data_dir` 下 books/ covers/ 的文件 (不递归).
+/// 返回复制的字节数. 与 Tauri 无关, 便于单测.
+pub fn copy_library(
+  data_dir: &Path,
+  db_dir: &Path,
+  dest: &Path,
+  mut progress: impl FnMut(MigrateProgress),
+) -> Result<u64, String> {
+  let io = |e: std::io::Error| format!("file: {e}");
+  for dir in LIBRARY_DIRS {
+    std::fs::create_dir_all(dest.join(dir)).map_err(io)?;
+  }
+  let mut bytes = 0u64;
+  let dbs: Vec<_> = DB_FILES.iter().filter(|name| db_dir.join(name).is_file()).collect();
+  for (i, name) in dbs.iter().enumerate() {
+    progress(MigrateProgress { stage: "db", done: i, total: dbs.len() });
+    bytes += std::fs::copy(db_dir.join(name), dest.join(name)).map_err(io)?;
+  }
+  for dir in LIBRARY_DIRS {
+    let src = data_dir.join(dir);
+    let files: Vec<_> = match std::fs::read_dir(&src) {
+      Ok(entries) => entries
+        .filter_map(Result::ok)
+        .filter(|entry| entry.file_type().map(|t| t.is_file()).unwrap_or(false))
+        .collect(),
+      Err(e) if e.kind() == std::io::ErrorKind::NotFound => continue,
+      Err(e) => return Err(io(e)),
+    };
+    for (i, entry) in files.iter().enumerate() {
+      progress(MigrateProgress { stage: dir, done: i + 1, total: files.len() });
+      bytes += std::fs::copy(entry.path(), dest.join(dir).join(entry.file_name())).map_err(io)?;
+    }
+  }
+  Ok(bytes)
+}
+
+/// 换书库文件夹: 从当前书库 (`from_root` 为空表示默认的应用数据目录) 整库复制到 `to_root`.
+/// 完成后由前端写入 libraryRoot 设置并整页重载.
+#[tauri::command]
+pub async fn library_migrate<R: tauri::Runtime>(
+  app: tauri::AppHandle<R>,
+  from_root: String,
+  to_root: String,
+  on_progress: Channel<MigrateProgress>,
+) -> Result<u64, String> {
+  let dest = std::path::PathBuf::from(to_root.trim_end_matches(['/', '\\']));
+  if !dest.is_absolute() {
+    return Err(format!("file: 目标文件夹必须是绝对路径 {to_root}"));
+  }
+  let from = from_root.trim_end_matches(['/', '\\']);
+  let (data_dir, db_dir) = if from.is_empty() {
+    let paths = app.path();
+    (
+      paths.app_data_dir().map_err(|e| format!("file: {e}"))?,
+      // SQLite 主库在 AppConfig (macOS 上与 AppData 同目录, 其他平台不同)
+      paths.app_config_dir().map_err(|e| format!("file: {e}"))?,
+    )
+  } else {
+    let p = std::path::PathBuf::from(from);
+    if !p.is_absolute() || !p.join("lightread.db").is_file() {
+      return Err(format!("file: 不是轻阅书库目录 {from}"));
+    }
+    (p.clone(), p)
+  };
+  if dest == data_dir {
+    return Err("file: 新文件夹就是当前书库".into());
+  }
+  tauri::async_runtime::spawn_blocking(move || {
+    copy_library(&data_dir, &db_dir, &dest, |p| {
+      let _ = on_progress.send(p);
+    })
   })
   .await
   .map_err(|e| format!("file: {e}"))?
@@ -207,6 +297,44 @@ mod tests {
 
   fn temp(name: &str) -> std::path::PathBuf {
     std::env::temp_dir().join(format!("lr-libfile-{}-{name}", std::process::id()))
+  }
+
+  #[test]
+  fn copies_library_db_books_and_covers() {
+    let base = temp("migrate");
+    let (data, db, dest) = (base.join("data"), base.join("config"), base.join("dest"));
+    for dir in [data.join("books"), data.join("covers"), db.clone()] {
+      std::fs::create_dir_all(dir).unwrap();
+    }
+    std::fs::write(db.join("lightread.db"), b"db").unwrap();
+    std::fs::write(db.join("lightread.db-wal"), b"wal").unwrap();
+    std::fs::write(data.join("books/a.epub"), vec![7u8; 5000]).unwrap();
+    std::fs::write(data.join("books/b.pdf"), b"pdf").unwrap();
+    std::fs::write(data.join("covers/a.jpg"), b"jpg").unwrap();
+    std::fs::create_dir_all(data.join("books/nested")).unwrap();
+
+    let mut seen = vec![];
+    let bytes = copy_library(&data, &db, &dest, |p| seen.push(p)).unwrap();
+    assert_eq!(bytes, 2 + 3 + 5000 + 3 + 3);
+    assert_eq!(std::fs::read(dest.join("lightread.db-wal")).unwrap(), b"wal");
+    assert!(!dest.join("lightread.db-shm").exists());
+    assert_eq!(std::fs::read(dest.join("books/a.epub")).unwrap(), vec![7u8; 5000]);
+    assert_eq!(std::fs::read(dest.join("covers/a.jpg")).unwrap(), b"jpg");
+    assert!(!dest.join("books/nested").exists(), "子目录不复制");
+    assert_eq!(seen.iter().filter(|p| p.stage == "books").last(), Some(&MigrateProgress { stage: "books", done: 2, total: 2 }));
+    assert_eq!(seen.iter().filter(|p| p.stage == "db").count(), 2);
+    std::fs::remove_dir_all(&base).unwrap();
+  }
+
+  #[test]
+  fn copy_library_tolerates_missing_cover_dir() {
+    let base = temp("migrate-empty");
+    let (data, dest) = (base.join("data"), base.join("dest"));
+    std::fs::create_dir_all(data.join("books")).unwrap();
+    std::fs::write(data.join("lightread.db"), b"db").unwrap();
+    assert_eq!(copy_library(&data, &data, &dest, |_| {}).unwrap(), 2);
+    assert!(dest.join("covers").is_dir());
+    std::fs::remove_dir_all(&base).unwrap();
   }
 
   #[test]

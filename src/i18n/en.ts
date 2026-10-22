@@ -114,6 +114,7 @@ export default {
   'library.manageBooklistsHint': 'Rename or delete booklists. Deleting a booklist never deletes its books.',
   'library.booklistCreateHint': 'Organize themed reading, annual plans, or books to read.',
   'library.booklistNamePlaceholder': "e.g. 2026 reading plan",
+  'library.booklistName': 'Booklist name',
   'library.booklistNameExists': "This name is already in use. Choose another name",
   'library.booklistCreated': 'Created booklist "{name}"',
   'library.booklistRenamed': 'Booklist renamed',

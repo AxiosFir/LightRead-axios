@@ -7,6 +7,7 @@
 import { zipSync, unzipSync, strToU8, strFromU8 } from 'fflate'
 import { parseDocument, stringify } from 'yaml'
 import {
+  getLibraryRoot,
   getStorage,
   newId,
   type AnnotationRec,
@@ -14,6 +15,7 @@ import {
   type BookFormat,
   type BookMeta,
   type CatalogSourceRec,
+  type NewBookMeta,
 } from '../storage'
 import { importReadingLogRows, listReadingLog, normalizeRow, rowKey, type ReadingLogRow } from './readingLog.ts'
 
@@ -590,10 +592,86 @@ function annotationKey(annotation: Omit<AnnotationRec, 'id' | 'bookId'>): string
   ])
 }
 
+/** 包内一项: 内存里的字节, 或 (桌面原生导出时) 书库里的文件, 由原生层直接写进 ZIP */
+type PackedEntry = Uint8Array | { rel: string }
+
+/** 书 / 封面怎样进包: 网页版读进内存; 桌面版只登记书库路径, 由 Rust 算指纹并流式写包 */
+interface AssetPacker {
+  book(book: BookMeta, path: string, mediaType: string): Promise<[PackedEntry, AssetDescriptor]>
+  cover(book: BookMeta, path: string): Promise<[PackedEntry, AssetDescriptor] | undefined>
+}
+
+const memoryPacker = (storage: Awaited<ReturnType<typeof getStorage>>): AssetPacker => ({
+  async book(book, path, mediaType) {
+    const bytes = new Uint8Array(await (await storage.getBookFile(book.id)).arrayBuffer())
+    return [bytes, await describeAsset(path, mediaType, bytes)]
+  },
+  async cover(book, path) {
+    const coverUrl = await storage.getCoverUrl(book.id)
+    if (!coverUrl) return undefined
+    const coverBlob = await (await fetch(coverUrl)).blob()
+    const bytes = new Uint8Array(await coverBlob.arrayBuffer())
+    return [bytes, await describeAsset(path, coverBlob.type || 'image/jpeg', bytes)]
+  },
+})
+
+/** 桌面原生打包: 书 / 封面不进 WebView, 只在原生层读一遍算 SHA-256 (写包时再读一遍) */
+function nativePacker(storage: Awaited<ReturnType<typeof getStorage>>, root: string): AssetPacker {
+  const describe = async (path: string, mediaType: string, rel: string): Promise<[PackedEntry, AssetDescriptor]> => {
+    const { invoke } = await import('@tauri-apps/api/core')
+    const [digest] = await invoke<Array<{ size: number; sha256: string }>>('library_files_describe', { root, rels: [rel] })
+    return [{ rel }, { path, mediaType, byteLength: digest.size, sha256: digest.sha256 }]
+  }
+  return {
+    async book(book, path, mediaType) {
+      const ref = await storage.getBookFileRef?.(book.id)
+      if (!ref) throw new Error('书籍不存在')
+      return describe(path, mediaType, ref.rel)
+    },
+    // 封面路径与 storage/tauri.ts 的 coverPath 一致
+    cover: async (book, path) => (book.hasCover ? describe(path, 'image/jpeg', `covers/${book.id}.jpg`) : undefined),
+  }
+}
+
+/** 导出藏书包 (网页 / App): 整包在内存里打好, 交给浏览器下载 */
 export async function exportBackup(onProgress?: (msg: string) => void): Promise<Blob> {
   const storage = await getStorage()
+  const entries = await buildBackupEntries(storage, memoryPacker(storage), onProgress)
+  // 书籍文件通常已压缩，容器使用 store 模式，优先速度并避免无意义的重复压缩。
+  const zipped = zipSync(entries as Record<string, Uint8Array>, { level: 0 })
+  return new Blob([zipped.buffer as ArrayBuffer], {
+    type: 'application/zip',
+  })
+}
+
+/**
+ * 桌面版导出藏书包到 `dest` (绝对路径): 清单在前端生成, 书和封面由原生层流式写进 ZIP,
+ * 不受 WebView 内存限制 (src-tauri/src/backup_zip.rs)。包的内容与 exportBackup 相同。
+ */
+export async function exportBackupToFile(dest: string, onProgress?: (msg: string) => void): Promise<void> {
+  const storage = await getStorage()
+  const root = getLibraryRoot().replace(/\/+$/, '')
+  const entries = await buildBackupEntries(storage, nativePacker(storage, root), onProgress)
+  const { invoke, Channel } = await import('@tauri-apps/api/core')
+  const progress = new Channel<{ done: number; total: number }>()
+  progress.onmessage = p => onProgress?.(`写入 ${p.done}/${p.total}…`)
+  await invoke('backup_write_zip', {
+    root,
+    dest,
+    // 除书 / 封面外都是 UTF-8 文本 (清单、说明、JSON)
+    entries: Object.entries(entries).map(([path, entry]) =>
+      entry instanceof Uint8Array ? { path, text: strFromU8(entry) } : { path, rel: entry.rel }),
+    onProgress: progress,
+  })
+}
+
+async function buildBackupEntries(
+  storage: Awaited<ReturnType<typeof getStorage>>,
+  packer: AssetPacker,
+  onProgress?: (msg: string) => void,
+): Promise<Record<string, PackedEntry>> {
   const books = await storage.listBooks()
-  const entries: Record<string, Uint8Array> = {}
+  const entries: Record<string, PackedEntry> = {}
   const bookIndex: string[] = []
   const exportedAt = new Date().toISOString()
   const compatibilityManifest: CompatibilityManifest = {
@@ -609,19 +687,15 @@ export async function exportBackup(onProgress?: (msg: string) => void): Promise<
   for (const [index, book] of books.entries()) {
     onProgress?.(`打包 ${book.title} (${index + 1}/${books.length})`)
     const contentPath = `assets/books/${book.id}/content${contentSuffix(book.format)}`
-    const file = await storage.getBookFile(book.id)
-    const fileBytes = new Uint8Array(await file.arrayBuffer())
-    entries[contentPath] = fileBytes
-    const content = await describeAsset(contentPath, MEDIA_TYPES[book.format], fileBytes)
+    const [fileEntry, content] = await packer.book(book, contentPath, MEDIA_TYPES[book.format])
+    entries[contentPath] = fileEntry
 
     let cover: AssetDescriptor | undefined
-    const coverUrl = await storage.getCoverUrl(book.id)
-    if (coverUrl) {
-      const coverBlob = await (await fetch(coverUrl)).blob()
-      const coverPath = `assets/books/${book.id}/cover.jpg`
-      const coverBytes = new Uint8Array(await coverBlob.arrayBuffer())
-      entries[coverPath] = coverBytes
-      cover = await describeAsset(coverPath, coverBlob.type || 'image/jpeg', coverBytes)
+    const coverPath = `assets/books/${book.id}/cover.jpg`
+    const packedCover = await packer.cover(book, coverPath)
+    if (packedCover) {
+      entries[coverPath] = packedCover[0]
+      cover = packedCover[1]
     }
 
     const annotations = await storage.listAnnotations(book.id)
@@ -782,19 +856,121 @@ export async function exportBackup(onProgress?: (msg: string) => void): Promise<
   } catch (err) {
     console.warn('[backup] booklists export failed', err)
   }
-  // 书籍文件通常已压缩，容器使用 store 模式，优先速度并避免无意义的重复压缩。
-  const zipped = zipSync(entries, { level: 0 })
-  return new Blob([zipped.buffer as ArrayBuffer], {
-    type: 'application/zip',
-  })
+  return entries
 }
 
+/** 包的读取方式: 网页版整包解压在内存; 桌面版只取文本项, 书由原生层校验并解到书库 */
+interface ArchiveSource {
+  /** 清单 / 概念文档 / JSON 等文本项 (网页版是全部项) */
+  entries: Record<string, Uint8Array>
+  /** 写入前校验全部书与封面, 任何一项不通过就抛错 */
+  verifyAll(books: RestorableBook[]): Promise<void>
+  /** 恢复一本书, 返回新 id */
+  addBook(book: RestorableBook, meta: NewBookMeta): Promise<string>
+}
+
+type LibraryStorage = Awaited<ReturnType<typeof getStorage>>
+
+function memoryArchive(storage: LibraryStorage, entries: Record<string, Uint8Array>): ArchiveSource {
+  const payloads = new Map<RestorableBook, { content: Uint8Array; cover?: Uint8Array }>()
+  return {
+    entries,
+    async verifyAll(books) {
+      for (const [index, book] of books.entries()) {
+        const content = await verifyAsset(entries, book.content, `books[${index}].content`)
+        const cover = book.cover
+          ? await verifyAsset(entries, book.cover, `books[${index}].cover`)
+          : undefined
+        payloads.set(book, { content, cover })
+      }
+    },
+    async addBook(book, meta) {
+      const payload = payloads.get(book)!
+      const blob = new Blob([new Uint8Array(payload.content)], {
+        type: book.content.mediaType || MEDIA_TYPES[book.meta.format],
+      })
+      const cover = payload.cover
+        ? new Blob([new Uint8Array(payload.cover)], {
+          type: book.cover?.mediaType || 'image/jpeg',
+        })
+        : undefined
+      return storage.addBook(meta, blob, cover)
+    },
+  }
+}
+
+async function nativeArchive(storage: LibraryStorage, src: string): Promise<ArchiveSource> {
+  const { invoke } = await import('@tauri-apps/api/core')
+  const root = getLibraryRoot().replace(/\/+$/, '')
+  const index = await invoke<{ texts: Record<string, string> }>('backup_open', { src })
+  const entries = Object.fromEntries(Object.entries(index.texts).map(([path, text]) => [path, strToU8(text)]))
+  return {
+    entries,
+    async verifyAll(books) {
+      const checks: Array<RestorableAsset & { label: string }> = []
+      for (const [index, book] of books.entries()) {
+        checks.push({ ...book.content, label: `books[${index}].content` })
+        if (book.cover) checks.push({ ...book.cover, label: `books[${index}].cover` })
+      }
+      const results = await invoke<string[]>('backup_verify', {
+        src,
+        checks: checks.map(({ path, byteLength, sha256 }) => ({ path, byteLength, sha256 })),
+      })
+      results.forEach((result, i) => {
+        const { label, path } = checks[i]
+        if (result === 'missing') archiveError(`${label} 缺少文件 ${path}`)
+        if (result === 'size') archiveError(`${label} 长度不匹配`)
+        if (result === 'sha256') archiveError(`${label} SHA-256 校验失败`)
+        if (result) archiveError(`${label} ${result}`)
+      })
+    },
+    async addBook(book, meta) {
+      if (!storage.stageBookFile || !storage.addBookFromStaged) throw new Error('当前存储不支持原生导入')
+      const staged = await storage.stageBookFile(`restore-${newId()}`)
+      try {
+        await invoke('backup_extract', { src, path: book.content.path, root, rel: staged.rel })
+        const cover = book.cover
+          ? new Blob([await invoke<ArrayBuffer>('backup_read_entry', { src, path: book.cover.path })], {
+            type: book.cover.mediaType || 'image/jpeg',
+          })
+          : undefined
+        return await storage.addBookFromStaged(meta, staged, cover)
+      } catch (err) {
+        await storage.discardStaged?.(staged).catch(() => { /* 暂存文件可能没建成 */ })
+        throw err
+      }
+    },
+  }
+}
+
+/** 导入藏书包 (网页 / App): 整包读进内存解压 */
 export async function importBackup(
   file: File,
   onProgress?: (msg: string) => void,
 ): Promise<{ books: number; annotations: number; sources: number }> {
   const storage = await getStorage()
   const entries = unzipSync(new Uint8Array(await file.arrayBuffer()))
+  return restoreBackup(storage, memoryArchive(storage, entries), onProgress)
+}
+
+/**
+ * 桌面版从 `src` (绝对路径) 导入藏书包: 只有清单等文本进 WebView, 书在原生层校验 SHA-256 后
+ * 直接解到书库 (src-tauri/src/backup_zip.rs)。结果与 importBackup 相同。
+ */
+export async function importBackupFromFile(
+  src: string,
+  onProgress?: (msg: string) => void,
+): Promise<{ books: number; annotations: number; sources: number }> {
+  const storage = await getStorage()
+  return restoreBackup(storage, await nativeArchive(storage, src), onProgress)
+}
+
+async function restoreBackup(
+  storage: LibraryStorage,
+  archive: ArchiveSource,
+  onProgress?: (msg: string) => void,
+): Promise<{ books: number; annotations: number; sources: number }> {
+  const { entries } = archive
   const manifest = entries['index.md']
     ? parseOkfBundle(entries)
     : entries['manifest.json']
@@ -803,14 +979,7 @@ export async function importBackup(
 
   // 在写入任何数据前验证所有载荷，防止损坏的包只恢复一半。
   onProgress?.('校验藏书包…')
-  const payloads: Array<{ content: Uint8Array; cover?: Uint8Array }> = []
-  for (const [index, book] of manifest.books.entries()) {
-    const content = await verifyAsset(entries, book.content, `books[${index}].content`)
-    const cover = book.cover
-      ? await verifyAsset(entries, book.cover, `books[${index}].cover`)
-      : undefined
-    payloads.push({ content, cover })
-  }
+  await archive.verifyAll(manifest.books)
 
   const existing = await storage.listBooks()
   const existingByKey = new Map(existing.map(book => [
@@ -828,17 +997,8 @@ export async function importBackup(
       continue
     }
 
-    const payload = payloads[index]
-    const blob = new Blob([new Uint8Array(payload.content)], {
-      type: book.content.mediaType || MEDIA_TYPES[book.meta.format],
-    })
-    const cover = payload.cover
-      ? new Blob([new Uint8Array(payload.cover)], {
-        type: book.cover?.mediaType || 'image/jpeg',
-      })
-      : undefined
     const { id: _oldId, hasCover: _hasCover, ...meta } = book.meta
-    const newId = await storage.addBook(meta, blob, cover)
+    const newId = await archive.addBook(book, meta)
     idMap.set(book.meta.id, newId)
     existingByKey.set(`${book.meta.title}::${book.meta.fileName}`, newId)
     bookCount++

@@ -652,7 +652,7 @@ const menuBook = computed(() => library.books.find(book => book.id === menuBookI
 
 /** 最近打开的书; 搜索 / 筛选 / 书单 / 选择时不显示 */
 const resumeBook = computed(() => {
-  if (!phone.value || manageMode.value) return undefined
+  if (manageMode.value) return undefined
   if (keyword.value.trim() || tagFilter.value || activeBooklistId.value || paperStatus.value) return undefined
   let last: BookMeta | undefined
   for (const book of kindBooks.value) if (book.lastReadAt && (!last || book.lastReadAt > (last.lastReadAt ?? 0))) last = book
@@ -897,7 +897,7 @@ async function batchClearTags() {
       <input v-if="folderSupported" ref="folderInput" type="file" webkitdirectory hidden data-folder-input @change="onFolderPick" />
     </header>
     <!-- 手机端的格式说明在添加面板里 -->
-    <p v-if="!phone" class="add-books-hint">{{ t(touchPrimary ? 'library.addFormatsHintTouch' : 'library.addFormatsHint') }}<span v-if="activeBooklist"> · {{ t('library.addIntoBooklist', { name: activeBooklist.name }) }}</span></p>
+    <p v-if="!phone" class="add-books-hint">{{ paperMode ? t('library.papersEmptyHint') : t(touchPrimary ? 'library.addFormatsHintTouch' : 'library.addFormatsHint') }}<span v-if="activeBooklist"> · {{ t('library.addIntoBooklist', { name: activeBooklist.name }) }}</span></p>
 
     <!-- 手机: 继续阅读 (最近打开的书) -->
     <section v-if="resumeBook" class="resume card" role="button" tabindex="0" :aria-label="`${t('library.continueReading')}: ${resumeBook.title}`" @click="openBook(resumeBook)" @keydown.enter.prevent="openBook(resumeBook)">
@@ -962,7 +962,7 @@ async function batchClearTags() {
     </section>
 
     <!-- 手机论文页: 阅读状态 + 标签合成一行可横滑的筛选 -->
-    <div v-if="phone && paperMode && kindBooks.length && !manageMode" class="paper-chips" role="group" :aria-label="t('library.paperFilter')">
+    <div v-if="paperMode && kindBooks.length && !(phone && manageMode)" class="paper-chips" role="group" :aria-label="t('library.paperFilter')">
       <button class="paper-chip" :class="{ active: !paperStatus && !tagFilter }" :aria-pressed="!paperStatus && !tagFilter" @click="paperStatus = ''; tagFilter = ''">
         {{ t('library.filterAll') }}<span class="paper-chip-n">{{ kindBooks.length }}</span>
       </button>
@@ -986,7 +986,7 @@ async function batchClearTags() {
     </div>
 
     <!-- 标签筛选 -->
-    <div v-if="allTags.length && !(phone && paperMode)" class="tag-row">
+    <div v-if="allTags.length && !paperMode" class="tag-row">
       <button class="tag-chip" :class="{ active: !tagFilter }" :aria-pressed="!tagFilter" @click="tagFilter = ''">{{ t('library.filterAll') }}</button>
       <button
         v-for="tag in allTags"
@@ -1438,6 +1438,9 @@ async function batchClearTags() {
             <input
               v-model="pickerDraft"
               class="input"
+              name="booklist-name"
+              autocomplete="off"
+              :aria-label="t('library.booklistName')"
               :placeholder="t('library.booklistNamePlaceholder')"
               maxlength="40"
               @keyup.enter="createBooklistAndAdd"
@@ -1470,6 +1473,8 @@ async function batchClearTags() {
             <input
               v-model="booklistRenames[item.id]"
               class="input"
+              autocomplete="off"
+              :aria-label="t('library.booklistName')"
               maxlength="40"
               @keyup.enter="renameBooklist(item.id)"
             />
@@ -1570,6 +1575,8 @@ async function batchClearTags() {
 .add-books-hint { margin: -4px 0 16px; color: var(--text-3); font-size: 12px; line-height: 1.6; }
 .library {
   min-height: 100%;
+  max-width: calc(var(--page-max) + 2 * var(--page-x));
+  margin: 0 auto;
   padding: 0 var(--page-x) calc(var(--page-bottom) + var(--lr-safe-bottom));
   position: relative;
 }
@@ -1597,7 +1604,7 @@ async function batchClearTags() {
 }
 .toolbar h1 {
   font-size: var(--page-title);
-  font-weight: 650;
+  font-weight: 700;
   letter-spacing: -0.01em;
   white-space: nowrap;
 }
@@ -1669,14 +1676,24 @@ async function batchClearTags() {
 }
 .search-icon {
   position: absolute;
-  left: 10px;
+  left: 12px;
   color: var(--text-3);
   pointer-events: none;
 }
 .search {
   width: 100%;
-  padding-left: 32px;
+  padding-left: 34px;
   padding-right: 30px;
+  /* 与 App 一致: 填充式胶囊搜索框, 聚焦时才出现描边 */
+  border-color: transparent;
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
+}
+.search:hover:not(:focus) {
+  border-color: var(--border);
+}
+.search:focus {
+  background: var(--card);
 }
 .search-clear {
   position: absolute;
@@ -1751,11 +1768,10 @@ async function batchClearTags() {
 .booklist-section {
   margin: -2px 0 16px;
   padding: 12px 14px 14px;
-  border: 1px solid var(--border);
+  border: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
   border-radius: var(--radius-lg);
-  background:
-    linear-gradient(110deg, color-mix(in srgb, var(--brand-light) 55%, transparent), transparent 52%),
-    var(--card);
+  background: var(--card);
+  box-shadow: var(--shadow-sm);
 }
 .booklist-heading {
   display: flex;
@@ -2161,6 +2177,178 @@ async function batchClearTags() {
   box-shadow: var(--shadow-lg);
 }
 
+/* 继续阅读 / 论文状态筛选: 与 App 同一形态, 桌面也显示 */
+/* 继续阅读 */
+.resume {
+  display: flex;
+  gap: 14px;
+  max-width: 560px;
+  margin: 0 0 20px;
+  padding: 14px;
+  border: none;
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+}
+.resume:hover {
+  box-shadow: var(--shadow-md);
+}
+.resume:active {
+  background: var(--surface-2);
+}
+.resume:focus-visible {
+  outline: none;
+  box-shadow: var(--ring);
+}
+.resume-cover {
+  position: relative;
+  flex-shrink: 0;
+  width: 64px;
+  aspect-ratio: 2 / 3;
+  border-radius: 3px 5px 5px 3px;
+  overflow: hidden;
+  background: var(--cover-paper-0);
+  color: var(--cover-ink-0);
+  box-shadow: var(--cover-shadow);
+}
+.resume-cover::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 1px var(--cover-edge);
+  background: linear-gradient(90deg, rgba(0, 0, 0, 0.12) 0, rgba(255, 255, 255, 0.14) 2.5%, transparent 6%);
+}
+.resume-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.resume-cover-title {
+  display: -webkit-box;
+  -webkit-line-clamp: 5;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  padding: 10px 8px;
+  font-family: 'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', 'STSong', serif;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+.resume-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.resume-eyebrow {
+  font-size: 12px;
+  color: var(--text-3);
+}
+.resume-title {
+  margin-top: 4px;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.resume-author {
+  margin-top: 2px;
+  font-size: 13px;
+  color: var(--text-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.resume-foot {
+  margin-top: auto;
+  padding-top: 10px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.resume-track {
+  flex: 1;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--surface-3);
+  overflow: hidden;
+}
+.resume-fill {
+  display: block;
+  height: 100%;
+  border-radius: 2px;
+  background: var(--brand);
+}
+.resume-pct {
+  font-size: 12px;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+.resume-go {
+  flex-shrink: 0;
+  height: 32px;
+  padding: 0 14px;
+  border-radius: var(--radius-pill);
+  display: inline-flex;
+  align-items: center;
+  background: var(--brand);
+  color: var(--on-brand);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* 论文: 状态 + 标签筛选 */
+.paper-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 18px;
+}
+.paper-chip {
+  flex: none;
+  height: var(--control-h-sm);
+  padding: 0 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: var(--card);
+  box-shadow: var(--shadow-sm);
+  color: var(--text-2);
+  font-size: 14px;
+  white-space: nowrap;
+}
+:root[data-theme='dark'] .paper-chip {
+  background: var(--surface-2);
+  box-shadow: none;
+}
+.paper-chip.active,
+:root[data-theme='dark'] .paper-chip.active {
+  background: var(--text);
+  color: var(--bg);
+}
+.paper-chip.ghost {
+  background: none;
+  box-shadow: inset 0 0 0 1px var(--border);
+  color: var(--text-3);
+}
+.paper-chip-n {
+  font-size: 12px;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+.paper-chip.active .paper-chip-n {
+  color: inherit;
+  opacity: 0.7;
+}
+
+
 @media (max-width: 720px) {
   /* 手机两行: 标题 + 今日 + ＋ / 搜索。负 top 吸顶: 标题行滚走, 只留搜索条 */
   .toolbar {
@@ -2283,126 +2471,6 @@ async function batchClearTags() {
     box-shadow: var(--ring);
   }
 
-  /* 继续阅读 */
-  .resume {
-    display: flex;
-    gap: 14px;
-    margin: 4px 0 18px;
-    padding: 14px;
-    border: none;
-    border-radius: var(--radius-xl);
-    box-shadow: var(--shadow-sm);
-    cursor: pointer;
-  }
-  .resume:active {
-    background: var(--surface-2);
-  }
-  .resume:focus-visible {
-    outline: none;
-    box-shadow: var(--ring);
-  }
-  .resume-cover {
-    position: relative;
-    flex-shrink: 0;
-    width: 64px;
-    aspect-ratio: 2 / 3;
-    border-radius: 3px 5px 5px 3px;
-    overflow: hidden;
-    background: var(--cover-paper-0);
-    color: var(--cover-ink-0);
-    box-shadow: var(--cover-shadow);
-  }
-  .resume-cover::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    border-radius: inherit;
-    box-shadow: inset 0 0 0 1px var(--cover-edge);
-    background: linear-gradient(90deg, rgba(0, 0, 0, 0.12) 0, rgba(255, 255, 255, 0.14) 2.5%, transparent 6%);
-  }
-  .resume-cover img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    display: block;
-  }
-  .resume-cover-title {
-    display: -webkit-box;
-    -webkit-line-clamp: 5;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-    padding: 10px 8px;
-    font-family: 'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', 'STSong', serif;
-    font-size: 11px;
-    font-weight: 600;
-    line-height: 1.4;
-  }
-  .resume-info {
-    flex: 1;
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
-  }
-  .resume-eyebrow {
-    font-size: 12px;
-    color: var(--text-3);
-  }
-  .resume-title {
-    margin-top: 4px;
-    font-size: 16px;
-    font-weight: 700;
-    line-height: 1.35;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-  }
-  .resume-author {
-    margin-top: 2px;
-    font-size: 13px;
-    color: var(--text-3);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  .resume-foot {
-    margin-top: auto;
-    padding-top: 10px;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-  }
-  .resume-track {
-    flex: 1;
-    height: 4px;
-    border-radius: 2px;
-    background: var(--surface-3);
-    overflow: hidden;
-  }
-  .resume-fill {
-    display: block;
-    height: 100%;
-    border-radius: 2px;
-    background: var(--brand);
-  }
-  .resume-pct {
-    font-size: 12px;
-    color: var(--text-3);
-    font-variant-numeric: tabular-nums;
-  }
-  .resume-go {
-    flex-shrink: 0;
-    height: 32px;
-    padding: 0 14px;
-    border-radius: var(--radius-pill);
-    display: inline-flex;
-    align-items: center;
-    background: var(--brand);
-    color: var(--on-brand);
-    font-size: 13px;
-    font-weight: 600;
-  }
-
   /* 列表标题: 范围 · 数量 / 排序 / 选择 */
   .list-head {
     display: flex;
@@ -2521,10 +2589,9 @@ async function batchClearTags() {
   .phone-actionbar button:active:not(:disabled) {
     background: var(--surface-2);
   }
-  /* 论文: 状态 + 标签筛选 */
+  /* 论文: 状态 + 标签筛选 — 手机一行横滑 */
   .paper-chips {
-    display: flex;
-    gap: 8px;
+    flex-wrap: nowrap;
     overflow-x: auto;
     scrollbar-width: none;
     margin: 0 calc(-1 * var(--page-x)) 14px;
@@ -2533,43 +2600,9 @@ async function batchClearTags() {
   .paper-chips::-webkit-scrollbar {
     display: none;
   }
-  .paper-chip {
-    flex: none;
-    height: var(--control-h-sm);
-    padding: 0 14px;
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    border: none;
-    border-radius: var(--radius-pill);
-    background: var(--card);
-    box-shadow: var(--shadow-sm);
-    color: var(--text-2);
-    font-size: 14px;
-    white-space: nowrap;
-  }
-  :root[data-theme='dark'] .paper-chip {
-    background: var(--surface-2);
-    box-shadow: none;
-  }
-  .paper-chip.active,
-  :root[data-theme='dark'] .paper-chip.active {
-    background: var(--text);
-    color: var(--bg);
-  }
-  .paper-chip.ghost {
-    background: none;
-    box-shadow: inset 0 0 0 1px var(--border);
-    color: var(--text-3);
-  }
-  .paper-chip-n {
-    font-size: 12px;
-    color: var(--text-3);
-    font-variant-numeric: tabular-nums;
-  }
-  .paper-chip.active .paper-chip-n {
-    color: inherit;
-    opacity: 0.7;
+  .resume {
+    max-width: none;
+    margin: 4px 0 18px;
   }
 
   /* 论文列表 */

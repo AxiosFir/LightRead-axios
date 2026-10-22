@@ -5048,7 +5048,7 @@ onBeforeUnmount(() => {
 .reader-segment button.active {
   color: var(--brand);
   background: var(--card);
-  box-shadow: 0 1px 3px rgba(22, 100, 255, 0.12), 0 0 0 1px rgba(22, 100, 255, 0.08);
+  box-shadow: 0 1px 3px color-mix(in srgb, var(--brand) 12%, transparent), 0 0 0 1px color-mix(in srgb, var(--brand) 8%, transparent);
 }
 .reader-tool {
   flex-shrink: 0;
@@ -5086,9 +5086,9 @@ onBeforeUnmount(() => {
 }
 .reader-tool.active {
   color: var(--brand);
-  border-color: rgba(22, 100, 255, 0.18);
+  border-color: color-mix(in srgb, var(--brand) 18%, transparent);
   background: var(--brand-light, #e8f0ff);
-  box-shadow: inset 0 0 0 1px rgba(22, 100, 255, 0.04);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--brand) 4%, transparent);
 }
 .reader-segment button:active,
 .reader-tool:active {
@@ -5096,7 +5096,7 @@ onBeforeUnmount(() => {
 }
 .reader-segment button:focus-visible,
 .reader-tool:focus-visible {
-  outline: 2px solid rgba(22, 100, 255, 0.55);
+  outline: 2px solid color-mix(in srgb, var(--brand) 55%, transparent);
   outline-offset: 2px;
 }
 .page-view-segment button {
@@ -6252,7 +6252,7 @@ onBeforeUnmount(() => {
   padding: 10px 14px;
   border-radius: 12px;
   border: 1px solid rgba(29, 33, 41, 0.08);
-  box-shadow: 0 8px 26px rgba(22, 100, 255, 0.12), 0 2px 8px rgba(29, 33, 41, 0.08);
+  box-shadow: 0 8px 26px color-mix(in srgb, var(--brand) 12%, transparent), 0 2px 8px rgba(29, 33, 41, 0.08);
   backdrop-filter: blur(14px);
 }
 .auto-panel label {

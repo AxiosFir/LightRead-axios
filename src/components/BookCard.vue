@@ -66,13 +66,12 @@ const ariaLabel = computed(() => {
   return parts.join(', ')
 })
 
-// 无封面时由书名生成稳定的柔和底色; compact 用其中一组纸色令牌
+// 无封面时由书名稳定地取一组纸色 + 墨色令牌 (与 App 的生成封面一致)
 const titleHash = computed(() => {
   let hash = 0
   for (const ch of props.book.title) hash = (hash * 31 + ch.charCodeAt(0)) | 0
   return Math.abs(hash)
 })
-const fallbackHue = computed(() => titleHash.value % 360)
 const fallbackTone = computed(() => titleHash.value % 6)
 
 /* compact 的书名 / 元信息: 短书名; 「12% · 作者」, 读完显示「读完」, 未读不显示进度 */
@@ -163,10 +162,7 @@ function onKeydown(e: KeyboardEvent) {
       <div
         v-else
         class="cover-fallback"
-        :class="compact && `tone-${fallbackTone}`"
-        :style="{
-          '--h': fallbackHue,
-        }"
+        :class="`tone-${fallbackTone}`"
         aria-hidden="true"
       >
         <span class="cover-fallback-title"><template v-if="compact">{{ displayTitle }}</template><template v-else v-for="(part, i) in coverTitleParts" :key="i">{{ part }}<wbr /></template></span>
@@ -330,39 +326,42 @@ function onKeydown(e: KeyboardEvent) {
   display: block;
 }
 .cover-fallback {
-  --h: 210;
   width: 100%;
   height: 100%;
   display: flex;
   flex-direction: column;
-  justify-content: center;
-  gap: 6px;
-  padding: 16px 12px 14px 16px;
+  justify-content: flex-start;
+  gap: 0;
+  padding: 26% 13% 12%;
   text-align: left;
-  color: hsl(var(--h) 40% 24%);
-  background:
-    linear-gradient(160deg, hsl(var(--h) 55% 92%) 0%, hsl(var(--h) 45% 82%) 100%);
-  border-left: 5px solid hsl(var(--h) 45% 62%);
+  /* 生成封面: 纸色 + 衬线书名 + 细线 (与 App 一致), 不用渐变色块 */
+  color: var(--ink);
+  background: var(--paper);
+  border-left: 3px solid color-mix(in srgb, var(--ink) 12%, transparent);
 }
-:root[data-theme='dark'] .cover-fallback {
-  color: hsl(var(--h) 60% 88%);
-  background: linear-gradient(160deg, hsl(var(--h) 26% 30%) 0%, hsl(var(--h) 24% 20%) 100%);
-  border-left-color: hsl(var(--h) 40% 50%);
+.cover-fallback::before {
+  content: '';
+  height: 1px;
+  margin-bottom: 14%;
+  background: currentColor;
+  opacity: 0.35;
 }
 .cover-fallback-title {
-  font-size: 14px;
+  font-family: 'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', 'STSong', serif;
+  font-size: 16px;
   overflow-wrap: break-word;
-  font-weight: 650;
-  line-height: 1.35;
-  letter-spacing: 0.01em;
+  font-weight: 600;
+  line-height: 1.4;
+  letter-spacing: 0.03em;
   display: -webkit-box;
   -webkit-line-clamp: 4;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
 .cover-fallback-author {
+  margin-top: auto;
   font-size: 11px;
-  opacity: 0.75;
+  opacity: 0.7;
   display: -webkit-box;
   -webkit-line-clamp: 1;
   -webkit-box-orient: vertical;

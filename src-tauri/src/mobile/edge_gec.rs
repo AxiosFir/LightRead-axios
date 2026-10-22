@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LGPL-3.0-only
 // Port of edge-tts 7.3.1 drm.py, Copyright (c) rany <rany@riseup.net>.
 // https://github.com/rany2/edge-tts/blob/7.3.1/src/edge_tts/drm.py
-// Mobile-only protocol compatibility; desktop 1.x retains its existing implementation.
+// Shared by desktop and App: the old v1 token is now rejected with 403.
 // See edge-tts-LICENSE.txt and edge-tts-COPYING.txt for upstream licensing.
 const INITIAL: [u32; 8] = [
     0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19,

@@ -147,18 +147,18 @@ watch(immersive, (now, before) => {
 })
 
 const allNavs = [
-  { path: '/library', labelKey: 'nav.library', icon: 'M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15.5a2.5 2.5 0 0 1-2.5 2.5H6.5A2.5 2.5 0 0 1 4 18.5v-13zM6.5 5A.5.5 0 0 0 6 5.5V16.05c.16-.03.32-.05.5-.05H18V5H6.5zM6 18.5a.5.5 0 0 0 .5.5H18v-1H6.5a.5.5 0 0 0-.5.5z' },
-  { path: '/papers', labelKey: 'nav.papers', icon: 'M6 2h9a1 1 0 0 1 .7.3l4 4a1 1 0 0 1 .3.7v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zm8 2H6v16h12V8h-3a1 1 0 0 1-1-1V4zm2 .41V6h1.59L16 4.41zM8 11a1 1 0 0 1 1-1h6a1 1 0 1 1 0 2H9a1 1 0 0 1-1-1zm0 4a1 1 0 0 1 1-1h6a1 1 0 1 1 0 2H9a1 1 0 0 1-1-1z' },
-  { path: '/catalogs', labelKey: 'nav.catalogs', icon: 'M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zM4.06 13h3.97c.1 1.9.5 3.63 1.1 5.02A8.02 8.02 0 0 1 4.06 13zm0-2a8.02 8.02 0 0 1 5.07-7.02c-.6 1.4-1 3.12-1.1 5.02H4.06zM12 4.04c.83.9 1.72 2.87 1.94 6.96h-3.88c.22-4.09 1.1-6.05 1.94-6.96zM10.06 13h3.88c-.22 4.09-1.11 6.05-1.94 6.96-.83-.9-1.72-2.87-1.94-6.96zm5.9 0h3.98a8.02 8.02 0 0 1-5.07 5.02c.6-1.4 1-3.12 1.1-5.02zm0-2c-.1-1.9-.5-3.63-1.1-5.02A8.02 8.02 0 0 1 19.95 11h-3.98z' },
-  { path: '/stats', labelKey: 'nav.stats', icon: 'M4 13a1.5 1.5 0 0 1 3 0v5.5a1.5 1.5 0 0 1-3 0V13zm6.5-5a1.5 1.5 0 0 1 3 0v10.5a1.5 1.5 0 0 1-3 0V8zM17 4.5a1.5 1.5 0 0 1 3 0v14a1.5 1.5 0 0 1-3 0v-14z' },
+  { path: '/library', labelKey: 'nav.library', icon: 'M4 3v18M9 3v18M14 4l6 16M3 21h18' },
+  { path: '/papers', labelKey: 'nav.papers', icon: 'M6 3h9l4 4v14H6zM14 3v5h5M9 12h7M9 16h7' },
+  { path: '/catalogs', labelKey: 'nav.catalogs', icon: 'M4 5h16v15H4zM8 2v6M16 2v6M4 10h16M8 14h8' },
+  { path: '/stats', labelKey: 'nav.stats', icon: 'M4 21V11M10 21V4M16 21V8M22 21H2' },
   // 互传: 手机底部标签栏已有 5 个, 不再挤第 6 个 (手机入口在藏书页「导入」菜单与设置页), 见 docs/device-transfer.md
-  { path: '/transfer', labelKey: 'nav.transfer', desktopOnly: true, icon: 'M16.3 3.3a1 1 0 0 1 1.4 0l3 3a1 1 0 0 1 0 1.4l-3 3a1 1 0 1 1-1.4-1.4L17.58 8H5a1 1 0 0 1 0-2h12.59l-1.3-1.3a1 1 0 0 1 0-1.4zM7.7 13.3a1 1 0 0 1 0 1.4L6.42 16H19a1 1 0 1 1 0 2H6.41l1.3 1.3a1 1 0 1 1-1.42 1.4l-3-3a1 1 0 0 1 0-1.4l3-3a1 1 0 0 1 1.42 0z' },
+  { path: '/transfer', labelKey: 'nav.transfer', desktopOnly: true, icon: 'M4 7h16m-5-4 5 4-5 4M20 17H4m5-4-5 4 5 4' },
 ]
 // 互传关闭时隐藏入口 (连同未读角标)
 const navs = computed(() => allNavs.filter(n => n.path !== '/transfer' || settings.features.transfer))
 
 // 设置固定在侧栏左下角, 保持主导航干净
-const settingsNav = { path: '/settings', labelKey: 'nav.settings', icon: 'M10.83 3.28a1.5 1.5 0 0 1 2.34 0l.94 1.16c.24.3.62.45 1 .4l1.47-.2a1.5 1.5 0 0 1 1.69 1.61l-.12 1.49c-.03.38.14.75.46.97l1.23.85a1.5 1.5 0 0 1 .4 2.3l-.86 1.22c-.22.31-.26.72-.1 1.07l.6 1.36a1.5 1.5 0 0 1-1.17 2.03l-1.47.24c-.38.06-.7.32-.83.68l-.52 1.4a1.5 1.5 0 0 1-2.2.8l-1.28-.77a1.13 1.13 0 0 0-1.08 0l-1.28.76a1.5 1.5 0 0 1-2.2-.79l-.52-1.4a1.13 1.13 0 0 0-.83-.68l-1.47-.24a1.5 1.5 0 0 1-1.17-2.03l.6-1.36c.16-.35.12-.76-.1-1.07l-.87-1.22a1.5 1.5 0 0 1 .41-2.3l1.23-.85c.32-.22.49-.59.46-.97l-.12-1.5a1.5 1.5 0 0 1 1.69-1.6l1.48.2c.37.05.75-.1.99-.4l.94-1.16zM12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z' }
+const settingsNav = { path: '/settings', labelKey: 'nav.settings', icon: 'M9 3h6l1 3 3 1 2 5-2 5-3 1-1 3H9l-1-3-3-1-2-5 2-5 3-1zM16 12a4 4 0 1 0-8 0 4 4 0 0 0 8 0' }
 </script>
 
 <template>
@@ -188,7 +188,7 @@ const settingsNav = { path: '/settings', labelKey: 'nav.settings', icon: 'M10.83
           :title="t(n.labelKey)"
         >
           <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
-            <path :d="n.icon" fill="currentColor" />
+            <path :d="n.icon" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
           </svg>
           <span class="nav-label">{{ t(n.labelKey) }}</span>
           <span
@@ -202,7 +202,7 @@ const settingsNav = { path: '/settings', labelKey: 'nav.settings', icon: 'M10.83
         <router-link :to="settingsNav.path" class="nav-item sidebar-settings" :title="t(settingsNav.labelKey)">
           <span class="sidebar-settings-icon">
             <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
-              <path :d="settingsNav.icon" fill="currentColor" />
+              <path :d="settingsNav.icon" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
             </svg>
             <!-- 手机底部标签栏没有更新按钮: 在「设置」图标上挂一个小圆点提示 -->
             <span v-if="showSidebarUpdate" class="sidebar-settings-badge" aria-hidden="true" />
@@ -292,9 +292,8 @@ const settingsNav = { path: '/settings', labelKey: 'nav.settings', icon: 'M10.83
   flex-shrink: 0;
 }
 .logo-text {
-  font-size: 17px;
-  font-weight: 650;
-  letter-spacing: -0.01em;
+  font-size: 20px;
+  font-weight: 400;
   white-space: nowrap;
 }
 .nav {

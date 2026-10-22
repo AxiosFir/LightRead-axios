@@ -114,6 +114,7 @@ export default {
   'library.manageBooklistsHint': '重命名或删除书单，书仍保留在藏书中',
   'library.booklistCreateHint': '把主题阅读、年度计划或待读的书放在一起',
   'library.booklistNamePlaceholder': '例如：2026 阅读计划',
+  'library.booklistName': '书单名称',
   'library.booklistNameExists': '已有同名书单，换个名字试试',
   'library.booklistCreated': '已创建书单「{name}」',
   'library.booklistRenamed': '书单已重命名',

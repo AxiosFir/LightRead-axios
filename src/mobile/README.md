@@ -11,7 +11,7 @@
 - 版本校验：桌面 `node scripts/check-release.mjs --tag v2.0.0`；App 加 `--platform android --tag app-v2.1.0`。
 - 回归：`node --test scripts/test-platform-boundary.mjs scripts/test-mobile-tts.mjs scripts/test-apk-layout.mjs`。桌面用原有 `e2e-smoke.mjs`；App 用 `e2e-v2.mjs`、`e2e-mobile.mjs`。
 
-字体仅通过 App 的 CSS / JS 依赖打包，许可一起分发。原生语音协议更新通过 Rust 平台条件限定 Android/iOS；桌面协议与行为保持 1.x。`src-tauri/src/mobile/edge_gec.rs` 的测试可独立用 `rustc --edition 2021 --test` 运行，不需要构建桌面壳。
+字体仅通过 App 的 CSS / JS 依赖打包，许可一起分发。原生在线语音的 Sec-MS-GEC v2 (`src-tauri/src/mobile/edge_gec.rs`) 桌面与 App 共用：2026-10-22 核实旧 v1 令牌已被微软端点以 403 拒绝，桌面一并改用 v2，edge-tts 许可由 `nativeLicenses` 随所有构建分发。`src-tauri/src/mobile/edge_gec.rs` 的测试可独立用 `rustc --edition 2021 --test` 运行，不需要构建桌面壳。
 
 2026-10-18 用户确认版本统一为 2.0.0。全平台使用 `vX.Y.Z`，Android 更新器同时兼容统一标签与历史 `app-vX.Y.Z`；旧 1.20.1 Android 更新器可识别统一标签。桌面发布仍从 `scripts/desktop-release.json` 固定的已发布源码做纯版本补丁构建，附 `desktop-version.patch` 和各平台原生版本检查报告，保持界面与功能不变。
 

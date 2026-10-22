@@ -602,42 +602,16 @@ export async function migrateLibraryTo(
   newRoot: string,
   onProgress?: (msg: string) => void,
 ): Promise<void> {
-  const fs = await import('@tauri-apps/plugin-fs')
-  const root = newRoot.replace(/\/+$/, '')
-  const currentRoot = getLibraryRoot().replace(/\/+$/, '')
-  const srcLoc = (rel: string): [string, { baseDir?: number }] =>
-    currentRoot ? [`${currentRoot}/${rel}`, {}] : [rel, { baseDir: fs.BaseDirectory.AppData }]
-  // SQLite 主库在 AppConfig (macOS 上与 AppData 同目录, 其他平台不同)
-  const srcDbLoc = (rel: string): [string, { baseDir?: number }] =>
-    currentRoot ? [`${currentRoot}/${rel}`, {}] : [rel, { baseDir: fs.BaseDirectory.AppConfig }]
-
-  for (const dir of ['books', 'covers']) {
-    if (!(await fs.exists(`${root}/${dir}`))) {
-      await fs.mkdir(`${root}/${dir}`, { recursive: true })
-    }
+  // 原生整库复制: 书和封面不经 WebView 进出 (以前逐个 readFile → writeFile, 大书库会占满内存)
+  const { invoke, Channel } = await import('@tauri-apps/api/core')
+  const progress = new Channel<{ stage: 'db' | 'books' | 'covers'; done: number; total: number }>()
+  progress.onmessage = p => {
+    onProgress?.(p.stage === 'db' ? '复制索引数据库…' : `复制 ${p.stage} (${p.done}/${p.total})…`)
   }
-
-  onProgress?.('复制索引数据库…')
-  for (const dbFile of ['lightread.db', 'lightread.db-wal', 'lightread.db-shm']) {
-    const [src, opts] = srcDbLoc(dbFile)
-    if (await fs.exists(src, opts)) {
-      const bytes = await fs.readFile(src, opts)
-      await fs.writeFile(`${root}/${dbFile}`, bytes)
-    }
-  }
-
-  for (const dir of ['books', 'covers']) {
-    const [srcDir, opts] = srcLoc(dir)
-    if (!(await fs.exists(srcDir, opts))) continue
-    const entries = await fs.readDir(srcDir, opts)
-    let done = 0
-    for (const entry of entries) {
-      if (!entry.isFile) continue
-      onProgress?.(`复制 ${dir} (${++done}/${entries.length})…`)
-      const [srcFile, srcOpts] = srcLoc(`${dir}/${entry.name}`)
-      const bytes = await fs.readFile(srcFile, srcOpts)
-      await fs.writeFile(`${root}/${dir}/${entry.name}`, bytes)
-    }
-  }
+  await invoke<number>('library_migrate', {
+    fromRoot: getLibraryRoot(),
+    toRoot: newRoot,
+    onProgress: progress,
+  })
   onProgress?.('迁移完成')
 }

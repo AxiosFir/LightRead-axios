@@ -10,6 +10,8 @@ import { useSettings } from '../stores/settings'
 import { useLibrary } from '../stores/library'
 import {
   exportBackup,
+  exportBackupToFile,
+  importBackupFromFile,
   importBackup,
   LIBRARY_ARCHIVE_EXTENSION,
 } from '../services/backup'
@@ -812,12 +814,21 @@ async function doExport() {
   busyScope.value = 'local'
   busy.value = t('settings.preparingExport')
   try {
-    const blob = await exportBackup(msg => (busy.value = msg))
-    const a = document.createElement('a')
-    a.href = URL.createObjectURL(blob)
-    a.download = `lightread-library-${new Date().toISOString().slice(0, 10)}${LIBRARY_ARCHIVE_EXTENSION}`
-    a.click()
-    URL.revokeObjectURL(a.href)
+    const fileName = `lightread-library-${new Date().toISOString().slice(0, 10)}${LIBRARY_ARCHIVE_EXTENSION}`
+    if (isTauri() && !isAndroid) {
+      // 桌面: 先选保存位置, 再由原生层流式写包 (书不经 WebView, 大书库不爆内存)
+      const { save } = await import('@tauri-apps/plugin-dialog')
+      const dest = await save({ defaultPath: fileName, filters: [{ name: 'LightRead', extensions: ['zip'] }] })
+      if (!dest) return
+      await exportBackupToFile(dest, msg => (busy.value = msg))
+    } else {
+      const blob = await exportBackup(msg => (busy.value = msg))
+      const a = document.createElement('a')
+      a.href = URL.createObjectURL(blob)
+      a.download = fileName
+      a.click()
+      URL.revokeObjectURL(a.href)
+    }
     toast(t('settings.backupExported'), 'success')
   } catch (e: any) {
     toast(t('settings.exportFailed', { msg: e?.message }), 'error', 5000)
@@ -826,15 +837,30 @@ async function doExport() {
   }
 }
 
+/** 桌面: 用系统对话框拿到路径, 由原生层读包 (书不经 WebView); 网页 / App: 文件选择框 */
+async function pickBackup() {
+  if (!isTauri() || isAndroid) {
+    backupInput.value?.click()
+    return
+  }
+  const { open } = await import('@tauri-apps/plugin-dialog')
+  const src = await open({ multiple: false, directory: false, filters: [{ name: 'LightRead', extensions: ['zip', 'lightread'] }] })
+  if (typeof src === 'string') await runImport(msg => importBackupFromFile(src, msg))
+}
+
 async function doImport(e: Event) {
   const input = e.target as HTMLInputElement
   const file = input.files?.[0]
   input.value = ''
   if (!file) return
+  await runImport(msg => importBackup(file, msg))
+}
+
+async function runImport(run: (onProgress: (msg: string) => void) => ReturnType<typeof importBackup>) {
   busyScope.value = 'local'
   busy.value = t('settings.readingBackup')
   try {
-    const result = await importBackup(file, msg => (busy.value = msg))
+    const result = await run(msg => (busy.value = msg))
     await library.refresh()
     toast(t('settings.importDone', { books: result.books, annotations: result.annotations, sources: result.sources }), 'success', 5000)
   } catch (e: any) {
@@ -1478,7 +1504,7 @@ const APPEARANCE_OPTIONS = [
         </div>
         <div class="row-actions">
           <button class="btn" :disabled="!!busy" @click="doExport">{{ t('settings.exportBackup') }}</button>
-          <button class="btn" :disabled="!!busy" @click="backupInput?.click()">{{ t('settings.importBackup') }}</button>
+          <button class="btn" :disabled="!!busy" @click="pickBackup">{{ t('settings.importBackup') }}</button>
           <input ref="backupInput" type="file" accept=".okf.zip,.lightread,.zip" hidden @change="doImport" />
         </div>
       </div>
@@ -1715,7 +1741,7 @@ const APPEARANCE_OPTIONS = [
           <span class="ps-ico brand" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 4v11m-5-5 5 5 5-5M5 20h14"/></svg></span>
           <span class="ps-label">{{ t('settings.exportBackup') }}</span>
         </button>
-        <button type="button" class="ps-row" :disabled="!!busy" @click="sheetThen(() => backupInput?.click())">
+        <button type="button" class="ps-row" :disabled="!!busy" @click="sheetThen(pickBackup)">
           <span class="ps-ico" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7.5 12 3l9 4.5v9L12 21l-9-4.5zM3 7.5l9 4.5 9-4.5M12 12v9"/></svg></span>
           <span class="ps-label">{{ t('settings.importBackup') }}</span>
         </button>
@@ -1756,12 +1782,12 @@ const APPEARANCE_OPTIONS = [
 .settings {
   --nav-h: 52px;
   padding: var(--page-top) var(--page-x) calc(var(--page-bottom) + var(--lr-safe-bottom));
-  max-width: 820px;
+  max-width: calc(var(--page-max-narrow) + 2 * var(--page-x));
   margin: 0 auto;
 }
 h1 {
   font-size: var(--page-title);
-  font-weight: 650;
+  font-weight: 700;
   letter-spacing: -0.01em;
   margin-bottom: 6px;
 }
@@ -1778,7 +1804,6 @@ h1 {
   overflow-x: auto;
   scrollbar-width: none;
   background: var(--bg);
-  box-shadow: 0 1px 0 color-mix(in srgb, var(--border) 70%, transparent);
 }
 .settings-nav::-webkit-scrollbar {
   display: none;
@@ -1820,12 +1845,11 @@ h1 {
   scroll-margin-top: calc(var(--nav-h) + 8px);
 }
 h2 {
-  font-size: 12px;
+  font-size: 15px;
   font-weight: 650;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--text-3);
-  padding: 14px 0 4px;
+  letter-spacing: -0.005em;
+  color: var(--text);
+  padding: 16px 0 4px;
 }
 h2:focus {
   outline: none;

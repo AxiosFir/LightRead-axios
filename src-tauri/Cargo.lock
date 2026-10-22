@@ -2320,6 +2320,8 @@ version = "2.0.0"
 dependencies = [
  "base64 0.22.1",
  "bzip2 0.5.2",
+ "crc32fast",
+ "flate2",
  "fontdb",
  "futures-util",
  "libc",

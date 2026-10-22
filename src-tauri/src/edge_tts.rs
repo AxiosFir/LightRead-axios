@@ -2,11 +2,9 @@
 //! 端点要求特定的 Origin / User-Agent 握手头, 浏览器 JS 无法设置, 故在 Rust 侧实现.
 
 use futures_util::{SinkExt, StreamExt};
-#[cfg(not(any(target_os = "android", target_os = "ios")))]
-use sha2::{Digest, Sha256};
-#[cfg(any(target_os = "android", target_os = "ios"))]
+// 桌面与 App 共用 Sec-MS-GEC v2: 旧的 v1 (时间窗 + token 直接 SHA-256) 现在会被端点以 403 拒绝
 #[path = "mobile/edge_gec.rs"]
-mod mobile_gec;
+mod gec;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tokio_tungstenite::{
     connect_async,
@@ -15,32 +13,12 @@ use tokio_tungstenite::{
 
 const TRUSTED_CLIENT_TOKEN: &str = "6A5AA1D4EAFF4E9FB37E23D68491D6F4";
 const CHROMIUM_VERSION: &str = "143.0.3650.75";
-#[cfg(any(target_os = "android", target_os = "ios"))]
 const GEC_VERSION: &str = "2";
-#[cfg(not(any(target_os = "android", target_os = "ios")))]
-const GEC_VERSION: &str = "1";
 const OUTPUT_FORMAT: &str = "audio-24khz-48kbitrate-mono-mp3";
 
-/// Sec-MS-GEC: Windows 文件时间 ticks 按 5 分钟窗口取整后与 token 拼接做 SHA-256
-#[cfg(not(any(target_os = "android", target_os = "ios")))]
+/// Sec-MS-GEC v2 (见 mobile/edge_gec.rs, 移植自 edge-tts 7.3.1)
 fn sec_ms_gec() -> String {
-    let unix = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_secs();
-    let win_seconds = unix + 11_644_473_600;
-    let rounded = win_seconds - (win_seconds % 300);
-    let ticks = rounded * 10_000_000;
-    let digest = Sha256::digest(format!("{ticks}{TRUSTED_CLIENT_TOKEN}").as_bytes());
-    digest
-        .iter()
-        .map(|b| format!("{b:02X}"))
-        .collect::<String>()
-}
-
-#[cfg(any(target_os = "android", target_os = "ios"))]
-fn sec_ms_gec() -> String {
-    mobile_gec::generate(
+    gec::generate(
         SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap_or_default()

@@ -1300,7 +1300,7 @@ async function removeSource(s: CatalogSourceRec) {
       <section v-if="settings.features.recommendedBooklists" v-show="!curatedOpen" ref="curatedSectionEl" class="cat-section curated-section">
         <div class="section-head">
           <div>
-            <h2>{{ t('booklist.curatedTitle') }}</h2>
+            <h2 class="display-heading">{{ t('booklist.curatedTitle') }}</h2>
             <p class="section-desc">{{ t('booklist.curatedDesc') }}</p>
           </div>
           <div class="section-actions">
@@ -1341,7 +1341,7 @@ async function removeSource(s: CatalogSourceRec) {
       <section v-show="!curatedOpen" class="cat-section">
         <div class="section-head">
           <div>
-            <h2>{{ t('catalog.sourcesTitle') }}</h2>
+            <h2 class="display-heading">{{ t('catalog.sourcesTitle') }}</h2>
             <p class="section-desc">{{ t('catalog.sourcesDesc') }}</p>
           </div>
         </div>
@@ -1407,7 +1407,7 @@ async function removeSource(s: CatalogSourceRec) {
       <section v-if="calibreAvailable()" v-show="!curatedOpen" class="cat-section calibre-section">
         <div class="section-head">
           <div>
-            <h2>{{ t('catalog.calibreTitle') }}</h2>
+            <h2 class="display-heading">{{ t('catalog.calibreTitle') }}</h2>
             <p v-if="!settings.calibrePath" class="section-desc">{{ t('catalog.calibreIntro') }}</p>
             <p v-else class="section-desc calibre-path" :title="settings.calibrePath">{{ settings.calibrePath }}</p>
           </div>
@@ -1457,7 +1457,7 @@ async function removeSource(s: CatalogSourceRec) {
       <section v-show="!curatedOpen" class="cat-section web-sources">
         <div class="section-head">
           <div>
-            <h2>{{ t('catalog.webSourcesTitle') }}</h2>
+            <h2 class="display-heading">{{ t('catalog.webSourcesTitle') }}</h2>
             <p class="section-desc">{{ t('catalog.webSourcesHint') }}</p>
           </div>
         </div>
@@ -1477,7 +1477,7 @@ async function removeSource(s: CatalogSourceRec) {
       <section v-show="!curatedOpen" class="cat-section gh-section">
         <div class="section-head">
           <div>
-            <h2>{{ t('catalog.ghListTitle') }}</h2>
+            <h2 class="display-heading">{{ t('catalog.ghListTitle') }}</h2>
             <p class="section-desc">{{ t('catalog.ghListIntro') }}</p>
           </div>
           <div class="section-actions">
@@ -1747,7 +1747,8 @@ async function removeSource(s: CatalogSourceRec) {
   overflow-wrap: anywhere;
   padding: var(--page-top) var(--page-x) calc(var(--page-bottom) + var(--lr-safe-bottom));
   min-height: 100%;
-  max-width: 1160px;
+  max-width: calc(var(--page-max) + 2 * var(--page-x));
+  margin: 0 auto;
 }
 .spacer {
   flex: 1;
@@ -1766,7 +1767,7 @@ async function removeSource(s: CatalogSourceRec) {
 }
 .page-title h1 {
   font-size: var(--page-title);
-  font-weight: 650;
+  font-weight: 700;
   letter-spacing: -0.01em;
   line-height: 1.3;
 }
@@ -1809,9 +1810,9 @@ async function removeSource(s: CatalogSourceRec) {
 .uni-input {
   width: 100%;
   height: 46px;
-  padding: 0 14px 0 42px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
+  padding: 0 16px 0 42px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-pill);
   background: var(--surface-2);
   color: var(--text);
   font: inherit;
@@ -1840,8 +1841,8 @@ async function removeSource(s: CatalogSourceRec) {
 .uni-submit {
   height: 46px;
   min-width: 88px;
-  padding: 0 20px;
-  border-radius: var(--radius-lg);
+  padding: 0 22px;
+  border-radius: var(--radius-pill);
   font-size: 15px;
 }
 
@@ -2149,7 +2150,7 @@ async function removeSource(s: CatalogSourceRec) {
   margin-bottom: 14px;
 }
 .section-head h2 {
-  font-size: 16px;
+  font-size: 19px;
   font-weight: 650;
   line-height: 1.4;
 }

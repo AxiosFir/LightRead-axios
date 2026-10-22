@@ -212,7 +212,7 @@ const showHow = ref(false)
 
 <style scoped>
 .stats {
-  max-width: 1160px;
+  max-width: calc(var(--page-max) + 2 * var(--page-x));
   margin: 0 auto;
   padding: var(--page-top) var(--page-x) calc(var(--page-bottom) + var(--lr-safe-bottom));
 }

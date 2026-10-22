@@ -1,11 +1,14 @@
 mod agent;
 mod app_update;
 mod background_process;
+mod backup_zip;
 mod babeldoc;
 mod calibre;
 mod edge_tts;
 mod fonts;
 mod http_upload;
+#[cfg(test)]
+mod ipc_contract_tests;
 mod library_files;
 mod local_tts;
 mod tts_device;
@@ -167,6 +170,13 @@ pub fn run() {
       library_files::library_file_rename,
       library_files::library_file_remove,
       library_files::library_file_write_chunk,
+      library_files::library_migrate,
+      backup_zip::library_files_describe,
+      backup_zip::backup_write_zip,
+      backup_zip::backup_open,
+      backup_zip::backup_verify,
+      backup_zip::backup_extract,
+      backup_zip::backup_read_entry,
       app_update::update_download,
       app_update::update_finish,
       calibre::calibre_list_books,

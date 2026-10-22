@@ -76,6 +76,8 @@ npm run e2e:transfer         # 互传端到端: 本地 wrangler sync-server + �
 npm run e2e:convert-epub / e2e:library-upload / e2e:book-sources   # 对应功能的浏览器端到端 (需先 build + preview)
 (cd sync-server && node --test test/api.test.mjs)                  # 账号后端契约 (wrangler 本地运行时)
 cargo test --manifest-path src-tauri/Cargo.toml agent   # 论文 Agent 原生契约
+cargo test --manifest-path src-tauri/Cargo.toml ipc_contract   # 书库原生命令 IPC 契约: 藏书包原生导出/导入、换书库文件夹、改名 (前端实际 JSON 参数)
+scripts/build-ui-font.sh   # 重新生成桌面展示字体子集 (霞鹜文楷, 只含界面词典用到的字); 改标题类文案后重跑
 npm run tauri dev|build     # 桌面 (需要 Rust 工具链)
 
 # 端到端冒烟 (Playwright): 先构建并起预览, 再跑脚本 (脚本写死 http://localhost:4173)

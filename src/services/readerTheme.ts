@@ -11,7 +11,7 @@ export interface ReaderThemeColors {
 export type ReaderThemeName = Exclude<ReaderPrefs['theme'], 'auto'>
 
 export const READER_THEMES: Record<ReaderThemeName, ReaderThemeColors> = {
-  light: { bg: '#ffffff', fg: '#1d2129', link: '#1664ff' },
+  light: { bg: '#ffffff', fg: '#1d2129', link: '#0066cf' },
   sepia: { bg: '#faf3e7', fg: '#453c2c', link: '#8f6c2e' },
   green: { bg: '#c7edcc', fg: '#243528', link: '#1e6b4a' },
   dark: { bg: '#17181a', fg: '#c5c8ce', link: '#6a9bff' },

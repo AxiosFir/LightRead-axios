@@ -28,11 +28,27 @@ export function mobileUi(root = fileURLToPath(new URL('.', import.meta.url))): P
     },
     generateBundle() {
       // Fonts are emitted through their CSS/JS imports; distribute their licenses alongside them.
+      // (edge-tts licenses are emitted for every target by nativeLicenses.)
+      for (const name of ['Noto-LICENSE.txt', 'WenKai-LICENSE.txt']) {
+        this.emitFile({ type: 'asset', fileName: `fonts/${name}`, source: readFileSync(resolve(src, 'mobile/assets/fonts', name)) })
+      }
+    },
+  }
+}
+
+/** The native speech client (src-tauri/src/mobile/edge_gec.rs, LGPL-3.0 port of edge-tts) ships in every
+ *  native build, desktop and App alike, so its license texts go into every bundle. */
+export function nativeLicenses(root = fileURLToPath(new URL('.', import.meta.url)), { desktopFonts = false } = {}): Plugin {
+  return {
+    name: 'lightread:native-licenses',
+    apply: 'build',
+    generateBundle() {
       for (const name of ['edge-tts-LICENSE.txt', 'edge-tts-COPYING.txt']) {
         this.emitFile({ type: 'asset', fileName: `licenses/${name}`, source: readFileSync(resolve(root, 'src-tauri/src/mobile', name)) })
       }
-      for (const name of ['Noto-LICENSE.txt', 'WenKai-LICENSE.txt']) {
-        this.emitFile({ type: 'asset', fileName: `fonts/${name}`, source: readFileSync(resolve(src, 'mobile/assets/fonts', name)) })
+      // 桌面界面的展示字体子集 (src/assets/fonts); App 构建由 mobileUi 分发同一份许可
+      if (desktopFonts) {
+        this.emitFile({ type: 'asset', fileName: 'fonts/WenKai-LICENSE.txt', source: readFileSync(resolve(root, 'src/assets/fonts/WenKai-LICENSE.txt')) })
       }
     },
   }

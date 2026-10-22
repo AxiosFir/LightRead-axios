@@ -1,5 +1,5 @@
 import { defineConfig, type Plugin } from 'vite'
-import { mobileUi, uiTarget } from './vite.platform.ts'
+import { mobileUi, nativeLicenses, uiTarget } from './vite.platform.ts'
 import vue from '@vitejs/plugin-vue'
 import { VitePWA } from 'vite-plugin-pwa'
 import { readFileSync } from 'node:fs'
@@ -36,7 +36,7 @@ export default defineConfig({
   define: {
     __APP_VERSION__: JSON.stringify(mobile ? mobileVersion : pkg.version),
   },
-  plugins: [...(mobile ? [mobileUi()] : []), foliatePaginatorFork(), legacyRegexRewrite(), vue(), VitePWA({
+  plugins: [...(mobile ? [mobileUi()] : []), nativeLicenses(undefined, { desktopFonts: !mobile }), foliatePaginatorFork(), legacyRegexRewrite(), vue(), VitePWA({
     // 桌面/移动端 (Tauri) 资源都在本地, 不需要 PWA 离线缓存; Windows WebView2
     // 会把 Service Worker 缓存的旧版界面存进用户数据目录, 升级后仍加载旧代码。
     // 自毁型 SW 让已装机器上的旧 SW 在更新检查时自动注销并清缓存。
@@ -49,7 +49,7 @@ export default defineConfig({
       // MuPDF wasm 约 10MB，网页版需要完整预缓存以支持离线阅读。
       maximumFileSizeToCacheInBytes: 16 * 1024 * 1024,
       // 与插件默认一致的 js / css / html / wasm, 另加打字机打字声 (约 95KB): 网页版离线也能用真实录音
-      globPatterns: ['**/*.{js,css,html,wasm}', ...(mobile ? ['**/*.woff2'] : []), 'sounds/typewriter/**/*.{ogg,m4a,json}'],
+      globPatterns: ['**/*.{js,css,html,wasm}', ...(mobile ? ['**/*.woff2'] : ['**/lxgw-wenkai-ui-*.woff2']), 'sounds/typewriter/**/*.{ogg,m4a,json}'],
       // 仿生阅读的中文词表 (约 230KB gzip) 不预缓存: 第一次在中文书里开启时才下载, 之后离线也能用。
       // 文件名带内容哈希, CacheFirst 不会拿到旧版; 只留最近两版
       runtimeCaching: [{

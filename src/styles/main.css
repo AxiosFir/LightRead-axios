@@ -13,10 +13,11 @@
   --lr-safe-left: env(safe-area-inset-left);
 
   /* 品牌 */
-  --brand: #1664ff;
-  --brand-hover: #0e4fd1;
-  --brand-active: #0a3ba8;
-  --brand-light: #e8f0ff;
+  /* 与 App (src/mobile/styles/main.css) 同一套已确认配色: 沉稳的墨蓝, 冷灰石板色文字 */
+  --brand: #0066cf;
+  --brand-hover: #0054ad;
+  --brand-active: #004590;
+  --brand-light: #dceeff;
   --brand-soft: color-mix(in srgb, var(--brand) 10%, transparent);
   --on-brand: #ffffff;
   /* 二维码: 深色模式下也保持白底深色模块, 否则部分扫码器认不出反色码 (不在深色主题里重定义) */
@@ -24,26 +25,26 @@
   --qr-fg: #111418;
 
   /* 表面与文字 */
-  --bg: #f5f6f8;
+  --bg: #f3f5f8;
   --card: #ffffff;
-  --surface-2: #f0f2f5;   /* 悬停 / 次级面板 */
+  --surface-2: #ebeff3;   /* 悬停 / 次级面板 */
   --surface-3: #e6e8ec;   /* 按下 / 轨道 */
-  --text: #1d2129;
-  --text-2: #4e5969;
-  --text-3: #6b7480;      /* ≥4.5:1 于白底 */
-  --border: #e5e6eb;
+  --text: #202a36;
+  --text-2: #535f6d;
+  --text-3: #697787;      /* ≥4.5:1 于白底 */
+  --border: #e3e7ed;
   --border-strong: #cfd3da;
   --overlay: rgba(17, 20, 26, 0.48);
   --skeleton: #e9ebef;
   --skeleton-shine: rgba(255, 255, 255, 0.7);
 
   /* 手机书格: 无封面的生成封面 (纸色 + 墨色, 按书名哈希取一组) */
-  --cover-paper-0: #efe6d6; --cover-ink-0: #5a4630;
-  --cover-paper-1: #dde4ea; --cover-ink-1: #2f4656;
-  --cover-paper-2: #e1e7da; --cover-ink-2: #3d4f35;
-  --cover-paper-3: #ecdcd4; --cover-ink-3: #6a3b2e;
-  --cover-paper-4: #e4dfec; --cover-ink-4: #45395c;
-  --cover-paper-5: #e9e6df; --cover-ink-5: #3f3b33;
+  --cover-paper-0: #c8dfcd; --cover-ink-0: #5a4630;
+  --cover-paper-1: #c5d9e6; --cover-ink-1: #2f4656;
+  --cover-paper-2: #efd0bf; --cover-ink-2: #3d4f35;
+  --cover-paper-3: #eae0c8; --cover-ink-3: #6a3b2e;
+  --cover-paper-4: #dcd2e6; --cover-ink-4: #45395c;
+  --cover-paper-5: #d5dfd4; --cover-ink-5: #3f3b33;
   --cover-edge: rgba(29, 33, 41, 0.08);
   --cover-shadow: 0 1px 2px rgba(29, 33, 41, 0.1), 0 6px 14px -4px rgba(29, 33, 41, 0.18);
 
@@ -58,8 +59,8 @@
   /* 圆角 */
   --radius-sm: 6px;
   --radius: 8px;
-  --radius-lg: 12px;
-  --radius-xl: 16px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
   --radius-pill: 999px;
 
   /* 间距 (4pt 节奏) */
@@ -97,12 +98,18 @@
   --font: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Segoe UI',
     'Microsoft YaHei', 'Helvetica Neue', Arial, sans-serif;
   --font-mono: ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+  /* 展示字体: 霞鹜文楷 (与 App 同源), 只用于 logo / 页面标题 / 大分区标题这些界面固定文案;
+     正文和控件仍用系统无衬线, 小字号楷体不易读。字形子集只含界面词典里的字 (scripts/build-ui-font.sh) */
+  --font-display: 'LightRead Display', 'LXGW WenKai', 'Kaiti SC', 'STKaiti', 'KaiTi', var(--font);
 
   /* 页面骨架: 各页根容器的边距与标题, 手机断点下统一收窄 (见下方「尺寸层」) */
   --page-x: 28px;
   --page-top: 24px;
   --page-bottom: 40px;
-  --page-title: 22px;
+  --page-title: 30px;
+  /* 桌面内容宽度: 浏览类页面 (藏书/论文/书源/阅读记录) 与表单类页面 (设置/互传) 两档, 都居中 */
+  --page-max: 1240px;
+  --page-max-narrow: 860px;
 }
 
 /* ---- 尺寸层: 断点 / 页面骨架 / 触控 ----
@@ -120,12 +127,12 @@
     --page-x: clamp(12px, 4.1vw, 20px);
     --page-top: 16px;
     --page-bottom: 24px;
-    --page-title: 20px;
+    --page-title: 26px;
   }
 }
 @media (max-width: 380px) {
   :root {
-    --page-title: 19px;
+    --page-title: 24px;
   }
 }
 @media (pointer: coarse) {
@@ -184,11 +191,11 @@
    普通声明里的 color-mix 由构建期 PostCSS 插件 (vite.legacy.ts) 自动插入回退。 */
 @supports not (color: color-mix(in srgb, red 50%, blue)) {
   :root {
-    --brand-soft: rgba(22, 100, 255, 0.1);
+    --brand-soft: rgba(0, 102, 207, 0.1);
     --danger-soft: rgba(229, 56, 59, 0.1);
     --success-soft: rgba(18, 138, 62, 0.1);
     --warning-soft: rgba(180, 83, 9, 0.1);
-    --ring: 0 0 0 3px rgba(22, 100, 255, 0.28);
+    --ring: 0 0 0 3px rgba(0, 102, 207, 0.28);
   }
   :root[data-theme='dark'] {
     --brand-soft: rgba(91, 141, 255, 0.16);
@@ -197,6 +204,23 @@
     --warning-soft: rgba(245, 165, 36, 0.1);
     --ring: 0 0 0 3px rgba(91, 141, 255, 0.28);
   }
+}
+
+@font-face {
+  font-family: 'LightRead Display';
+  src: url('../assets/fonts/lxgw-wenkai-ui.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* 展示字体只有常规字重: 关掉伪粗体, 各页标题的 font-weight 不会把楷体糊成一团 */
+.logo-text,
+.main h1,
+.main .display-heading {
+  font-family: var(--font-display);
+  font-synthesis: none;
+  letter-spacing: 0.02em;
 }
 
 * {
