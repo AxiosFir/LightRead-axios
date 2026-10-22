@@ -52,6 +52,8 @@ DPR 2 下每页 ≈ 20MB 位图，固有成本：`clear` ~5 ms、MuPDF `run` ~15
 | 换书库文件夹 `library_migrate` (`std::fs::copy`) | 以前逐个 `readFile → writeFile` 经 WebView | **保留** |
 | `http_upload` 书库文件改为流式上传 (显式 Content-Length, 不用分块编码) + `http_upload_file` 带进度 | 同步上传不再把整本书读进 Rust 内存; 互传「发送书籍」不再读进 WebView | **保留** |
 | TXT → EPUB 转换移到 Rust? 实测浏览器内 JS: 2.5 MB 95 ms / 10 MB 238 ms / 30 MB 618 ms (Chromium headless, 4236 章) | 最多省几百毫秒, 且 EPUB 字节仍要经 IPC 交给 foliate, 还要重新证明分章规则一致 | **不做** |
+| 选择文件夹导入的目录扫描 `folder_scan` (一次 IPC 递归遍历 + 大小 / 修改时间) | 以前每个目录一次 `readDir`、每本候选书一次 `stat` | **保留** |
+| 书源 / 链接下载改为原生下载到磁盘? | 桌面 `fetchRemote` 已走 plugin-http (Rust reqwest); `importFile` 仍要字节给 foliate 取元数据, 原生落盘再读回只多一次磁盘往返 | **不做** |
 | 导入时元数据 (书名/作者/封面) 移到 Rust? | foliate (EPUB/MOBI/AZW3/FB2/CBZ) 与 PDFium 封面渲染都在 WebView; 桌面 IPC 已是原始二进制, 只省一次写盘 | **不做** |
 
 仍是瓶颈的只有 PDF 打开 (见上文 2026-08-17)。真要原生化需要 Rust 端渲染位图 + 改 PaperReaderView 的渲染管线, 属于结构性改动, 先测量再决定。
