@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { verifyApkLayout } from './apk-layout.mjs'
+import { verifyApkLayout, verifyNativeLibraries } from './apk-layout.mjs'
 import { createHash } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
@@ -107,9 +107,10 @@ try {
       const metadata = verifyApkMetadata(tool('aapt', ['dump', 'badging', values.apk]), tool('apksigner', ['verify', '--verbose', '--print-certs', values.apk]), { ...expected, cert: values.cert })
       const bytes = readFileSync(values.apk)
       const layout = verifyApkLayout(bytes)
+      const nativeLibraries = verifyNativeLibraries(bytes)
       const sha256 = createHash('sha256').update(bytes).digest('hex')
       writeFileSync(`${values.apk}.sha256`, `${sha256}  ${basename(values.apk)}\n`)
-      writeFileSync(`${values.apk}.json`, `${JSON.stringify({ file: basename(values.apk), ...metadata, layout, sha256 }, null, 2)}\n`)
+      writeFileSync(`${values.apk}.json`, `${JSON.stringify({ file: basename(values.apk), ...metadata, layout, nativeLibraries, sha256 }, null, 2)}\n`)
       console.log(JSON.stringify({ ...metadata, sha256 }, null, 2))
     }
   }
