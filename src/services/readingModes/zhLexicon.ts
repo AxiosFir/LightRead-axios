@@ -6,6 +6,7 @@
  */
 import lexiconUrl from '../../data/zh-lexicon.txt?url'
 import { parseZhLexicon, type ZhLexicon } from './zhSegment.ts'
+import { installZhSegmentWasm } from './zhSegmentWasm.ts'
 
 const RETRY_MS = 60_000
 
@@ -23,6 +24,8 @@ export function loadZhLexicon(): Promise<ZhLexicon | null> {
   if (lexicon) return Promise.resolve(lexicon)
   if (pending) return pending
   if (failedAt && Date.now() - failedAt < RETRY_MS) return Promise.resolve(null)
+  // 分词热循环换成 Rust (wasm); 与词表并行加载, 失败时照旧用 JS
+  void installZhSegmentWasm()
   pending = fetch(lexiconUrl)
     .then(res => {
       if (!res.ok) throw new Error(`HTTP ${res.status}`)

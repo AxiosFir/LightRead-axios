@@ -78,7 +78,8 @@
     "e2e:concept-recognition": "node scripts/e2e-concept-recognition.mjs",
     "e2e:mobile-booklists": "node scripts/e2e-mobile-booklists.mjs",
     "test:mobile-messages": "node --test scripts/test-mobile-messages.mjs",
-    "e2e:mobile-messages": "node scripts/e2e-mobile-messages.mjs"
+    "e2e:mobile-messages": "node scripts/e2e-mobile-messages.mjs",
+    "test:zh-segment-wasm": "node --experimental-strip-types --test scripts/test-zh-segment-wasm.mjs"
   },
   "dependencies": {
     "@embedpdf/pdfium": "^2.14.4",

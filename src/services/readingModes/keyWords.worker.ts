@@ -13,6 +13,7 @@
  *   { type: 'picked', id, picks: Int32Array, ms } | { type: 'pickFailed', id, error }
  */
 import { parseZhLexicon, type ZhLexicon } from './zhSegment.ts'
+import { installZhSegmentWasm } from './zhSegmentWasm.ts'
 import { KwBook, packPicks, type KwPickRequest } from './keyWordsBook.ts'
 import { loadConceptLexicon } from './conceptLexicon.ts'
 
@@ -38,6 +39,8 @@ async function handle(msg: any) {
   switch (msg?.type) {
     case 'init': {
       if (lexicon) return
+      // 分词热循环换成 Rust (wasm); 失败时照旧用 JS
+      void installZhSegmentWasm()
       lexicon = fetch(msg.lexiconUrl)
         .then(res => { if (!res.ok) throw new Error(`HTTP ${res.status}`); return res.text() })
         .then(text => {

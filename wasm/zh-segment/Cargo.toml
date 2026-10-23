@@ -1,0 +1,20 @@
+[package]
+name = "zh-segment"
+version = "0.1.0"
+edition = "2021"
+description = "LightRead 中文分词核心 (cutHan) 的 Rust 实现, 编译为 WebAssembly; 与 src/services/readingModes/zhSegment.ts 逐位一致"
+license = "AGPL-3.0-or-later"
+publish = false
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
+
+# 独立于 src-tauri 的工作区 (wasm32 目标, 不拉 Tauri 依赖)
+[workspace]

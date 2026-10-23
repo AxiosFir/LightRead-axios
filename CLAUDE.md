@@ -77,6 +77,7 @@ npm run e2e:convert-epub / e2e:library-upload / e2e:book-sources   # 对应功�
 (cd sync-server && node --test test/api.test.mjs)                  # 账号后端契约 (wrangler 本地运行时)
 cargo test --manifest-path src-tauri/Cargo.toml agent   # 论文 Agent 原生契约
 cargo test --manifest-path src-tauri/Cargo.toml ipc_contract   # 书库原生命令 IPC 契约: 藏书包原生导出/导入、换书库文件夹、改名 (前端实际 JSON 参数)
+npm run test:zh-segment-wasm   # 中文分词核心 Rust/wasm 与 JS 逐位一致 + 整条重点词管线不变; 改 wasm/zh-segment 后先 scripts/build-zh-segment-wasm.sh
 node scripts/gen-epub-meta-golden.mjs   # 升级 foliate-js / 改导入取元数据规则后: 重生成 Rust 原生 EPUB 元数据的期望, 再跑 cargo test epub_meta
 node scripts/gen-txt-epub-golden.mjs   # 改了 TXT 分章 / 段落规则后: 用前端 convertToEpub 重生成 Rust 原生 TXT→EPUB 的逐字节期望 (需 vite 开发服务器 5180), 再跑 cargo test txt_epub
 scripts/build-ui-font.sh   # 重新生成桌面展示字体子集 (霞鹜文楷, 只含界面词典用到的字); 改标题类文案后重跑

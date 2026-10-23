@@ -108,11 +108,27 @@ export function parseZhLexicon(text: string): ZhLexicon {
   return { cost, maxLen, unk: Math.log(rank + RANK_K) + 3, size: cost.size }
 }
 
+export type CutHanImpl = (run: string, lex: ZhLexicon, margin: number | null) => { ends: number[]; unsure: boolean[] } | null
+let fastCut: CutHanImpl | null = null
+
+/**
+ * 安装更快的 cutHan 实现 (Rust 编译的 WebAssembly, 见 zhSegmentWasm.ts / wasm/zh-segment);
+ * 它返回 null (如还没准备好) 时照旧用下面的 JS 实现。两者结果逐位一致 (scripts/test-zh-segment-wasm.mjs)。
+ */
+export function setFastCutHan(impl: CutHanImpl | null) {
+  fastCut = impl
+}
+
 /**
  * 一个汉字串的 DAG 最小代价切分 (从右往左动态规划, 同 jieba 的 calc, 不用 HMM)。
  * 返回各词的终点 (UTF-16 下标, 递增) 与「没把握」标记。
  */
 export function cutHan(run: string, lex: ZhLexicon, margin: number | null = UNSURE_MARGIN): { ends: number[]; unsure: boolean[] } {
+  return fastCut?.(run, lex, margin) ?? cutHanJs(run, lex, margin)
+}
+
+/** cutHan 的 JS 实现 (网页 / 测试的基准, wasm 不可用时的回退) */
+export function cutHanJs(run: string, lex: ZhLexicon, margin: number | null = UNSURE_MARGIN): { ends: number[]; unsure: boolean[] } {
   const n = run.length
   const L = lex.maxLen
   const best = new Float64Array(n + 1)
