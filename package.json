@@ -1,7 +1,7 @@
 {
   "name": "lightread",
   "private": true,
-  "version": "2.2.4",
+  "version": "2.2.5",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -26,6 +26,7 @@
     "test:library-upload": "node --experimental-strip-types --test scripts/test-library-upload.mjs scripts/test-library-upload-task.mjs scripts/test-opds-library.mjs",
     "e2e:library-upload": "node scripts/e2e-library-upload.mjs",
     "e2e:folder-pick": "node scripts/e2e-folder-pick.mjs",
+    "e2e:folder-root-booklist": "node scripts/e2e-folder-root-booklist.mjs",
     "test:smart-toc": "node --experimental-strip-types --test scripts/test-smart-toc.mjs",
     "test:txt-paragraphs": "node --experimental-strip-types --test scripts/test-txt-paragraphs.mjs",
     "test:keyboard-shortcuts": "node --experimental-strip-types --test scripts/test-keyboard-shortcuts.mjs",

@@ -330,7 +330,7 @@ function showFolderPlan(scan: FolderScan) {
     scanning: false,
     scan,
     plan,
-    booklistPlan: kind === 'book' ? planFolderBooklists(plan) : undefined,
+    booklistPlan: kind === 'book' ? planFolderBooklists(plan, { rootName: scan.name }) : undefined,
   }
 }
 

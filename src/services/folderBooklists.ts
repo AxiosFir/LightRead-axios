@@ -1,6 +1,8 @@
 /**
  * 文件夹导入的分类规划: 文件所在目录相对导入根目录的完整路径就是书单名.
- * 例如 `科幻/刘慈欣/三体.epub` → `科幻-刘慈欣`; 根目录下的书不归入书单.
+ * 例如 `科幻/刘慈欣/三体.epub` → `科幻-刘慈欣`.
+ * 如果拖入的目录本身是分类 (例如直接拖入「科幻」), 或书直接位于根目录,
+ * 根目录名会加入书单; 根目录下已经存在多个一级分类时则不预置根目录名.
  *
  * 去重后的一本书可能来自多个分类目录 (同一本书的多个格式), 这里会保留全部归属.
  * 纯函数, 不依赖 DOM / Tauri, 测试见 scripts/test-folder-booklists.mjs.
@@ -15,6 +17,13 @@ export interface FolderBooklistGroup<T extends FolderEntry> {
   existing: T[]
 }
 
+export interface FolderBooklistOptions {
+  /** 拖入目录的名字 */
+  rootName?: string
+  /** 强制包含 / 排除根目录名; 缺省时自动判断 */
+  includeRoot?: boolean
+}
+
 const collator = new Intl.Collator('en', { numeric: true, sensitivity: 'base' })
 
 /** 去掉目录段首尾空白和连续空白, 避免把不可见字符带进书单名 */
@@ -26,10 +35,17 @@ function cleanSegment(segment: string): string {
  * 从文件相对路径得到书单名.
  * 返回 null 表示文件直接位于导入根目录, 不创建书单.
  */
-export function booklistNameForPath(path: string): string | null {
+export function booklistNameForPath(
+  path: string,
+  rootName = '',
+  includeRoot = false,
+): string | null {
   const parts = path.replace(/\\/g, '/').split('/').filter(Boolean)
-  if (parts.length < 2) return null
-  const name = parts.slice(0, -1).map(cleanSegment).filter(Boolean).join('-')
+  const directories = parts.slice(0, -1).map(cleanSegment).filter(Boolean)
+  const root = cleanSegment(rootName)
+  const segments = root && includeRoot ? [root, ...directories] : directories
+  if (!segments.length) return null
+  const name = segments.join('-')
   return name || null
 }
 
@@ -39,16 +55,27 @@ export function booklistNameForPath(path: string): string | null {
  */
 export function planFolderBooklists<T extends FolderEntry>(
   plan: FolderPlan<T>,
+  options: FolderBooklistOptions = {},
 ): FolderBooklistGroup<T>[] {
   const duplicatePaths = new Map<string, string[]>()
   for (const group of plan.skippedDuplicates) {
     duplicatePaths.set(group.kept.path, [group.kept.path, ...group.dropped.map(entry => entry.path)])
   }
 
+  const entries = [...plan.selected, ...plan.alreadyInLibrary]
+  const firstLevels = new Set<string>()
+  for (const entry of entries) {
+    const parts = entry.path.replace(/\\/g, '/').split('/').filter(Boolean)
+    if (parts.length > 1) firstLevels.add(parts[0])
+  }
+  const includeRoot = options.includeRoot ?? (!!cleanSegment(options.rootName ?? '') && firstLevels.size < 2)
+  const rootName = cleanSegment(options.rootName ?? '')
   const groups = new Map<string, FolderBooklistGroup<T>>()
   const add = (entry: T, existing: boolean) => {
     const paths = duplicatePaths.get(entry.path) ?? [entry.path]
-    const names = [...new Set(paths.map(booklistNameForPath).filter((name): name is string => !!name))]
+    const names = [...new Set(paths
+      .map(path => booklistNameForPath(path, rootName, includeRoot))
+      .filter((name): name is string => !!name))]
     for (const name of names) {
       const group = groups.get(name) ?? { name, selected: [], existing: [] }
       const bucket = existing ? group.existing : group.selected

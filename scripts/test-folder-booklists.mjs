@@ -13,6 +13,8 @@ test('booklist name is the complete relative parent path joined with hyphens', (
   assert.equal(booklistNameForPath('科幻/三体.epub'), '科幻')
   assert.equal(booklistNameForPath(' 科幻 /  刘慈欣 /三体.epub'), '科幻-刘慈欣')
   assert.equal(booklistNameForPath('三体.epub'), null)
+  assert.equal(booklistNameForPath('三体.epub', '科幻', true), '科幻')
+  assert.equal(booklistNameForPath('刘慈欣/三体.epub', '科幻', true), '科幻-刘慈欣')
 })
 
 test('duplicate formats across categories keep every category membership', () => {
@@ -31,7 +33,29 @@ test('duplicate formats across categories keep every category membership', () =>
   }
 })
 
-test('root books are imported without a booklist and existing books stay linked', () => {
+test('a dropped category folder becomes the root of the booklist name', () => {
+  const direct = plan([file('三体.epub'), file('球状闪电.pdf')])
+  assert.deepEqual(planFolderBooklists(direct, { rootName: '科幻' }).map(group => group.name), ['科幻'])
+
+  const nested = plan([file('刘慈欣/三体.epub')])
+  assert.deepEqual(
+    planFolderBooklists(nested, { rootName: '科幻' }).map(group => group.name),
+    ['科幻-刘慈欣'],
+  )
+})
+
+test('a container with multiple top-level categories does not prefix its own name', () => {
+  const pick = plan([
+    file('科幻/刘慈欣/三体.epub'),
+    file('历史/史记.pdf'),
+  ])
+  assert.deepEqual(
+    planFolderBooklists(pick, { rootName: '我的书库' }).map(group => group.name),
+    ['历史', '科幻-刘慈欣'],
+  )
+})
+
+test('existing books stay linked to their planned booklists', () => {
   const entries = [
     file('root.epub'),
     file('科幻/刘慈欣/三体.epub'),
@@ -41,7 +65,7 @@ test('root books are imported without a booklist and existing books stay linked'
     formats: IMPORT_FORMATS,
     existingFileNames: ['三体.epub'],
   })
-  const booklists = planFolderBooklists(pick)
+  const booklists = planFolderBooklists(pick, { rootName: '我的书库' })
 
   assert.deepEqual(pick.selected.map(entry => entry.path), ['root.epub', '历史/史记.pdf'])
   assert.deepEqual(pick.alreadyInLibrary.map(entry => entry.path), ['科幻/刘慈欣/三体.epub'])
