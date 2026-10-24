@@ -7,6 +7,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useLibrary } from '../stores/library'
 import { importFiles, type LazyImportFile } from '../services/importer'
+import { pendingLibraryAction } from '../services/libraryActions'
 import { IMPORT_FORMATS, planFolderPick, type FolderPlan } from '../services/folderPick'
 import { planFolderBooklists, type FolderBooklistGroup } from '../services/folderBooklists'
 import {
@@ -151,6 +152,14 @@ watch(() => [route.query.booklist, library.loaded] as const, ([id]) => {
   if (typeof id === 'string' && id && !paperMode.value && library.booklists.some(item => item.id === id)) {
     activeBooklistId.value = id
   }
+}, { immediate: true })
+
+// 左侧书单栏的“新建 / 管理”复用藏书页已有弹窗，不复制一套书单管理逻辑。
+watch(pendingLibraryAction, action => {
+  if (!action) return
+  if (action === 'create-booklist') openCreateBooklist()
+  else if (action === 'manage-booklists') openBooklistManage()
+  pendingLibraryAction.value = null
 }, { immediate: true })
 
 // 顶部「今日阅读」入口 (藏书模式), 记录变化时实时刷新
@@ -1045,7 +1054,7 @@ async function batchClearTags() {
     </section>
 
     <!-- 书单: 一级内容分组，可与标签和搜索组合筛选; 手机上只有建过书单才出现, 操作在添加面板 / 列表标题里 -->
-    <section v-if="!paperMode && (!phone || library.booklists.length)" class="booklist-section">
+    <section v-if="!paperMode && (!phone || library.booklists.length)" class="booklist-section booklist-inline">
       <div v-if="!phone" class="booklist-heading">
         <span>{{ t('library.booklists') }}</span>
         <button class="booklist-text-action hit" @click="openCreateBooklist">
@@ -2477,6 +2486,10 @@ async function batchClearTags() {
   opacity: 0.7;
 }
 
+
+@media (min-width: 1024px) {
+  .booklist-inline { display: none; }
+}
 
 @media (max-width: 720px) {
   /* 手机两行: 标题 + 今日 + ＋ / 搜索。负 top 吸顶: 标题行滚走, 只留搜索条 */

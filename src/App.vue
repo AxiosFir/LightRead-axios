@@ -7,6 +7,7 @@ import ToastHost from './components/ToastHost.vue'
 import ConfirmHost from './components/ConfirmHost.vue'
 import BabeldocTaskStatus from './components/BabeldocTaskStatus.vue'
 import LibraryUploadStatus from './components/LibraryUploadStatus.vue'
+import SidebarBooklists from './components/SidebarBooklists.vue'
 import { useSettings } from './stores/settings'
 import { watchReadingViewport } from './services/readingViewport'
 import { useAppearance } from './services/appearance'
@@ -115,6 +116,7 @@ const settingsNav = { path: '/settings', labelKey: 'nav.settings', icon: 'M9 3h6
           >{{ transferState.unread > 99 ? '99+' : transferState.unread }}</span>
         </router-link>
       </nav>
+      <SidebarBooklists />
       <div class="sidebar-bottom">
         <router-link :to="settingsNav.path" class="nav-item sidebar-settings" :title="t(settingsNav.labelKey)">
           <span class="sidebar-settings-icon">
@@ -149,7 +151,7 @@ const settingsNav = { path: '/settings', labelKey: 'nav.settings', icon: 'M9 3h6
   padding-right: var(--lr-safe-right);
 }
 .sidebar {
-  width: 208px;
+  width: 240px;
   flex-shrink: 0;
   position: relative;
   z-index: 2;
@@ -180,7 +182,7 @@ const settingsNav = { path: '/settings', labelKey: 'nav.settings', icon: 'M9 3h6
   display: flex;
   flex-direction: column;
   gap: 2px;
-  flex: 1;
+  flex: 0 0 auto;
 }
 .nav-item {
   position: relative;
@@ -482,6 +484,9 @@ const settingsNav = { path: '/settings', labelKey: 'nav.settings', icon: 'M9 3h6
   }
   .nav-item.router-link-active::before {
     left: -10px;
+  }
+  .nav {
+    flex: 1;
   }
   .sidebar-settings {
     padding-right: 0;

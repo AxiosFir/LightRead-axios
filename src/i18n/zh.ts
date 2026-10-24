@@ -121,6 +121,8 @@ export default {
   'library.booklistDeleted': '书单已删除，书籍仍保留在藏书中',
   'library.deleteBooklistConfirm': '删除书单「{name}」？书籍仍会保留在藏书中。',
   'library.noBooklists': '还没有书单',
+  'library.searchBooklists': '搜索书单',
+  'library.noMatchingBooklists': '没有匹配的书单',
   'library.booklistBooks': '{count} 本',
   'library.chooseBooklist': '加入书单',
   'library.chooseBooklistHint': '选择要收录这 {count} 本书的书单',

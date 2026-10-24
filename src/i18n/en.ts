@@ -121,6 +121,8 @@ export default {
   'library.booklistDeleted': 'Booklist deleted; its books remain in your library',
   'library.deleteBooklistConfirm': 'Delete booklist "{name}"? Its books will remain in your library.',
   'library.noBooklists': 'No booklists yet',
+  'library.searchBooklists': 'Search booklists',
+  'library.noMatchingBooklists': 'No matching booklists',
   'library.booklistBooks': '{count} books',
   'library.chooseBooklist': "Add to booklist",
   'library.chooseBooklistHint': 'Choose a booklist for these {count} books.',
