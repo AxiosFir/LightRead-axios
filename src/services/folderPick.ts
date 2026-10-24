@@ -132,7 +132,8 @@ export function bookIdentity(name: string): BookIdentity {
   return base ? { key, withoutCopyNumber: compact(base, fallback), copy: true } : { key, copy }
 }
 
-const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' })
+/** 固定排序语言, 避免同一目录在中文 Windows 与 Linux CI 中产生不同顺序 */
+const collator = new Intl.Collator('en', { numeric: true, sensitivity: 'base' })
 const byPath = <T extends FolderEntry>(a: T, b: T) => collator.compare(a.path, b.path)
 const normName = (name: string) => name.normalize('NFKC').toLowerCase()
 

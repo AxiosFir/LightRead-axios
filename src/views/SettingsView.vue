@@ -24,10 +24,7 @@ import AccountCard from '../components/settings/AccountCard.vue'
 import { fetchRemote } from '../services/net'
 import { toast } from '../services/toast'
 import {
-  CURRENT_VERSION, RELEASES_URL, REPO_URL, ISSUES_URL,
-  checkUpdate, pickDownloads, openDownload, canInAppInstall,
-  downloadInstaller, installWithPrompt, downloadErrorMessage, openInstallPermission, installPermissionGranted, copyLink,
-  type UpdateInfo, type DownloadOption,
+  CURRENT_VERSION, REPO_URL, ISSUES_URL, openDownload,
 } from '../services/updater'
 import { t } from '../i18n'
 import { providerById, chatStream } from '../services/ai'
@@ -550,7 +547,6 @@ async function testProxy() {
 
 onMounted(async () => {
   parseProxyUrl(settings.httpProxy)
-  doCheckUpdate(false)
   const storage = await getStorage()
   storageKind.value = storage.kind
   await refreshPaperAgentStatuses()
@@ -683,30 +679,6 @@ async function testAi() {
   }
 }
 
-// ---- 版本与更新 ----
-const updateInfo = ref<UpdateInfo | null>(null)
-const checking = ref(false)
-const checkError = ref('')
-/** 手动检查过才显示"已是最新", 静默检查只在有新版时提示 */
-const checkedManually = ref(false)
-const downloads = computed(() => updateInfo.value ? pickDownloads(updateInfo.value.assets) : [])
-
-async function doCheckUpdate(manual = true) {
-  if (checking.value) return
-  checking.value = true
-  checkError.value = ''
-  if (manual) checkedManually.value = true
-  try {
-    updateInfo.value = await checkUpdate(manual)
-  } catch (e: any) {
-    if (manual) checkError.value = e?.message ?? t('update.checkFailed')
-  } finally {
-    checking.value = false
-  }
-}
-
-const fmtSize = (bytes: number) => `${(bytes / 1048576).toFixed(0)} MB`
-
 async function download(url: string) {
   try {
     await openDownload(url)
@@ -715,64 +687,6 @@ async function download(url: string) {
     toast(t('update.cannotOpenLink'), 'error')
     return false
   }
-}
-
-// ---- 应用内下载安装 (桌面端与安卓应用, 走已配置的网络代理) ----
-const installing = ref('')
-const installedPath = ref('')
-/** 安卓应用: 安装包存在应用缓存里, 不展示路径, 只给「安装」按钮 */
-const isAndroidApp = isTauri() && isAndroid
-/** 安卓: 等用户允许轻阅安装应用 (从设置页回来时重新判断) */
-const needsInstallPermission = ref(false)
-const refreshInstallPermission = () => {
-  if (needsInstallPermission.value && document.visibilityState !== 'hidden') {
-    needsInstallPermission.value = !installPermissionGranted()
-  }
-}
-document.addEventListener('visibilitychange', refreshInstallPermission)
-onBeforeUnmount(() => document.removeEventListener('visibilitychange', refreshInstallPermission))
-
-async function downloadOption(d: DownloadOption) {
-  if (!canInAppInstall()) {
-    if (await download(d.url)) toast(t('update.browserDownloadStarted'), 'success')
-    return
-  }
-  if (installing.value) return
-  installing.value = t('common.connecting')
-  installedPath.value = ''
-  needsInstallPermission.value = false
-  try {
-    const fileName = decodeURIComponent(d.url.split('/').pop() ?? 'LightRead-installer')
-    installedPath.value = await downloadInstaller(d.url, fileName, p => {
-      installing.value = p.fraction != null
-        ? t('update.downloadingPct', { pct: (p.fraction * 100).toFixed(0), received: p.receivedMB, total: p.totalMB })
-        : t('update.downloadingMB', { received: p.receivedMB })
-    })
-  } catch (e) {
-    toast(downloadErrorMessage(e), 'error', 10_000, { label: t('update.retry'), run: () => { void downloadOption(d) } })
-    return
-  } finally {
-    installing.value = ''
-  }
-  await installDownloaded()
-}
-
-async function installDownloaded() {
-  if (!installedPath.value) return
-  try {
-    await installWithPrompt(installedPath.value)
-    // 已打开安装 (或回到前台后由 App 自动接着装); 没开权限时卡片上留一个「去开启」
-    needsInstallPermission.value = !installPermissionGranted()
-  } catch (e: any) {
-    installedPath.value = ''
-    needsInstallPermission.value = false
-    toast(e?.message || t('update.openFailed'), 'error', 6000)
-  }
-}
-
-async function doCopyLink(url: string) {
-  const ok = await copyLink(url)
-  toast(ok ? t('update.linkCopied') : t('common.copyFailed'), ok ? 'success' : 'error')
 }
 
 // ---- 存储位置 (桌面端) ----
@@ -1029,8 +943,7 @@ const APPEARANCE_OPTIONS = [
         <button type="button" class="pl-row" @click="openPhonePage('about')">
           <img class="pl-app-icon" src="/icon-192.png" alt="" />
           <span class="pl-text"><span class="pl-title">LightRead 轻阅</span><span class="pl-desc">{{ !isTauri() ? t('settings.webVersion') : isAndroid ? t('settings.androidVersion') : t('settings.desktopVersion') }} · v{{ CURRENT_VERSION }}</span></span>
-          <span v-if="updateInfo?.hasUpdate" class="pl-badge">{{ t('update.newVersion') }}</span>
-          <span v-else class="pl-value">{{ t('update.check') }}</span><svg class="pl-chev" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="m9 6 6 6-6 6"/></svg>
+          <svg class="pl-chev" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="m9 6 6 6-6 6"/></svg>
         </button>
         <button type="button" class="pl-row" @click="$router.push('/manual')">
           <span class="pl-ico tone-success" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 6.5C10.5 5 8 4.5 4 4.5v13c4 0 6.5.5 8 2 1.5-1.5 4-2 8-2v-13c-4 0-6.5.5-8 2zM12 6.5v13"/></svg></span>
@@ -1578,73 +1491,7 @@ const APPEARANCE_OPTIONS = [
         </div>
         <div class="about-actions">
           <button class="btn" @click="$router.push('/manual')">{{ t('manual.title') }}</button>
-          <button class="btn" :disabled="checking" @click="doCheckUpdate()">
-            {{ checking ? t('update.checking') : t('update.check') }}
-          </button>
         </div>
-      </div>
-
-      <!-- 检查结果 -->
-      <div v-if="checkError" class="update-state error" role="alert">
-        <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M12 2a10 10 0 1 1 0 20 10 10 0 0 1 0-20zm0 2a8 8 0 1 0 0 16 8 8 0 0 0 0-16zm0 3a1 1 0 0 1 1 1v5a1 1 0 1 1-2 0V8a1 1 0 0 1 1-1zm0 8.5a1.25 1.25 0 1 1 0 2.5 1.25 1.25 0 0 1 0-2.5z"/></svg>
-        {{ checkError }}
-      </div>
-      <div v-else-if="checkedManually && !checking && updateInfo && !updateInfo.hasUpdate" class="update-state ok" role="status">
-        <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M12 2a10 10 0 1 1 0 20 10 10 0 0 1 0-20zm0 2a8 8 0 1 0 0 16 8 8 0 0 0 0-16zm4.2 5.3a1 1 0 0 1 0 1.4l-4.9 4.9a1 1 0 0 1-1.4 0l-2.1-2.1a1 1 0 1 1 1.4-1.4l1.4 1.4 4.2-4.2a1 1 0 0 1 1.4 0z"/></svg>
-        {{ t('update.latest') }}
-      </div>
-
-      <!-- 新版本卡片 -->
-      <div v-if="updateInfo?.hasUpdate" class="update-card">
-        <div class="update-head">
-          <span class="update-badge">{{ t('update.newVersion') }}</span>
-          <strong>v{{ updateInfo.version }}</strong>
-          <span class="update-date">{{ updateInfo.publishedAt }}</span>
-        </div>
-        <pre v-if="updateInfo.notes" class="update-notes">{{ updateInfo.notes }}</pre>
-        <div class="update-actions">
-          <template v-for="(d, i) in downloads.filter(x => x.recommended)" :key="d.url">
-            <button
-              class="btn btn-sm"
-              :class="{ 'btn-primary': i === 0 }"
-              :disabled="!!installing"
-              @click="downloadOption(d)"
-            >
-              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v11m0 0 4-4m-4 4-4-4M5 17v2a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-2"/></svg>
-              {{ d.label }} · {{ fmtSize(d.size) }}
-            </button>
-            <button class="copy-link-btn" :title="t('update.copyLinkTitle')" :aria-label="t('update.copyLinkTitle')" @click="doCopyLink(d.url)">
-              <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M8 5a3 3 0 0 1 3-3h8a3 3 0 0 1 3 3v8a3 3 0 0 1-3 3h-2v-2h2a1 1 0 0 0 1-1V5a1 1 0 0 0-1-1h-8a1 1 0 0 0-1 1v2H8V5zM2 11a3 3 0 0 1 3-3h8a3 3 0 0 1 3 3v8a3 3 0 0 1-3 3H5a3 3 0 0 1-3-3v-8zm3-1a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1v-8a1 1 0 0 0-1-1H5z"/></svg>
-            </button>
-          </template>
-          <a class="all-downloads" href="javascript:void 0" @click="download(updateInfo.pageUrl)">
-            {{ t('update.allPlatforms') }}
-          </a>
-        </div>
-        <div v-if="installing" class="install-progress">
-          {{ installing }}
-          <span v-if="settings.httpProxy" class="install-hint">{{ t('update.viaProxy', { proxy: settings.httpProxy }) }}</span>
-        </div>
-        <div v-else-if="installedPath && isAndroidApp" class="install-done" role="status">
-          <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M12 2a10 10 0 1 1 0 20 10 10 0 0 1 0-20zm0 2a8 8 0 1 0 0 16 8 8 0 0 0 0-16zm4.2 5.3a1 1 0 0 1 0 1.4l-4.9 4.9a1 1 0 0 1-1.4 0l-2.1-2.1a1 1 0 1 1 1.4-1.4l1.4 1.4 4.2-4.2a1 1 0 0 1 1.4 0z"/></svg>
-          <template v-if="needsInstallPermission">
-            {{ t('update.needInstallPermission') }}
-            <button class="btn btn-sm btn-primary" @click="openInstallPermission()">{{ t('update.allowInstall') }}</button>
-          </template>
-          <template v-else>
-            {{ t('update.readyToInstall') }}
-            <button class="btn btn-sm" @click="installDownloaded()">{{ t('update.install') }}</button>
-          </template>
-        </div>
-        <div v-else-if="installedPath" class="install-done">
-          <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M12 2a10 10 0 1 1 0 20 10 10 0 0 1 0-20zm0 2a8 8 0 1 0 0 16 8 8 0 0 0 0-16zm4.2 5.3a1 1 0 0 1 0 1.4l-4.9 4.9a1 1 0 0 1-1.4 0l-2.1-2.1a1 1 0 1 1 1.4-1.4l1.4 1.4 4.2-4.2a1 1 0 0 1 1.4 0z"/></svg>
-          {{ t('update.downloadedTo') }} <code>{{ installedPath }}</code>
-          <button class="btn btn-sm" @click="installDownloaded()">{{ t('update.openInstaller') }}</button>
-        </div>
-        <p v-else-if="canInAppInstall() && isAndroidApp" class="install-tip">{{ t('update.installTipAndroid') }}</p>
-        <p v-else-if="canInAppInstall()" class="install-tip">
-          {{ t('update.installTipMain') }}{{ settings.httpProxy ? t('update.installTipProxied') : t('update.installTipNoProxy') }}{{ t('update.installTipEnd') }}
-        </p>
       </div>
 
       <div class="star-callout">
@@ -1668,7 +1515,6 @@ const APPEARANCE_OPTIONS = [
         <p class="about-links">
           <a href="javascript:void 0" @click="download(REPO_URL)">{{ t('settings.repoLink') }}</a>
           <a href="javascript:void 0" @click="download(ISSUES_URL)">{{ t('settings.issuesLink') }}</a>
-          <a href="javascript:void 0" @click="download(RELEASES_URL)">{{ t('settings.releasesLink') }}</a>
         </p>
         <p class="muted">
           {{ t('settings.author') }}: 云中江树 ({{ t('settings.wechat') }}: 云中江树) · {{ t('settings.license') }}: GNU AGPL v3.0+

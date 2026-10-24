@@ -8,7 +8,11 @@ import { useRoute, useRouter } from 'vue-router'
 import { useLibrary } from '../stores/library'
 import { importFiles, type LazyImportFile } from '../services/importer'
 import { IMPORT_FORMATS, planFolderPick, type FolderPlan } from '../services/folderPick'
-import { canPickFolder, loadFolderFile, scanFromFileList, scanNativeFolder, useNativeFolderPicker, type FolderFile, type FolderScan } from '../services/folderSource'
+import { planFolderBooklists, type FolderBooklistGroup } from '../services/folderBooklists'
+import {
+  canPickFolder, droppedFileEntry, loadFolderFile, scanFromFileList, scanNativeFolder,
+  scanNativeFolderPath, useNativeFolderPicker, type FolderFile, type FolderScan,
+} from '../services/folderSource'
 import { importFromUrl } from '../services/urlImport'
 import { sendBookToDevices } from '../services/transfer'
 import { canConvertToEpub } from '../services/format'
@@ -25,7 +29,7 @@ import FolderPickDialog from '../components/FolderPickDialog.vue'
 import BooklistWantedPanel from '../components/BooklistWantedPanel.vue'
 import BooklistShareDialog from '../components/BooklistShareDialog.vue'
 import BooklistImportDialog from '../components/BooklistImportDialog.vue'
-import type { BookMeta } from '../storage'
+import { isTauri, type BookMeta } from '../storage'
 import { t } from '../i18n'
 import { useSettings } from '../stores/settings'
 
@@ -57,6 +61,7 @@ const importing = ref(false)
 const importState = ref({ done: 0, total: 0, current: '' })
 const showCloudUpload = ref(false)
 const cloudBookIds = ref<string[]>([])
+let stopNativeDrag: (() => void) | undefined
 
 function uploadBooks(ids: string[] = []) {
   cloudBookIds.value = ids
@@ -171,10 +176,12 @@ onMounted(() => {
   window.addEventListener('keydown', onGlobalKeydown)
   void refreshToday()
   stopReadingLog = onReadingLogChange(() => void refreshToday())
+  void listenForNativeDrop()
 })
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', onGlobalKeydown)
   stopReadingLog?.()
+  stopNativeDrag?.()
 })
 
 /** Esc 逐层关闭: 弹窗 → 导入菜单 → 管理模式 */
@@ -287,7 +294,12 @@ const folderInput = ref<HTMLInputElement>()
 /** 以触屏为主的设备: 文案不提「拖入」 */
 const touchPrimary = useMediaQuery(MQ.touch)
 const folderSupported = canPickFolder()
-const folderPick = ref<{ scanning: boolean; scan?: FolderScan; plan?: FolderPlan<FolderFile> } | null>(null)
+const folderPick = ref<{
+  scanning: boolean
+  scan?: FolderScan
+  plan?: FolderPlan<FolderFile>
+  booklistPlan?: FolderBooklistGroup<FolderFile>[]
+} | null>(null)
 
 async function chooseFolder() {
   importMenu.value = false
@@ -313,18 +325,133 @@ function showFolderPlan(scan: FolderScan) {
   const kind = pageKind.value
   // 藏书里已有同名文件的不再导入 (导入流程本身不做内容去重)
   const existing = library.books.filter(b => (b.kind ?? 'book') === kind).map(b => b.fileName)
-  folderPick.value = { scanning: false, scan, plan: planFolderPick(scan.entries, { formats: IMPORT_FORMATS, existingFileNames: existing }) }
+  const plan = planFolderPick(scan.entries, { formats: IMPORT_FORMATS, existingFileNames: existing })
+  folderPick.value = {
+    scanning: false,
+    scan,
+    plan,
+    booklistPlan: kind === 'book' ? planFolderBooklists(plan) : undefined,
+  }
 }
 
 function confirmFolderImport() {
-  const selected = folderPick.value?.plan?.selected ?? []
+  const pick = folderPick.value
   folderPick.value = null
-  if (selected.length) void handleFiles(selected.map(e => e.file ?? { name: e.name, load: () => loadFolderFile(e) }))
+  const hasCategorizedBooks = pick?.booklistPlan?.some(group => group.selected.length || group.existing.length)
+  if (pick?.plan && (pick.plan.selected.length || hasCategorizedBooks)) {
+    void handleFolderImport(pick.plan, pick.booklistPlan ?? [])
+  }
+}
+
+async function handleFolderImport(plan: FolderPlan<FolderFile>, booklists: FolderBooklistGroup<FolderFile>[]) {
+  if (importing.value) return
+  importing.value = true
+  try {
+    const selected = plan.selected
+    const results = await importFiles(
+      selected.map(entry => entry.file ?? { name: entry.name, load: () => loadFolderFile(entry) }),
+      '本地导入',
+      (done, total, current) => {
+        importState.value = { done, total, current }
+      },
+      { kind: 'book' },
+    )
+    await library.refresh()
+
+    const bookIdByPath = new Map<string, string>()
+    for (const [index, entry] of selected.entries()) {
+      const bookId = results[index]?.ok ? results[index].bookId : undefined
+      if (bookId) bookIdByPath.set(entry.path, bookId)
+    }
+    const existingByName = new Map<string, BookMeta>()
+    for (const book of library.books) {
+      if ((book.kind ?? 'book') !== 'book') continue
+      const key = book.fileName.normalize('NFKC').toLocaleLowerCase()
+      if (!existingByName.has(key)) existingByName.set(key, book)
+    }
+    for (const entry of plan.alreadyInLibrary) {
+      const book = existingByName.get(entry.name.normalize('NFKC').toLocaleLowerCase())
+      if (book) bookIdByPath.set(entry.path, book.id)
+    }
+
+    let touchedBooklists = 0
+    for (const group of booklists) {
+      const ids = [...new Set(
+        [...group.selected, ...group.existing]
+          .map(entry => bookIdByPath.get(entry.path))
+          .filter((id): id is string => !!id),
+      )]
+      if (!ids.length) continue
+      const normalized = group.name.normalize('NFKC').trim().toLocaleLowerCase()
+      const target = library.booklists.find(item =>
+        item.name.normalize('NFKC').trim().toLocaleLowerCase() === normalized)
+      const booklistId = target?.id ?? await library.createBooklist(group.name)
+      await library.addBooksToBooklist(booklistId, ids)
+      touchedBooklists++
+    }
+
+    const ids = [...new Set(
+      results.filter(result => result.ok && result.bookId).map(result => result.bookId!),
+    )]
+    if (ids.length) {
+      const suffix = touchedBooklists ? ` · ${t('folder.booklistsUpdated', { n: touchedBooklists })}` : ''
+      toast(`${t('library.importSuccess', { count: ids.length })}${suffix}`, 'success', touchedBooklists ? 6000 : 4000)
+    } else if (touchedBooklists) {
+      toast(t('folder.booklistsUpdated', { n: touchedBooklists }), 'success', 5000)
+    }
+    for (const result of results.filter(item => !item.ok)) {
+      toast(`${result.fileName}: ${result.error}`, 'error', 5000)
+    }
+  } catch (error: any) {
+    toast(error?.message ?? t('common.unknownError'), 'error', 6000)
+  } finally {
+    importing.value = false
+  }
 }
 
 function onDrop(e: DragEvent) {
   dragging.value = false
   if (e.dataTransfer?.files) handleFiles(e.dataTransfer.files)
+}
+
+async function listenForNativeDrop() {
+  if (!isTauri()) return
+  const { getCurrentWebview } = await import('@tauri-apps/api/webview')
+  stopNativeDrag = await getCurrentWebview().onDragDropEvent(event => {
+    if (event.payload.type === 'enter' || event.payload.type === 'over') {
+      dragging.value = true
+      return
+    }
+    if (event.payload.type === 'leave') {
+      dragging.value = false
+      return
+    }
+    dragging.value = false
+    void handleNativeDrop(event.payload.paths)
+  })
+}
+
+function baseName(path: string): string {
+  return path.replace(/[\\/]+$/, '').split(/[\\/]/).pop() || path
+}
+
+async function handleNativeDrop(paths: string[]) {
+  if (!paths.length || importing.value || paperMode.value) return
+  for (const path of paths) {
+    folderPick.value = {
+      scanning: true,
+      scan: { name: baseName(path), entries: [], truncated: false },
+    }
+    try {
+      const scan = await scanNativeFolderPath(path)
+      showFolderPlan(scan)
+      return
+    } catch {
+      folderPick.value = null
+    }
+  }
+  // 不是目录时保留原有单文件拖拽行为
+  await handleFiles(paths.map(droppedFileEntry))
 }
 
 function openBook(book: BookMeta) {
@@ -1383,6 +1510,8 @@ async function batchClearTags() {
       :scanning="folderPick.scanning"
       :scan="folderPick.scan"
       :plan="folderPick.plan"
+      :booklist-plan="folderPick.booklistPlan"
+      :existing-booklist-names="library.booklists.map(item => item.name)"
       @confirm="confirmFolderImport"
       @cancel="folderPick = null"
     />

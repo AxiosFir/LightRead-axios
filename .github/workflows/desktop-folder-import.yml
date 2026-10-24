@@ -1,0 +1,49 @@
+name: Windows Desktop
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - feat/folder-import-booklists
+
+permissions:
+  contents: read
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@1.87.0
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+          cache-targets: false
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify folder import planning
+        run: |
+          npm run test:folder-pick
+          npm run test:folder-booklists
+
+      - name: Build frontend
+        run: npm run build
+
+      - name: Build unsigned Windows installer
+        run: npm run tauri -- build --bundles nsis
+
+      - name: Upload Windows installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: LightRead-folder-import-windows
+          path: src-tauri/target/release/bundle/nsis/*.exe
+          if-no-files-found: error

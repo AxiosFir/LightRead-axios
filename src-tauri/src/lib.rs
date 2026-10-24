@@ -172,6 +172,7 @@ pub fn run() {
       edge_tts::edge_tts_synthesize,
       fonts::list_system_fonts,
       folder_scan::folder_scan,
+      folder_scan::folder_read_file,
       http_upload::http_upload,
       http_upload::http_upload_file,
       library_files::library_file_sha256,

@@ -2,6 +2,7 @@
 /** 选择文件夹后的确认: 找到几本、跳过了哪些重复格式, 确认后交给导入 / 上传流程 */
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import type { FolderPlan } from '../services/folderPick'
+import type { FolderBooklistGroup } from '../services/folderBooklists'
 import type { FolderFile, FolderScan } from '../services/folderSource'
 import { FOLDER_MAX_FILES } from '../services/folderSource'
 import { detectFormat, FORMAT_LABELS } from '../services/format'
@@ -12,6 +13,8 @@ const props = defineProps<{
   scanning?: boolean
   scan?: FolderScan
   plan?: FolderPlan<FolderFile>
+  booklistPlan?: FolderBooklistGroup<FolderFile>[]
+  existingBooklistNames?: string[]
   /** 上传的单本上限 (MB), 用于「超过 N MB」 */
   maxMb?: number
 }>()
@@ -21,6 +24,18 @@ const confirmBtn = ref<HTMLButtonElement>()
 let previousFocus: HTMLElement | null = null
 
 const count = computed(() => props.plan?.selected.length ?? 0)
+const categorizedExistingCount = computed(() =>
+  props.booklistPlan?.reduce((sum, group) => sum + group.existing.length, 0) ?? 0)
+const canConfirm = computed(() =>
+  count.value > 0 || (props.action === 'import' && categorizedExistingCount.value > 0))
+const PREVIEW_LIMIT = 200
+const previewSelected = computed(() => props.plan?.selected.slice(0, PREVIEW_LIMIT) ?? [])
+const hiddenSelected = computed(() => Math.max(0, count.value - previewSelected.value.length))
+const previewBooklists = computed(() => props.booklistPlan?.slice(0, PREVIEW_LIMIT) ?? [])
+const hiddenBooklists = computed(() => Math.max(0, (props.booklistPlan?.length ?? 0) - previewBooklists.value.length))
+const existingNames = computed(() =>
+  new Set((props.existingBooklistNames ?? []).map(name => name.normalize('NFKC').trim().toLocaleLowerCase())))
+const isExistingBooklist = (name: string) => existingNames.value.has(name.normalize('NFKC').trim().toLocaleLowerCase())
 const droppedCount = computed(() => props.plan?.skippedDuplicates.reduce((n, g) => n + g.dropped.length, 0) ?? 0)
 const summary = computed(() => {
   const plan = props.plan
@@ -58,13 +73,24 @@ onBeforeUnmount(() => previousFocus?.focus?.())
         <template v-else>
           <p class="folder-summary" role="status" aria-live="polite">{{ summary }}</p>
           <p v-if="scan?.truncated" class="folder-warn">{{ t('folder.truncated', { n: FOLDER_MAX_FILES }) }}</p>
-          <p v-if="!count" class="folder-muted">{{ t('folder.empty') }}</p>
+          <p v-if="!count && !categorizedExistingCount" class="folder-muted">{{ t('folder.empty') }}</p>
           <p v-if="droppedCount" class="folder-muted">{{ t('folder.rule') }}</p>
+          <details v-if="previewBooklists.length" class="folder-list folder-booklists">
+            <summary><svg class="folder-chevron" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M9.3 5.3a1 1 0 0 1 1.4 0l6 6a1 1 0 0 1 0 1.4l-6 6a1 1 0 1 1-1.4-1.4l5.29-5.3-5.3-5.3a1 1 0 0 1 0-1.4z"/></svg>{{ t('folder.booklists', { n: previewBooklists.length }) }}</summary>
+            <ul>
+              <li v-for="group in previewBooklists" :key="group.name">
+                <span class="folder-path"><strong>{{ group.name }}</strong><small>{{ t('folder.booklistBooks', { n: group.selected.length + group.existing.length }) }}</small></span>
+                <span class="tag">{{ t(isExistingBooklist(group.name) ? 'folder.booklistMerge' : 'folder.booklistNew') }}</span>
+              </li>
+            </ul>
+            <p v-if="hiddenBooklists" class="folder-more">{{ t('folder.previewLimited', { n: hiddenBooklists }) }}</p>
+          </details>
           <details v-if="count" class="folder-list folder-selected">
             <summary><svg class="folder-chevron" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M9.3 5.3a1 1 0 0 1 1.4 0l6 6a1 1 0 0 1 0 1.4l-6 6a1 1 0 1 1-1.4-1.4l5.29-5.3-5.3-5.3a1 1 0 0 1 0-1.4z"/></svg>{{ t('folder.listSelected', { n: count }) }}</summary>
             <ul>
-              <li v-for="entry in plan.selected" :key="entry.path"><span class="folder-path">{{ entry.path }}</span><span class="tag">{{ formatOf(entry) }}</span></li>
+              <li v-for="entry in previewSelected" :key="entry.path"><span class="folder-path">{{ entry.path }}</span><span class="tag">{{ formatOf(entry) }}</span></li>
             </ul>
+            <p v-if="hiddenSelected" class="folder-more">{{ t('folder.previewLimited', { n: hiddenSelected }) }}</p>
           </details>
           <details v-if="plan.skippedDuplicates.length" class="folder-list folder-duplicates">
             <summary><svg class="folder-chevron" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M9.3 5.3a1 1 0 0 1 1.4 0l6 6a1 1 0 0 1 0 1.4l-6 6a1 1 0 1 1-1.4-1.4l5.29-5.3-5.3-5.3a1 1 0 0 1 0-1.4z"/></svg>{{ t('folder.listDuplicates', { n: droppedCount }) }}</summary>
@@ -85,8 +111,10 @@ onBeforeUnmount(() => previousFocus?.focus?.())
         </template>
         <div class="folder-actions">
           <button class="btn btn-sm" @click="emit('cancel')">{{ t('common.cancel') }}</button>
-          <button ref="confirmBtn" class="btn btn-sm btn-primary folder-confirm" :disabled="scanning || !count" @click="emit('confirm')">
-            {{ t(action === 'upload' ? 'folder.upload' : 'folder.import', { n: count }) }}
+          <button ref="confirmBtn" class="btn btn-sm btn-primary folder-confirm" :disabled="scanning || !canConfirm" @click="emit('confirm')">
+            {{ count
+              ? t(action === 'upload' ? 'folder.upload' : 'folder.import', { n: count })
+              : t('folder.assignExisting', { n: categorizedExistingCount }) }}
           </button>
         </div>
       </section>
@@ -113,6 +141,7 @@ onBeforeUnmount(() => previousFocus?.focus?.())
 .folder-path strong { display: block; font-weight: 500; }
 .folder-path small, .folder-list li > small { display: block; margin-top: 2px; color: var(--text-3); font-size: 12px; }
 .folder-list li > small { margin: 0; flex-shrink: 0; }
+.folder-more { margin: 0; padding: 8px 12px 10px; border-top: 1px solid var(--border); color: var(--text-3); font-size: 12px; }
 .folder-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
 @media (max-width: 600px) {
   .folder-actions .btn { flex: 1; min-height: 44px; }

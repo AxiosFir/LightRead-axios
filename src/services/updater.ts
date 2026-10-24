@@ -13,10 +13,12 @@ import { fetchRemote, remoteProxy } from './net'
 import { t } from '../i18n'
 import { toast } from './toast'
 
+/** 旧版自动更新协议仍保留在源码中, 但桌面 UI 已不再调用；内部路径保持上游格式以兼容已有测试。 */
 const REPO = 'yzfly/LightRead'
+const PROJECT_REPO = 'AxiosFir/LightRead-axios'
 export const RELEASES_URL = `https://github.com/${REPO}/releases`
-export const REPO_URL = `https://github.com/${REPO}`
-export const ISSUES_URL = `https://github.com/${REPO}/issues`
+export const REPO_URL = `https://github.com/${PROJECT_REPO}`
+export const ISSUES_URL = `https://github.com/${PROJECT_REPO}/issues`
 
 /** GitCode 镜像: 由 .github/workflows/mirror-gitcode.yml 在 GitHub Release 公开后同步并逐个回下载校验 */
 const MIRROR_REPO = 'langgpt/LightRead'

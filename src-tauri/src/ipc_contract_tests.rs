@@ -23,6 +23,7 @@ fn app() -> WebviewWindow<MockRuntime> {
       library_files::library_migrate,
       crate::http_upload::http_upload_file,
       crate::folder_scan::folder_scan,
+      crate::folder_scan::folder_read_file,
       crate::comic::comic_cbr_cache,
       crate::txt_epub::txt_epub_cache,
       crate::epub_meta::epub_metadata,
@@ -220,7 +221,7 @@ fn folder_scan_matches_frontend_payload() {
   }
   let w = app();
   let r = json_of(call(&w, "folder_scan", json!({
-    "root": base.to_str().unwrap(), "maxFiles": 5000, "maxDepth": 8, "skipDirs": ["__macosx", "@eadir"],
+    "root": base.to_str().unwrap(), "maxFiles": 20000, "maxDepth": 32, "skipDirs": ["__macosx", "@eadir"],
   })));
   assert_eq!(r["truncated"], json!(false));
   let entries = r["entries"].as_array().unwrap();
@@ -229,6 +230,13 @@ fn folder_scan_matches_frontend_payload() {
   assert_eq!(entries[0]["size"], json!(3));
   assert!(entries[0]["absPath"].as_str().unwrap().ends_with("a.epub"));
   assert!(entries[0]["lastModified"].is_u64());
+  let bytes = call(&w, "folder_read_file", json!({
+    "root": base.to_str().unwrap(), "relPath": "书/a.epub",
+  })).expect("folder_read_file failed");
+  assert_eq!(bytes.deserialize::<Vec<u8>>().unwrap(), b"abc");
+  assert!(call(&w, "folder_read_file", json!({
+    "root": base.to_str().unwrap(), "relPath": "../outside.epub",
+  })).is_err());
   assert!(call(&w, "folder_scan", json!({ "root": "relative", "maxFiles": 1, "maxDepth": 1, "skipDirs": [] })).is_err());
   std::fs::remove_dir_all(&base).unwrap();
 }

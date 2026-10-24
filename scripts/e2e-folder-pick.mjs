@@ -37,6 +37,9 @@ writeTree(importDir, {
   'other (1).epub': epub('另一本书'),
   '.hidden.epub': epub('隐藏的书'),
   'notes.txt': Buffer.from('读书笔记\n\n第一段文字。'),
+  '科幻/刘慈欣/三体.epub': epub('三体'),
+  '科幻/刘慈欣/三体.pdf': junk('%PDF-1.4'),
+  '历史/史记.epub': epub('史记'),
   '分卷/卷1.epub': epub('分卷 卷1'),
   '分卷/卷2.epub': epub('分卷 卷2'),
   'sub/cover.jpg': junk('JPEG'),
@@ -83,30 +86,45 @@ try {
   await page.locator('header input[data-folder-input]').setInputFiles(importDir)
   await folderDialog.waitFor()
   assert.equal(await folderDialog.locator('.folder-name').innerText(), '我的书')
-  assert.equal(await folderDialog.locator('.folder-summary').innerText(), '找到 5 本书（另有 2 个重复格式已跳过、1 个不支持的文件）')
-  await folderDialog.getByText('将添加的书（5）').click()
+  assert.match(await folderDialog.locator('.folder-summary').innerText(), /找到 7 本书.*3 个重复格式已跳过.*1 个不支持的文件/)
+  const proposedBooklists = await folderDialog.locator('.folder-booklists .folder-path strong').allTextContents()
+  assert.ok(proposedBooklists.includes('科幻-刘慈欣'), `missing nested category: ${proposedBooklists.join(', ')}`)
+  assert.ok(proposedBooklists.includes('历史'), `missing first-level category: ${proposedBooklists.join(', ')}`)
+  await folderDialog.getByText('将添加的书（7）').click()
   assert.deepEqual(await folderDialog.locator('.folder-selected .folder-path').allInnerTexts(),
-    ['book.epub', 'notes.txt', 'other (1).epub', '分卷/卷1.epub', '分卷/卷2.epub'])
-  await folderDialog.getByText('跳过的重复格式（2）').click()
-  assert.equal(await folderDialog.locator('.folder-duplicates strong').innerText(), 'book.epub')
-  assert.equal(await folderDialog.locator('.folder-duplicates small').innerText(), '跳过：book.mobi、sub/book.pdf')
+    ['book.epub', 'notes.txt', 'other (1).epub', '分卷/卷1.epub', '分卷/卷2.epub', '历史/史记.epub', '科幻/刘慈欣/三体.epub'])
+  await folderDialog.getByText('跳过的重复格式（3）').click()
+  const duplicateGroups = await folderDialog.locator('.folder-duplicates .folder-group').allInnerTexts()
+  assert.ok(duplicateGroups.some(text => text.includes('book.epub') && text.includes('book.mobi') && text.includes('sub/book.pdf')))
+  assert.ok(duplicateGroups.some(text => text.includes('科幻/刘慈欣/三体.epub') && text.includes('科幻/刘慈欣/三体.pdf')))
   await page.screenshot({ path: `${tmp}/import-summary.png` })
-  await folderDialog.getByRole('button', { name: '添加 5 本', exact: true }).click()
-  await page.waitForFunction(() => document.querySelectorAll('.book-card').length === 5, null, { timeout: 45_000 })
+  await folderDialog.getByRole('button', { name: '添加 7 本', exact: true }).click()
+  await page.waitForFunction(() => document.querySelectorAll('.book-card').length === 7, null, { timeout: 45_000 })
   const titles = (await page.locator('.book-card').allInnerTexts()).join('\n')
-  for (const title of ['目录书 EPUB', '另一本书', '分卷 卷1', '分卷 卷2']) assert.ok(titles.includes(title), `missing ${title}`)
+  for (const title of ['目录书 EPUB', '另一本书', '三体', '史记', '分卷 卷1', '分卷 卷2']) assert.ok(titles.includes(title), `missing ${title}`)
   assert.ok(!titles.includes('隐藏的书'), 'hidden files must not be imported')
-  console.log('PASS folder import: format dedupe, hidden/unsupported filtering, volumes kept, 5 books imported')
+  const sciFiList = page.locator('.booklist-chip', { hasText: '科幻-刘慈欣' })
+  await sciFiList.waitFor()
+  await sciFiList.click()
+  await page.waitForFunction(() => document.querySelectorAll('.book-card').length === 1)
+  assert.match(await page.locator('.book-card').innerText(), /三体/)
+  console.log('PASS folder import: nested categories become booklists, format dedupe and filtering remain intact')
 
   // 再选一次同一个文件夹: 已在藏书里的不重复导入
   await page.locator('header input[data-folder-input]').setInputFiles(importDir)
   await folderDialog.waitFor()
-  assert.equal(await folderDialog.locator('.folder-summary').innerText(), '找到 0 本书（另有 2 个重复格式已跳过、1 个不支持的文件、5 本已在藏书中）')
-  assert.equal(await folderDialog.getByRole('button', { name: '添加 0 本', exact: true }).isDisabled(), true)
-  await folderDialog.getByRole('button', { name: '取消', exact: true }).click()
+  assert.match(await folderDialog.locator('.folder-summary').innerText(), /找到 0 本书.*3 个重复格式已跳过.*1 个不支持的文件.*7 本已在藏书中/)
+  await folderDialog.getByRole('button', { name: /归入书单/ }).click()
   await folderDialog.waitFor({ state: 'detached' })
-  assert.equal(await page.locator('.book-card').count(), 5)
-  console.log('PASS re-picking the same folder skips books already in the library')
+  assert.equal(await page.locator('.book-card').count(), 1)
+  console.log('PASS re-picking an imported folder can still apply its booklist structure without duplicating books')
+
+  // 桌面更新入口已移除, 不再展示版本检查或更新卡片
+  await page.goto(`${base}/#/settings`, { waitUntil: 'networkidle' })
+  await page.locator('.app-name').waitFor()
+  assert.equal(await page.getByRole('button', { name: '检查更新', exact: true }).count(), 0)
+  assert.equal(await page.locator('.update-card').count(), 0)
+  console.log('PASS desktop update checks and update card are absent')
 
   // 上传到私人书库
   await page.goto(`${base}/#/catalogs`, { waitUntil: 'networkidle' })

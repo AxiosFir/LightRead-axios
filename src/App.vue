@@ -2,7 +2,7 @@
 import { pingUsage } from './services/usageStats'
 import { localPack, localTtsAvailable, refreshLocalPack } from './services/localTts'
 import { useRoute, useRouter } from 'vue-router'
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, watch } from 'vue'
 import ToastHost from './components/ToastHost.vue'
 import ConfirmHost from './components/ConfirmHost.vue'
 import BabeldocTaskStatus from './components/BabeldocTaskStatus.vue'
@@ -16,17 +16,6 @@ import { startExternalOpen } from './services/externalOpen'
 import { toast } from './services/toast'
 import { requestAutoSync, startAutoSync } from './services/sync'
 import { startTransferPolling, transferState } from './services/transfer'
-import {
-  canInAppInstall,
-  downloadErrorMessage,
-  downloadInstaller,
-  installWithPrompt,
-  openDownload,
-  pickRecommendedDownload,
-  watchPendingInstall,
-  watchUpdateAvailability,
-  type UpdateInfo,
-} from './services/updater'
 
 const settings = useSettings()
 onBeforeUnmount(watchReadingViewport())
@@ -38,78 +27,8 @@ let stopExternalOpen: (() => void) | undefined
 let stopSync: (() => void) | undefined
 let stopTransfer: (() => void) | undefined
 let stopTransferWatch: (() => void) | undefined
-let stopUpdateChecks: (() => void) | undefined
-let stopPendingInstall: (() => void) | undefined
-
-const updateInfo = ref<UpdateInfo | null>(null)
-const updateBusy = ref(false)
-const updateProgress = ref<number | null>(null)
-const downloadedInstaller = ref('')
-const sidebarDownload = computed(() => {
-  return updateInfo.value ? pickRecommendedDownload(updateInfo.value.assets) : null
-})
-const showSidebarUpdate = computed(() => Boolean(updateInfo.value?.hasUpdate))
-const sidebarUpdateLabel = computed(() => {
-  if (updateBusy.value) {
-    return updateProgress.value == null
-      ? t('update.downloadingShort')
-      : `${Math.round(updateProgress.value * 100)}%`
-  }
-  return downloadedInstaller.value ? t('update.openShort') : t('update.action')
-})
-const sidebarUpdateTitle = computed(() => t(sidebarDownload.value ? 'update.sidebarTitle' : 'update.platformPendingTitle', {
-  version: updateInfo.value?.version ?? '',
-}))
-
-async function handleSidebarUpdate() {
-  if (updateBusy.value || !updateInfo.value) return
-
-  const download = sidebarDownload.value
-  if (!downloadedInstaller.value && (!download || !canInAppInstall())) {
-    try {
-      await openDownload(download?.url ?? updateInfo.value.pageUrl)
-      toast(t(download ? 'update.browserDownloadStarted' : 'update.platformPending'), download ? 'success' : 'info', 6000)
-    } catch {
-      toast(t('update.cannotOpenLink'), 'error')
-    }
-    return
-  }
-
-  if (!downloadedInstaller.value && download) {
-    updateBusy.value = true
-    updateProgress.value = null
-    try {
-      const encodedName = download.url.split('?')[0].split('/').pop() ?? 'LightRead-installer'
-      const fileName = decodeURIComponent(encodedName)
-      downloadedInstaller.value = await downloadInstaller(download.url, fileName, progress => {
-        updateProgress.value = progress.fraction
-      })
-    } catch (e) {
-      toast(downloadErrorMessage(e), 'error', 10_000, { label: t('update.retry'), run: () => { void handleSidebarUpdate() } })
-      return
-    } finally {
-      updateBusy.value = false
-      updateProgress.value = null
-    }
-  }
-
-  try {
-    await installWithPrompt(downloadedInstaller.value)
-  } catch (e: any) {
-    // 安装包不见了等: 下次点击重新下载
-    downloadedInstaller.value = ''
-    toast(e?.message || t('update.openFailed'), 'error', 6000)
-  }
-}
 
 onMounted(async () => {
-  stopUpdateChecks = watchUpdateAvailability(info => {
-    if (updateBusy.value) return
-    if (info.version !== updateInfo.value?.version) downloadedInstaller.value = ''
-    updateInfo.value = info
-  })
-  // 安卓: 去开「安装未知应用」回来后接着安装
-  stopPendingInstall = watchPendingInstall()
   if (isTauri()) stopExternalOpen = await startExternalOpen(router)
   // 多端同步: 启动一次、切到后台、每 5 分钟 (未开启自动同步时引擎自己跳过)
   stopSync = startAutoSync()
@@ -136,8 +55,6 @@ onBeforeUnmount(() => {
   stopSync?.()
   stopTransferWatch?.()
   stopTransfer?.()
-  stopUpdateChecks?.()
-  stopPendingInstall?.()
 })
 // 阅读页全屏沉浸, 隐藏侧栏
 const immersive = computed(() => String(route.path).startsWith('/read'))
@@ -204,46 +121,9 @@ const settingsNav = { path: '/settings', labelKey: 'nav.settings', icon: 'M9 3h6
             <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
               <path :d="settingsNav.icon" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
             </svg>
-            <!-- 手机底部标签栏没有更新按钮: 在「设置」图标上挂一个小圆点提示 -->
-            <span v-if="showSidebarUpdate" class="sidebar-settings-badge" aria-hidden="true" />
           </span>
           <span class="nav-label">{{ t(settingsNav.labelKey) }}</span>
         </router-link>
-        <button
-          v-if="showSidebarUpdate"
-          class="sidebar-update"
-          :class="{
-            downloading: updateBusy,
-            determinate: updateBusy && updateProgress != null,
-            ready: !updateBusy && !!downloadedInstaller,
-          }"
-          type="button"
-          :title="sidebarUpdateTitle"
-          :aria-label="sidebarUpdateTitle"
-          :aria-busy="updateBusy"
-          @click="handleSidebarUpdate"
-        >
-          <span class="sidebar-update-icon" aria-hidden="true">
-            <svg class="sidebar-update-ring" viewBox="0 0 24 24" width="24" height="24">
-              <circle class="ring-track" cx="12" cy="12" r="10.5" pathLength="100" />
-              <circle
-                class="ring-bar"
-                cx="12"
-                cy="12"
-                r="10.5"
-                pathLength="100"
-                :stroke-dashoffset="updateProgress == null ? 72 : 100 - Math.round(updateProgress * 100)"
-              />
-            </svg>
-            <svg class="sidebar-update-glyph" viewBox="0 0 24 24" width="15" height="15">
-              <path d="M12 4.5v10m0 0 4-4m-4 4-4-4M5.5 19.5h13" />
-            </svg>
-            <span class="sidebar-update-dot" />
-          </span>
-          <span class="sidebar-update-label" aria-hidden="true">
-            {{ sidebarUpdateLabel }}<span v-if="!updateBusy && !downloadedInstaller && updateInfo?.version" class="sidebar-update-version">v{{ updateInfo.version }}</span>
-          </span>
-        </button>
       </div>
     </aside>
     <main class="main">
@@ -375,7 +255,7 @@ const settingsNav = { path: '/settings', labelKey: 'nav.settings', icon: 'M9 3h6
   box-sizing: border-box;
   width: 100%;
   height: 40px;
-  padding-right: 48px;
+  padding-right: 12px;
   overflow: hidden;
 }
 .sidebar-settings-icon {
